@@ -1,0 +1,14 @@
+{
+  "name": "auvylen",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/web", "packages/contracts"],
+  "scripts": {
+    "dev": "npm run dev --workspace @auvylen/web",
+    "build": "npm run build --workspace @auvylen/web",
+    "lint": "npm run lint --workspace @auvylen/web",
+    "typecheck": "npm run typecheck --workspace @auvylen/web",
+    "test": "npm run test --workspace @auvylen/web"
+  },
+  "engines": {"node": ">=22.0.0"}
+}

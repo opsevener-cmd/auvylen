@@ -1,0 +1,140 @@
+name: Auvylen foundation, commercial and deployment checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  cloud-research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: python3 scripts/create-cloud-test-env.py
+      - run: docker compose --env-file .env.cloud.local -p auvylen-phase4a-test -f docker-compose.prod.yml -f docker-compose.cloud.yml -f docker-compose.cloud.local.yml --profile research build
+      - run: docker compose --env-file .env.cloud.local -p auvylen-phase4a-test -f docker-compose.prod.yml -f docker-compose.cloud.yml -f docker-compose.cloud.local.yml --profile research up -d --wait
+      - run: npm ci
+      - run: npm exec --workspace @auvylen/web -- playwright install --with-deps chromium
+      - run: npm exec --workspace @auvylen/web -- playwright test --config playwright.cloud.config.ts
+      - if: always()
+        run: docker compose --env-file .env.cloud.local -p auvylen-phase4a-test -f docker-compose.prod.yml -f docker-compose.cloud.yml -f docker-compose.cloud.local.yml --profile research down
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      REDEMPTION_CODE_PEPPER: ci-testing-only-secret-not-for-deployment
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: aevyra
+          POSTGRES_PASSWORD: aevyra_dev_only
+          POSTGRES_DB: aevyra
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aevyra -d aevyra"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run alembic -c services/api/alembic.ini upgrade head
+      - run: uv run pytest --integration
+      - run: uv run alembic -c services/api/alembic.ini check
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm exec --workspace @auvylen/web -- next typegen
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+  commercial-browser:
+    runs-on: ubuntu-latest
+    env:
+      REDEMPTION_CODE_PEPPER: ci-testing-only-secret-not-for-deployment
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: aevyra
+          POSTGRES_PASSWORD: aevyra_dev_only
+          POSTGRES_DB: aevyra
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aevyra -d aevyra"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: uv sync --locked
+      - run: npm ci
+      - run: uv run alembic -c services/api/alembic.ini upgrade head
+      - run: npm run build
+      - run: npm exec --workspace @auvylen/web -- playwright install --with-deps chromium
+      - run: npm run test:e2e --workspace @auvylen/web
+  deployment:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: aevyra-phase2
+      COMPOSE_FILE: docker-compose.prod.yml:docker-compose.prod.local.yml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import secrets
+          password = secrets.token_hex(32)
+          text = Path('.env.production.example').read_text()
+          text = text.replace('your-domain.example', 'localhost')
+          text = text.replace('POSTGRES_PASSWORD=\n', f'POSTGRES_PASSWORD={password}\n')
+          text = text.replace('DATABASE_URL=\n', f'DATABASE_URL=postgresql+psycopg://aevyra:{password}@postgres:5432/aevyra\n')
+          text = text.replace('REPLACE_WITH_SECURE_RANDOM_SECRET', secrets.token_hex(48))
+          text = text.replace('CORS_ORIGINS=[]', 'CORS_ORIGINS=["https://localhost:8443"]')
+          Path('.env.production.local').write_text(text)
+          PY
+      - run: docker compose --env-file .env.production.local build
+      - run: docker compose --env-file .env.production.local up -d --wait postgres redis
+      - run: docker compose --env-file .env.production.local run --rm --no-deps api alembic -c services/api/alembic.ini upgrade head
+      - run: docker compose --env-file .env.production.local run --rm --no-deps api alembic -c services/api/alembic.ini check
+      - run: docker compose --env-file .env.production.local up -d --wait
+      - run: npm ci
+      - run: npm exec --workspace @auvylen/web -- playwright install --with-deps chromium
+      - run: npm exec --workspace @auvylen/web -- playwright test --config playwright.deployment.config.ts
+        env:
+          AEVYRA_TEST_MODE: production
+      - run: |
+          sed -i 's/APP_ENV=production/APP_ENV=staging/' .env.production.local
+          docker compose --env-file .env.production.local up -d --wait
+      - run: npm exec --workspace @auvylen/web -- playwright test --config playwright.deployment.config.ts
+      - if: always()
+        run: docker compose --env-file .env.production.local down

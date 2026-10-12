@@ -1,0 +1,51 @@
+{
+    auto_https off
+    admin localhost:2019
+}
+
+:80 {
+    map {$PUBLIC_BASE_URL} {pilot_host} {
+        ~^https://([^/]+)$ ${1}
+    }
+    encode gzip zstd
+    request_body {
+        max_size 1MB
+    }
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        X-Frame-Options DENY
+        X-Robots-Tag "noindex, nofollow"
+    }
+    @private path /.env* /.git* /exports* /backups* /services* /infra* /docker-compose* /AGENTS.md /README.md *.map
+    handle @private {
+        respond 404
+    }
+    @account_api path /health /ready /api/v1/auth/* /api/v1/account /api/v1/redeem /api/v1/credit-products /api/v1/credit-analyses /api/v1/credit-analyses/*
+    handle @account_api {
+        reverse_proxy api:8000 {
+            # Configuration, not tunnel-supplied headers, establishes our origin.
+            header_up Host {pilot_host}
+            header_up X-Forwarded-Host {pilot_host}
+            header_up X-Forwarded-Proto https
+            header_up -X-Forwarded-For
+            header_up -X-Real-IP
+            header_up -Forwarded
+        }
+    }
+    @other_api path /api /api/* /docs /openapi.json /redoc
+    handle @other_api {
+        respond 404
+    }
+    handle {
+        reverse_proxy web:3000 {
+            header_up Host {pilot_host}
+            header_up X-Forwarded-Host {pilot_host}
+            header_up X-Forwarded-Proto https
+            header_up -X-Forwarded-For
+            header_up -X-Real-IP
+            header_up -Forwarded
+        }
+    }
+}

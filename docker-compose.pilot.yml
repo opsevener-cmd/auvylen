@@ -1,0 +1,20 @@
+# Always combine with docker-compose.prod.yml, never the development Compose file.
+services:
+  web:
+    environment:
+      APP_ENV: staging
+      PUBLIC_PILOT: "true"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set the canonical public HTTPS origin}
+  api:
+    environment:
+      APP_ENV: staging
+      PUBLIC_PILOT: "true"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set the canonical public HTTPS origin}
+      CORS_ORIGINS: "[]"
+  proxy:
+    environment:
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set the canonical public HTTPS origin}
+    ports: !override
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./infra/caddy/Caddyfile.pilot:/etc/caddy/Caddyfile:ro

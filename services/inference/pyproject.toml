@@ -1,0 +1,15 @@
+[project]
+name = "auvylen-inference"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["auvylen-contracts"]
+
+[tool.uv.sources]
+auvylen-contracts = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aevyra_inference"]

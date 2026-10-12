@@ -1,0 +1,106 @@
+name: aevyra-prod
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+services:
+  web:
+    image: auvylen-web:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      API_URL: ${API_URL:-http://api:8000}
+    restart: unless-stopped
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    networks: [app]
+    depends_on:
+      api: {condition: service_healthy}
+  api:
+    image: auvylen-api:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL explicitly}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL explicitly}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS explicitly, e.g. []}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      REDEMPTION_CODE_PEPPER: ${REDEMPTION_CODE_PEPPER:?Set and securely back up REDEMPTION_CODE_PEPPER}
+      SESSION_COOKIE_SECURE: "true"
+      SESSION_LIFETIME_SECONDS: ${SESSION_LIFETIME_SECONDS:-86400}
+    restart: unless-stopped
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    networks: [app, data]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aevyra}
+      POSTGRES_DB: ${POSTGRES_DB:-aevyra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong POSTGRES_PASSWORD}
+    volumes: [postgres_data:/var/lib/postgresql]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    networks: [data]
+  redis:
+    image: redis:8-alpine
+    # No business state or queue exists yet: intentionally disposable cache.
+    command: [redis-server, --save, "", --appendonly, "no", --maxmemory, 128mb, --maxmemory-policy, allkeys-lru]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    networks: [data]
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      AEVYRA_DOMAIN: ${AEVYRA_DOMAIN:?Set the public hostname without a scheme or path}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./infra/caddy/routes.caddy:/etc/caddy/routes.caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:2019/config/]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    networks: [app]
+    depends_on:
+      api: {condition: service_healthy}
+      web: {condition: service_healthy}
+networks:
+  app:
+  data:
+    internal: true
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,10 @@
+{
+	admin localhost:2019
+}
+{$AEVYRA_DOMAIN} {
+	import /etc/caddy/routes.caddy
+}
+http://{$AEVYRA_DOMAIN} {
+	header -Server
+	redir https://{$AEVYRA_DOMAIN}{uri} permanent
+}

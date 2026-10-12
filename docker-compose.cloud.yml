@@ -1,0 +1,82 @@
+# Layer onto docker-compose.prod.yml. No host paths or tunnel dependence.
+x-cloud-environment: &cloud-environment
+  APP_ENV: ${APP_ENV:-production}
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+  REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+  CORS_ORIGINS: ${CORS_ORIGINS:?Set exact HTTPS origins}
+  REDEMPTION_CODE_PEPPER: ${REDEMPTION_CODE_PEPPER:?Set and back up pepper}
+  SESSION_COOKIE_SECURE: "true"
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  PAYMENT_PROVIDER: mock
+  MOCK_CHECKOUT_ENABLED: "false"
+  RESEARCH_MODE: ${RESEARCH_MODE:-false}
+  SHARED_PROXY_RATE_LIMITS: "true"
+  ENABLED_MODEL_PROVIDERS: ${ENABLED_MODEL_PROVIDERS:-[]}
+  PRIVATE_UPLOAD_ROOT: /var/lib/auvylen/uploads
+  PRIVATE_MODEL_ROOT: /var/lib/auvylen/models
+services:
+  postgres:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+  proxy:
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+  web:
+    environment:
+      MOCK_CHECKOUT_ENABLED: "false"
+  api:
+    environment: *cloud-environment
+    volumes:
+      - private_uploads:/var/lib/auvylen/uploads
+      - private_models:/var/lib/auvylen/models:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  migrate:
+    image: auvylen-api:${IMAGE_TAG:-local}
+    environment:
+      <<: *cloud-environment
+      APPLY_MIGRATIONS: ${APPLY_MIGRATIONS:-false}
+    command: [python, -m, aevyra_api.migrate]
+    healthcheck: {disable: true}
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [data]
+    depends_on:
+      postgres: {condition: service_healthy}
+  worker:
+    image: auvylen-api:${IMAGE_TAG:-local}
+    profiles: [research]
+    environment:
+      <<: *cloud-environment
+      WORKER_QUEUE: cpu
+    command: [python, -m, aevyra_api.research.worker]
+    volumes:
+      - private_uploads:/var/lib/auvylen/uploads:ro
+      - private_models:/var/lib/auvylen/models
+    healthcheck:
+      test: [CMD, python, -c, "import time; from pathlib import Path; p=Path('/tmp/auvylen-worker-heartbeat'); assert p.exists() and time.time()-p.stat().st_mtime < 30"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    restart: unless-stopped
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    networks: [data]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    mem_limit: 512m
+    cpus: 1.0
+  redis:
+    image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, 256mb, --maxmemory-policy, noeviction]
+    volumes: [redis_data:/data]
+volumes:
+  private_uploads:
+  private_models:
+  redis_data:

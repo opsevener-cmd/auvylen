@@ -1,0 +1,17 @@
+encode zstd gzip
+request_body {
+	max_size 1MB
+}
+header {
+	-Server
+	X-Content-Type-Options nosniff
+	Referrer-Policy strict-origin-when-cross-origin
+	X-Frame-Options DENY
+}
+@api path /api /api/* /health /ready
+handle @api {
+	reverse_proxy api:8000
+}
+handle {
+	reverse_proxy web:3000
+}
