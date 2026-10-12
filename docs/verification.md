@@ -217,3 +217,18 @@ been refreshed. Full checks are prepared for the remote environment in
 [cloud-development.md](cloud-development.md). See
 [recovery-cloud-transition.md](recovery-cloud-transition.md) for measured resource
 usage, file changes, preserved data and the exact cloud-access blocker.
+
+
+## 2026-10-12 — remote Linux Phase 4B dataset increment
+
+Fresh verification in the managed Debian 13 cloud environment: baseline 117 backend/
+infrastructure, 27 frontend and two development browser tests passed before implementation.
+Final increment: 134 backend/infrastructure tests, 30 frontend tests, three development
+browser tests and two HTTPS cloud tests passed. Ruff, formatting, mypy, ESLint, TypeScript,
+host/production Docker builds and migration drift checks passed. All six cloud services
+reached healthy state. Private images and annotations survived API/worker recreation;
+worker deletion removed the files. Existing financial/research regressions remain passing.
+
+See [Phase 4B progress](phase4b-progress.md) for limits, cloud portability fixes, exact
+verification scope and remaining work. Real training, checkpoints and custom predictions
+are not implemented or claimed by this milestone. No public deployment took place.

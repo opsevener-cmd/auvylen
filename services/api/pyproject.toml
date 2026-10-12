@@ -3,9 +3,17 @@ name = "auvylen-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic-settings>=2.9,<3",
-  "sqlalchemy>=2.0,<3", "psycopg[binary]>=3.2,<4", "alembic>=1.15,<2",
-  "redis>=6,<9", "argon2-cffi>=25.1,<26", "auvylen-contracts", "auvylen-inference"
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "pydantic-settings>=2.9,<3",
+  "sqlalchemy>=2.0,<3",
+  "psycopg[binary]>=3.2,<4",
+  "alembic>=1.15,<2",
+  "redis>=6,<9",
+  "argon2-cffi>=25.1,<26",
+  "auvylen-contracts",
+  "auvylen-inference",
+  "pillow>=12,<13",
 ]
 
 [tool.uv.sources]

@@ -43,7 +43,16 @@ export async function accountRequest<T>(path: string, schema: z.ZodType<T>, body
       409: path === "/auth/register" ? "Account could not be created with this identifier." : "Insufficient Credits or conflicting request.",
       422: "Check the fields and try again.", 429: "Too many attempts. Please try again later.",
     };
-    throw new AccountError(response.status, messages[response.status] ?? "Service temporarily unavailable.");
+    const preferenceMessages: Record<number, string> = {
+      403: "Research access or request verification required.",
+      404: "Dataset or image is unavailable, expired or deleted.",
+      409: "This dataset is archived, the image is excluded, or deletion is pending.",
+      413: "Image upload exceeds the size limit.",
+      422: "Check consent, image format, dimensions and rating scale.",
+      429: "Upload capacity, request rate or private storage quota reached. Try again later.",
+    };
+    throw new AccountError(response.status, (path.startsWith("/research/preferences") ? preferenceMessages[response.status] : undefined)
+      ?? messages[response.status] ?? "Service temporarily unavailable.");
   }
   return schema.parse(await response.json());
 }

@@ -155,3 +155,32 @@ no GPU account is authorized. Image storage scales with compressed originals plu
 thumbnails; 1,000 images averaging 3 MiB use about 3 GiB before derivatives/backups.
 Embedding storage depends on dimension, dtype and image count. Dataset/checkpoint
 quotas and retention must be explicit before real ingestion.
+
+## 6. Verified cloud continuation (2026-10-12)
+
+See [the Phase 4B progress report](phase4b-progress.md) for the fresh cloud verification
+and first dataset/annotation implementation. The baseline dependency setup, application
+health, regression suites and production builds were executed on managed Linux. The
+repository now includes additive migration `0005_preferences`; always upgrade/check
+before running the updated API or worker.
+
+For environments with an installed Chromium and a blocked Playwright CDN, use
+`PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium`. The new browser test uses
+`E2E_RESEARCH=true` and isolated test images in ignored `private-data/e2e-uploads`.
+This does not enable a public preview.
+
+Managed proxy builds can mount the existing trusted combined CA as a BuildKit secret:
+
+```sh
+docker build --secret id=proxy_ca,src=/etc/ssl/certs/ca-certificates.crt -f services/api/Dockerfile -t auvylen-api:phase4b .
+docker build --secret id=proxy_ca,src=/etc/ssl/certs/ca-certificates.crt -f apps/web/Dockerfile -t auvylen-web:phase4b .
+```
+
+Use the matching `IMAGE_TAG=phase4b` in the isolated cloud test environment file. The CA
+mount is optional outside a managed proxy. It is not copied into runtime layers. Keep
+the private upload volume writable in the worker for retryable retention/deletion.
+
+Compose explicitly excludes only container-local and internal service names from outbound
+proxying. Managed proxy variables remain intact for external traffic. BusyBox health
+checks disable proxying only for their fixed `127.0.0.1` target. This prevents false 403
+responses from sending Caddy/Next.js internal requests to the cloud egress proxy.

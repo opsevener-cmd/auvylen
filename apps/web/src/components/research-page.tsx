@@ -39,6 +39,7 @@ export function ResearchPage() {
   return <section className="max-w-2xl">
     <h1 className="text-3xl font-medium">Research workspace</h1>
     <p className="mt-5">Authorized, non-commercial testing. Research jobs do not deduct Credits.</p>
+    <p className="mt-3"><Link href="/research/preferences" className="underline">Manage personal preference datasets</Link></p>
     <p className="mt-3">Only Synthetic / Development Analysis is runnable. No real facial model or training algorithm is installed.</p>
     {error && <p role="alert" className="mt-5">{error} <Link href="/login" className="underline">Sign in</Link></p>}
     {status && !status.authorized && <p className="mt-5">Research is disabled or operator authorization is required.</p>}
@@ -53,6 +54,14 @@ export function ResearchPage() {
     {job && <div className="mt-8 rounded-lg border border-black/10 p-5"><p>Research status: {job.status}</p>
       {score.success && <><p className="mt-4 text-2xl">Synthetic score: {score.data.display_score.toFixed(1)}</p><p>Raw score: {score.data.raw_score}</p><p>Engine: {score.data.engine} · Version: {score.data.version}</p></>}
       {job.failure_reason && <p>{job.failure_reason}</p>}
+      {["QUEUED", "RUNNING"].includes(job.status) && <button className="underline mt-3" disabled={busy} onClick={async () => {
+        setBusy(true); setError("");
+        try {
+          const cancelled = await accountRequest(`/research/jobs/${job.id}/cancel`, researchJobSchema, {});
+          setJob(cancelled); setJobs(jobs => jobs.map(item => item.id === cancelled.id ? cancelled : item));
+        } catch (error) {setError(error instanceof Error ? error.message : "Cancellation unavailable.");}
+        finally {setBusy(false);}
+      }}>Cancel research job</button>}
     </div>}
     <h2 className="mt-10 text-xl">Model availability</h2>
     <ul className="mt-4 space-y-2">{status?.providers.map(provider => <li key={provider.slug}>{provider.display_name}: {provider.available ? "Adapter available; image inference not integrated" : "Unavailable"}</li>)}</ul>

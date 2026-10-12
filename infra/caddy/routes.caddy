@@ -1,5 +1,10 @@
 encode zstd gzip
-request_body {
+@preference_upload path /api/v1/research/preferences/datasets/*/images
+request_body @preference_upload {
+	max_size 6MB
+}
+@other_requests not path /api/v1/research/preferences/datasets/*/images
+request_body @other_requests {
 	max_size 1MB
 }
 header {

@@ -123,6 +123,49 @@ class ResearchQueue:
                 job.lease_until = now() + timedelta(seconds=self.settings.job_lease_seconds)
                 return JobLease(job.id, job.user_id, job.provider, job.kind, job.lease_token)
 
+    def renew(self, lease: JobLease) -> bool:
+        """Extend a live owned lease; expired/revoked/cancelled work cannot resurrect."""
+        if not self.settings.research_mode:
+            return False
+        with self.sessions.begin() as session:
+            job = session.scalar(
+                select(ResearchJob)
+                .where(
+                    ResearchJob.id == lease.id,
+                    ResearchJob.user_id == lease.user_id,
+                    ResearchJob.status == "RUNNING",
+                    ResearchJob.lease_token == lease.token,
+                    ResearchJob.lease_until > now(),
+                )
+                .with_for_update()
+            )
+            if job is None or not authorized(session, lease.user_id):
+                return False
+            job.lease_until = now() + timedelta(seconds=self.settings.job_lease_seconds)
+            return True
+
+    def cancel(self, user_id: UUID, job_id: UUID) -> ResearchJob:
+        with self.sessions.begin() as session:
+            job = session.scalar(
+                select(ResearchJob)
+                .where(
+                    ResearchJob.id == job_id,
+                    ResearchJob.user_id == user_id,
+                )
+                .with_for_update()
+            )
+            if job is None:
+                raise DomainError("Research job not found", 404)
+            if job.status in {"QUEUED", "RUNNING"}:
+                # Preserve Phase 4A's wire/status vocabulary and fence completion immediately.
+                job.status = "FAILED"
+                job.failure_reason = "Cancelled by owner"
+                job.completed_at = now()
+                job.lease_token = None
+                job.lease_until = None
+                job.result = None
+            return job
+
     def finish(self, lease: JobLease, result: dict[str, JsonValue] | None) -> bool:
         with self.sessions.begin() as session:
             job = session.scalar(

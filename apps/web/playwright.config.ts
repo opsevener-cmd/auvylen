@@ -9,10 +9,12 @@ const webUrl = `http://127.0.0.1:${webPort}`;
 
 export default defineConfig({
   testDir: "./e2e", workers: 1, retries: 0,
-  use: {baseURL: webUrl, viewport: {width: 390, height: 844}, channel: process.env.PLAYWRIGHT_CHANNEL, trace: "retain-on-failure"},
+  use: {baseURL: webUrl, viewport: {width: 390, height: 844}, channel: process.env.PLAYWRIGHT_CHANNEL,
+    launchOptions: {executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH}, trace: "retain-on-failure"},
   webServer: [
     {command: `uv run uvicorn aevyra_api.main:app --host 127.0.0.1 --port ${apiPort} --no-access-log`,
-      env: {CORS_ORIGINS: JSON.stringify([webUrl])},
+      env: {CORS_ORIGINS: JSON.stringify([webUrl]), RESEARCH_MODE: process.env.E2E_RESEARCH ?? "false",
+        PRIVATE_UPLOAD_ROOT: path.join(root, "private-data/e2e-uploads")},
       cwd: root, url: `${apiUrl}/health`, reuseExistingServer: !process.env.CI},
     {command: `npm run start --workspace @auvylen/web -- --port ${webPort}`, cwd: root,
       url: webUrl, env: {API_URL: apiUrl}, reuseExistingServer: !process.env.CI},

@@ -261,8 +261,8 @@ mapped to a score does **not** measure any property of a face. Metadata states
 `synthetic=true`, `commercial_allowed=true` and `production_enabled=false`. Commercial
 permission covers only the internal synthetic implementation, not any future model.
 The registry refuses production execution unless both approval flags are true.
-Paid development orders invoke this engine through the registry. There is no standalone
-scoring execution endpoint or upload UI.
+Paid development orders invoke this engine through the registry. There is no standalone mock scoring execution endpoint. The separate authorized research
+dataset UI accepts private images but does not yet run real scoring.
 
 ## Manual commercial flow
 
@@ -298,7 +298,9 @@ the same analysis ID and is disabled in production. See [payments](docs/payments
 
 See [architecture](docs/architecture.md) and [verification](docs/verification.md).
 Pilot accounts have no email verification, automated password recovery or social login.
-No workers, image handling, real AI or real payments exist. Production hosting templates
+Phase 4B now includes private datasets, image ingestion, ratings and pairwise annotations;
+see [the tested implementation report](docs/phase4b-progress.md). Real model training,
+unseen-image predictions and real payments remain unimplemented. Production hosting templates
 remain provider-neutral, but public deployment is not performed. Shared TypeScript wire types are
 maintained explicitly alongside Python models; update both and tests when routes change.
 Engine inputs are opaque bytes; later phases must define safe input limits and validated

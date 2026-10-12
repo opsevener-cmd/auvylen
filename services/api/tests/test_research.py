@@ -131,3 +131,48 @@ def test_private_artifacts_ownership_limits_and_persistence(tmp_path):
         store.read(uuid4(), artifact)
     with pytest.raises(ValueError):
         store.put(owner, b"x" * 21)
+
+
+def test_lease_renewal_and_owner_cancellation_fence_results(credits):
+    register(credits.client)
+    enable(credits)
+    job = submit(credits).json()
+    queue = ResearchQueue(credits.sessions, credits.client.app.state.settings)
+    lease = queue.claim()
+    assert queue.renew(lease)
+    response = credits.client.post(
+        f"/api/v1/research/jobs/{job['id']}/cancel", json={}, headers=csrf_headers(credits.client)
+    )
+    assert response.status_code == 200
+    assert response.json()["failure_reason"] == "Cancelled by owner"
+    assert not queue.renew(lease)
+    assert not queue.finish(lease, {"synthetic": True})
+    assert queue.claim() is None
+    assert (
+        credits.client.post(f"/api/v1/research/jobs/{job['id']}/cancel", json={}).status_code == 403
+    )
+    register(credits.client, "other-cancelling-owner")
+    assert (
+        credits.client.post(
+            f"/api/v1/research/jobs/{job['id']}/cancel",
+            json={},
+            headers=csrf_headers(credits.client),
+        ).status_code
+        == 404
+    )
+
+
+def test_expired_and_revoked_leases_cannot_renew(credits):
+    register(credits.client)
+    enable(credits)
+    submit(credits)
+    queue = ResearchQueue(credits.sessions, credits.client.app.state.settings)
+    lease = queue.claim()
+    with credits.sessions.begin() as session:
+        session.get(ResearchJob, lease.id).lease_until = now() - timedelta(seconds=1)
+    assert not queue.renew(lease)
+    fresh = queue.claim()
+    assert fresh and queue.renew(fresh)
+    with credits.sessions.begin() as session:
+        session.get(ResearchAccess, user_id(credits)).enabled = False
+    assert not queue.renew(fresh)

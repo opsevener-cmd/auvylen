@@ -13,6 +13,8 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       API_URL: ${API_URL:-http://api:8000}
+      NO_PROXY: localhost,127.0.0.1,::1,api
+      no_proxy: localhost,127.0.0.1,::1,api
     restart: unless-stopped
     init: true
     cap_drop: [ALL]
@@ -78,6 +80,9 @@ services:
     image: caddy:2-alpine
     environment:
       AEVYRA_DOMAIN: ${AEVYRA_DOMAIN:?Set the public hostname without a scheme or path}
+      # Internal Compose traffic must not use a managed host's outbound proxy.
+      NO_PROXY: localhost,127.0.0.1,::1,api,web
+      no_proxy: localhost,127.0.0.1,::1,api,web
     ports: ["80:80", "443:443"]
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
@@ -85,7 +90,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     healthcheck:
-      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:2019/config/]
+      # BusyBox wget otherwise proxies even this container-local health request.
+      test: [CMD, wget, -Y, "off", -q, -O, /dev/null, http://127.0.0.1:2019/config/]
       interval: 15s
       timeout: 3s
       retries: 3

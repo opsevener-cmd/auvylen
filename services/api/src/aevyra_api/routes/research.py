@@ -1,6 +1,7 @@
 from dataclasses import asdict
 from uuid import UUID
 
+from aevyra_contracts.commercial import EmptyRequest
 from aevyra_contracts.research import ProviderView, ResearchJobView, ResearchRequest, ResearchStatus
 from aevyra_inference.providers import ProviderCatalog
 from fastapi import APIRouter, Depends, Request
@@ -60,3 +61,11 @@ def result(job_id: UUID, request: Request, user: CurrentUser) -> ResearchJobView
         if job is None:
             raise DomainError("Research job not found", 404)
         return ResearchJobView.model_validate(job)
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=ResearchJobView, dependencies=[Depends(csrf)])
+def cancel(
+    job_id: UUID, body: EmptyRequest, request: Request, user: CurrentUser
+) -> ResearchJobView:
+    job = ResearchQueue(sessions(request), config(request)).cancel(user.id, job_id)
+    return ResearchJobView.model_validate(job)

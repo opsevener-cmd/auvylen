@@ -50,7 +50,8 @@ services:
       WORKER_QUEUE: cpu
     command: [python, -m, aevyra_api.research.worker]
     volumes:
-      - private_uploads:/var/lib/auvylen/uploads:ro
+      # Retention/deletion cleanup removes private derivatives.
+      - private_uploads:/var/lib/auvylen/uploads
       - private_models:/var/lib/auvylen/models
     healthcheck:
       test: [CMD, python, -c, "import time; from pathlib import Path; p=Path('/tmp/auvylen-worker-heartbeat'); assert p.exists() and time.time()-p.stat().st_mtime < 30"]

@@ -11,7 +11,9 @@ from aevyra_inference.mock import MockScoringEngine
 from aevyra_api.config import Settings
 from aevyra_api.database import DependencyChecks
 from aevyra_api.logging import configure_logging
+from aevyra_api.preferences.service import PreferenceService
 from aevyra_api.research.jobs import ResearchQueue
+from aevyra_api.research.lease import LeaseHeartbeat
 
 logger = logging.getLogger("aevyra.worker")
 HEARTBEAT = Path("/tmp/auvylen-worker-heartbeat")
@@ -22,15 +24,17 @@ def run_one(queue: ResearchQueue) -> bool:
     if lease is None:
         return False
     try:
-        if lease.kind != "SCORE" or lease.provider != "mock":
-            raise RuntimeError("Requested model or training implementation unavailable")
-        score = EngineRegistry([MockScoringEngine()]).score(
-            "mock",
-            f"auvylen-research:{lease.id}".encode(),
-            production=queue.settings.api_environment == "production",
-        )
-        queue.finish(lease, score.model_dump(mode="json"))
-        logger.info("research_job_finished", extra={"analysis_id": str(lease.id)})
+        with LeaseHeartbeat(queue, lease) as heartbeat:
+            if lease.kind != "SCORE" or lease.provider != "mock":
+                raise RuntimeError("Requested model or training implementation unavailable")
+            score = EngineRegistry([MockScoringEngine()]).score(
+                "mock",
+                f"auvylen-research:{lease.id}".encode(),
+                production=queue.settings.api_environment == "production",
+            )
+            heartbeat.check()
+            if queue.finish(lease, score.model_dump(mode="json")):
+                logger.info("research_job_finished", extra={"analysis_id": str(lease.id)})
     except Exception as exc:
         queue.finish(lease, None)
         logger.error("research_job_failed", extra={"error_type": type(exc).__name__})
@@ -45,6 +49,7 @@ def main() -> None:
     checks = DependencyChecks(settings)
     queue = ResearchQueue(checks.sessions, settings)
     stopping = False
+    last_cleanup = 0.0
 
     def stop(signum: int, frame: object) -> None:
         nonlocal stopping
@@ -57,6 +62,9 @@ def main() -> None:
             try:
                 checks.database()
                 checks.cache()
+                if time.monotonic() - last_cleanup >= 60:
+                    PreferenceService(checks.sessions, settings).purge()
+                    last_cleanup = time.monotonic()
                 run_one(queue)
                 HEARTBEAT.touch(mode=0o600)
             except Exception as exc:

@@ -24,10 +24,14 @@ class PrivateArtifactStore:
         path = self._path(owner, artifact)
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, "wb") as file:
-            file.write(payload)
-            file.flush()
-            os.fsync(file.fileno())
+        try:
+            with os.fdopen(descriptor, "wb") as file:
+                file.write(payload)
+                file.flush()
+                os.fsync(file.fileno())
+        except OSError:
+            path.unlink(missing_ok=True)
+            raise
         return artifact, hashlib.sha256(payload).hexdigest()
 
     def read(self, owner: UUID, artifact: UUID) -> bytes:
@@ -37,3 +41,6 @@ class PrivateArtifactStore:
         if len(payload) > self.max_bytes:
             raise ValueError("Artifact size limit")
         return payload
+
+    def delete(self, owner: UUID, artifact: UUID) -> None:
+        self._path(owner, artifact).unlink(missing_ok=True)
