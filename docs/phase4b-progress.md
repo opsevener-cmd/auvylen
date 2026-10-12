@@ -1,5 +1,8 @@
 # Phase 4B cloud verification and first implementation increment
 
+Current continuation: [core training report](phase4b-training-report.md) and
+[model workflow](custom-preference-models.md). The text below records the preserved first milestone.
+
 Date: 2026-10-12. Scope: master instruction Steps 1–2, plus research lease/cancellation
 prerequisites. **This is not completion of the custom model/training system.**
 

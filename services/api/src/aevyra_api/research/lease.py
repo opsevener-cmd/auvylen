@@ -2,11 +2,13 @@
 
 import logging
 import threading
+from pathlib import Path
 from types import TracebackType
 
 from aevyra_api.research.jobs import JobLease, ResearchQueue
 
 logger = logging.getLogger("aevyra.worker")
+HEARTBEAT = Path("/tmp/auvylen-worker-heartbeat")
 
 
 class LeaseHeartbeat:
@@ -18,11 +20,12 @@ class LeaseHeartbeat:
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def _run(self) -> None:
-        while not self.stopping.wait(self.queue.settings.job_lease_seconds / 3):
+        while not self.stopping.wait(min(5.0, self.queue.settings.job_lease_seconds / 3)):
             try:
                 if not self.queue.renew(self.lease):
                     self.lost.set()
                     return
+                HEARTBEAT.touch(mode=0o600)
             except Exception as exc:
                 self.lost.set()
                 logger.error(

@@ -3,7 +3,6 @@
 import logging
 import signal
 import time
-from pathlib import Path
 
 from aevyra_inference.engine import EngineRegistry
 from aevyra_inference.mock import MockScoringEngine
@@ -11,12 +10,13 @@ from aevyra_inference.mock import MockScoringEngine
 from aevyra_api.config import Settings
 from aevyra_api.database import DependencyChecks
 from aevyra_api.logging import configure_logging
+from aevyra_api.preferences.execution import CustomExecution
 from aevyra_api.preferences.service import PreferenceService
+from aevyra_api.preferences.training import ModelService
 from aevyra_api.research.jobs import ResearchQueue
-from aevyra_api.research.lease import LeaseHeartbeat
+from aevyra_api.research.lease import HEARTBEAT, LeaseHeartbeat
 
 logger = logging.getLogger("aevyra.worker")
-HEARTBEAT = Path("/tmp/auvylen-worker-heartbeat")
 
 
 def run_one(queue: ResearchQueue) -> bool:
@@ -25,6 +25,12 @@ def run_one(queue: ResearchQueue) -> bool:
         return False
     try:
         with LeaseHeartbeat(queue, lease) as heartbeat:
+            if lease.provider == "custom":
+                execution = CustomExecution(queue, lease, heartbeat)
+                saved = execution.train() if lease.kind == "TRAIN" else execution.predict()
+                if saved:
+                    logger.info("custom_job_finished", extra={"analysis_id": str(lease.id)})
+                return True
             if lease.kind != "SCORE" or lease.provider != "mock":
                 raise RuntimeError("Requested model or training implementation unavailable")
             score = EngineRegistry([MockScoringEngine()]).score(
@@ -37,6 +43,8 @@ def run_one(queue: ResearchQueue) -> bool:
                 logger.info("research_job_finished", extra={"analysis_id": str(lease.id)})
     except Exception as exc:
         queue.finish(lease, None)
+        if lease.provider == "custom":
+            CustomExecution(queue, lease, LeaseHeartbeat(queue, lease)).fail()
         logger.error("research_job_failed", extra={"error_type": type(exc).__name__})
     return True
 
@@ -63,6 +71,7 @@ def main() -> None:
                 checks.database()
                 checks.cache()
                 if time.monotonic() - last_cleanup >= 60:
+                    ModelService(checks.sessions, settings).purge()
                     PreferenceService(checks.sessions, settings).purge()
                     last_cleanup = time.monotonic()
                 run_one(queue)

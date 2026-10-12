@@ -50,6 +50,8 @@ class ProviderCatalog:
         return provider
 
     def status(self, slug: str) -> ProviderStatus:
+        if slug == "custom":
+            return ProviderStatus(slug, PROVIDERS[slug], True, "first_party_rating_baseline")
         if slug not in self.enabled:
             return ProviderStatus(slug, PROVIDERS[slug], False, "disabled")
         try:

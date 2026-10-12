@@ -232,3 +232,15 @@ worker deletion removed the files. Existing financial/research regressions remai
 See [Phase 4B progress](phase4b-progress.md) for limits, cloud portability fixes, exact
 verification scope and remaining work. Real training, checkpoints and custom predictions
 are not implemented or claimed by this milestone. No public deployment took place.
+
+
+## 2026-10-12 — Phase 4B numerical-rating training core
+
+Commit 8bc1d62 was safely fast-forwarded to the confirmed private GitHub repository before
+implementation. The real CPU rating-model workflow now passes 144 backend/infrastructure
+tests, 30 frontend tests, four development browser flows and three HTTPS cloud flows.
+Actual checkpoint-based predictions survive API/worker/web container recreation unchanged;
+retraining preserves both versions. Registry research/commercial permissions are separate.
+Ruff, formatting, mypy, ESLint, TypeScript, host/container builds and migration checks pass.
+See [training report](phase4b-training-report.md) and [model workflow](custom-preference-models.md)
+for actual behavior, license evidence, accuracy limitations and remaining work.

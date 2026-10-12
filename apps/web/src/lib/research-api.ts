@@ -2,6 +2,7 @@ import type {ResearchJob, ResearchStatus} from "@auvylen/contracts";
 import {z} from "zod";
 
 export const researchJobSchema: z.ZodType<ResearchJob> = z.object({
+  progress: z.number().int().min(0).max(100), phase: z.string(), payload: z.record(z.string(), z.unknown()).nullable(),
   id: z.uuid(), provider: z.string(), kind: z.string(),
   status: z.enum(["QUEUED", "RUNNING", "COMPLETED", "FAILED"]),
   result: z.record(z.string(), z.unknown()).nullable(), failure_reason: z.string().nullable(),

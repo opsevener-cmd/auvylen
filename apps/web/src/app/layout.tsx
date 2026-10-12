@@ -26,7 +26,7 @@ export default function RootLayout({children}: Readonly<{children: React.ReactNo
       {pilot && <aside className="mt-6 rounded-md border border-black/10 p-4 text-sm" aria-label="Pilot notice"><strong>Auvylen Pilot</strong><p>Synthetic analysis is currently enabled for testing.</p></aside>}
       <main id="main" className="flex-1 py-16 sm:py-24">{children}</main>
       <footer className="flex flex-wrap justify-between gap-3 border-t border-black/10 py-6 text-xs text-[#68736d]">
-        <span>Auvylen · Pilot foundation</span><span>Synthetic analysis only</span>
+        <span>Auvylen · Private research</span><span>Personal preference models</span>
       </footer>
     </div>
   </body></html>;

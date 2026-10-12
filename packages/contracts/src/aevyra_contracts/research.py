@@ -18,6 +18,9 @@ class ResearchJobView(BaseModel):
     kind: str
     status: Literal["QUEUED", "RUNNING", "COMPLETED", "FAILED"]
     result: dict[str, JsonValue] | None
+    payload: dict[str, JsonValue] | None
+    progress: int
+    phase: str
     failure_reason: str | None
     created_at: datetime
     completed_at: datetime | None

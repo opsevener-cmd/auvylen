@@ -18,7 +18,15 @@ from aevyra_api.config import Settings
 from aevyra_api.database import DependencyChecks
 from aevyra_api.logging import configure_logging, request_id_context
 from aevyra_api.payments.mock import MockPaymentProvider
-from aevyra_api.routes import accounts, commercial, health, preferences, research, scoring
+from aevyra_api.routes import (
+    accounts,
+    commercial,
+    custom_models,
+    health,
+    preferences,
+    research,
+    scoring,
+)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -126,6 +134,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(accounts.router)
     application.include_router(research.router)
     application.include_router(preferences.router)
+    application.include_router(custom_models.router)
     return application
 
 

@@ -13,8 +13,9 @@ export default defineConfig({
     launchOptions: {executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH}, trace: "retain-on-failure"},
   webServer: [
     {command: `uv run uvicorn aevyra_api.main:app --host 127.0.0.1 --port ${apiPort} --no-access-log`,
-      env: {CORS_ORIGINS: JSON.stringify([webUrl]), RESEARCH_MODE: process.env.E2E_RESEARCH ?? "false",
-        PRIVATE_UPLOAD_ROOT: path.join(root, "private-data/e2e-uploads")},
+      env: {CORS_ORIGINS: JSON.stringify([webUrl]), SHARED_PROXY_RATE_LIMITS: "true", RESEARCH_MODE: process.env.E2E_RESEARCH ?? "false",
+        PRIVATE_UPLOAD_ROOT: path.join(root, "private-data/e2e-uploads"),
+        PRIVATE_MODEL_ROOT: path.join(root, "private-data/e2e-models")},
       cwd: root, url: `${apiUrl}/health`, reuseExistingServer: !process.env.CI},
     {command: `npm run start --workspace @auvylen/web -- --port ${webPort}`, cwd: root,
       url: webUrl, env: {API_URL: apiUrl}, reuseExistingServer: !process.env.CI},

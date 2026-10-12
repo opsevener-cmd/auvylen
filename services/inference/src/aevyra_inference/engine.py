@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
+from typing import Literal
 
 from aevyra_contracts import EngineMetadata, ScoringResult
 
@@ -36,12 +37,29 @@ class EngineRegistry:
     def metadata(self) -> list[EngineMetadata]:
         return [engine.metadata() for engine in self._engines.values()]
 
-    def score(self, slug: str, payload: bytes, *, production: bool) -> ScoringResult:
+    @staticmethod
+    def check_policy(
+        info: EngineMetadata,
+        *,
+        production: bool,
+        purpose: Literal["commercial", "research"] = "commercial",
+    ) -> None:
+        allowed = info.research_allowed if purpose == "research" else info.commercial_allowed
+        if production and (not allowed or not info.production_enabled):
+            raise EnginePolicyError("Engine is not approved for production execution")
+
+    def score(
+        self,
+        slug: str,
+        payload: bytes,
+        *,
+        production: bool,
+        purpose: Literal["commercial", "research"] = "commercial",
+    ) -> ScoringResult:
         engine = self._engines[slug]
         info = engine.metadata()
         # Policy runs before any preprocessing or inference.
-        if production and (not info.commercial_allowed or not info.production_enabled):
-            raise EnginePolicyError("Engine is not approved for production execution")
+        self.check_policy(info, production=production, purpose=purpose)
         raw = engine.predict(engine.preprocess(payload))
         return ScoringResult(
             raw_score=raw,

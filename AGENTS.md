@@ -31,9 +31,11 @@ back to Windows/WSL or local Docker. No cloud environment or paid server is assu
   and weight licenses; do not download these to the user's Windows computer.
 - Production website and workers run on a future Linux cloud host, never depend on the user's Windows computer. No VPS exists yet; do not claim remote deployment.
 - Keep custom-model contracts independent from removable third-party providers. Missing adapters/weights must report unavailable; never fabricate real predictions.
-- Only the mock engine exists now. Its scores must remain explicitly synthetic and its
-  production execution must remain disabled. Phase 4B real custom training/inference
-  requires reviewed implementations and tests; unavailable models must stay unavailable.
+- The mock engine must remain explicitly synthetic and disabled in production.
+  Phase 4B now includes the reviewed first-party visual rating baseline; see
+  docs/custom-preference-models.md. Custom training and inference are non-commercial
+  research operations and use the registry research policy gate. Unavailable external
+  models must stay unavailable.
 - Every future execution must use the registry policy gate; new engines require explicit
   provenance and licensing review. A commercial flag is not a substitute for evidence.
 

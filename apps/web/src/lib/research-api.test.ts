@@ -4,7 +4,7 @@ import {researchJobSchema, researchScoreSchema} from "./research-api";
 describe("research wire boundary", () => {
   it("validates a queued job without inventing a result", () => {
     const job = researchJobSchema.parse({id: "10000000-0000-4000-8000-000000000001", provider: "mock", kind: "SCORE",
-      status: "QUEUED", result: null, failure_reason: null, created_at: "2026-10-10", completed_at: null});
+      status: "QUEUED", progress: 0, phase: "Queued", payload: null, result: null, failure_reason: null, created_at: "2026-10-10", completed_at: null});
     expect(job.result).toBeNull();
   });
   it("requires the synthetic marker before showing a mock score", () => {

@@ -299,8 +299,9 @@ the same analysis ID and is disabled in production. See [payments](docs/payments
 See [architecture](docs/architecture.md) and [verification](docs/verification.md).
 Pilot accounts have no email verification, automated password recovery or social login.
 Phase 4B now includes private datasets, image ingestion, ratings and pairwise annotations;
-see [the tested implementation report](docs/phase4b-progress.md). Real model training,
-unseen-image predictions and real payments remain unimplemented. Production hosting templates
+see [the tested implementation report](docs/phase4b-progress.md). Real numerical-rating model training, versioned checkpoints, retraining and unseen-image
+predictions are implemented; see [custom preference models](docs/custom-preference-models.md).
+Real payments and external GitHub-model comparisons remain unimplemented. Production hosting templates
 remain provider-neutral, but public deployment is not performed. Shared TypeScript wire types are
 maintained explicitly alongside Python models; update both and tests when routes change.
 Engine inputs are opaque bytes; later phases must define safe input limits and validated

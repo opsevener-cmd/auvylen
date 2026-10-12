@@ -1,6 +1,6 @@
 """Permanent custom-model contracts, independent of third-party plugins.
 
-No training algorithm or image-import HTTP endpoint is implemented here.
+Legacy extension protocols remain; the first-party CPU implementation is in preference.py.
 """
 
 from pathlib import Path

@@ -19,7 +19,7 @@ CMD ["uv", "run", "pytest", "--integration"]
 
 FROM python:3.14-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a8c881db92ffb4d8fd20f83 AS runtime
 WORKDIR /app
-ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 APP_ENV=production
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 APP_ENV=production
 RUN useradd --create-home --uid 10001 auvylen
 RUN mkdir -p /var/lib/auvylen/uploads /var/lib/auvylen/models && chown -R 10001:10001 /var/lib/auvylen && chmod 700 /var/lib/auvylen/uploads /var/lib/auvylen/models
 COPY --from=build /app/.venv /app/.venv

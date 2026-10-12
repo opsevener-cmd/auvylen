@@ -46,9 +46,9 @@ export async function accountRequest<T>(path: string, schema: z.ZodType<T>, body
     const preferenceMessages: Record<number, string> = {
       403: "Research access or request verification required.",
       404: "Dataset or image is unavailable, expired or deleted.",
-      409: "This dataset is archived, the image is excluded, or deletion is pending.",
+      409: "The selected data/model is unavailable, archived, excluded or pending deletion.",
       413: "Image upload exceeds the size limit.",
-      422: "Check consent, image format, dimensions and rating scale.",
+      422: "Check consent, images and rating scale. Training needs 8 ratings, 5 independent groups and varied scores in the training split.",
       429: "Upload capacity, request rate or private storage quota reached. Try again later.",
     };
     throw new AccountError(response.status, (path.startsWith("/research/preferences") ? preferenceMessages[response.status] : undefined)

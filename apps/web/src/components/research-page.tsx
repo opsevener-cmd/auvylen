@@ -40,7 +40,7 @@ export function ResearchPage() {
     <h1 className="text-3xl font-medium">Research workspace</h1>
     <p className="mt-5">Authorized, non-commercial testing. Research jobs do not deduct Credits.</p>
     <p className="mt-3"><Link href="/research/preferences" className="underline">Manage personal preference datasets</Link></p>
-    <p className="mt-3">Only Synthetic / Development Analysis is runnable. No real facial model or training algorithm is installed.</p>
+    <p className="mt-3">Use personal preference datasets to train numerical rating models and predict from new photographs. Synthetic / Development Analysis remains available separately.</p>
     {error && <p role="alert" className="mt-5">{error} <Link href="/login" className="underline">Sign in</Link></p>}
     {status && !status.authorized && <p className="mt-5">Research is disabled or operator authorization is required.</p>}
     {status?.synthetic_available && <button disabled={busy || !!job && ["QUEUED", "RUNNING"].includes(job.status)} className="mt-6 rounded-md bg-[#253e34] px-5 py-3 text-white disabled:opacity-50" onClick={async () => {
@@ -64,7 +64,7 @@ export function ResearchPage() {
       }}>Cancel research job</button>}
     </div>}
     <h2 className="mt-10 text-xl">Model availability</h2>
-    <ul className="mt-4 space-y-2">{status?.providers.map(provider => <li key={provider.slug}>{provider.display_name}: {provider.available ? "Adapter available; image inference not integrated" : "Unavailable"}</li>)}</ul>
+    <ul className="mt-4 space-y-2">{status?.providers.map(provider => <li key={provider.slug}>{provider.display_name}: {provider.available ? (provider.slug === "custom" ? "Personal rating workflow available" : "Adapter available; image inference not integrated") : "Unavailable"}</li>)}</ul>
     <h2 className="mt-10 text-xl">Your research jobs</h2>
     <ul className="mt-4 space-y-3">{jobs.map(item => <li key={item.id}><button className="underline" onClick={() => setJob(item)}>{item.provider} · {item.status}</button></li>)}</ul>
   </section>;

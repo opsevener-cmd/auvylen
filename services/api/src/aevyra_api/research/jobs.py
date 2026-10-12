@@ -1,5 +1,6 @@
 """PostgreSQL durable queue. Execution is at-least-once; completion is fenced."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, timedelta
 from uuid import UUID, uuid4
@@ -38,8 +39,11 @@ class ResearchQueue:
     def enqueue(self, user_id: UUID, provider: str, request_key: str) -> ResearchJob:
         if not self.settings.research_mode:
             raise DomainError("Research mode unavailable", 404)
-        # Real providers need reviewed adapters AND an authorized image-import path.
-        # Neither exists yet; no fallback to the synthetic engine is permitted.
+        # This legacy request has no image/version fields. Custom jobs use their owned workflow.
+        if provider == "custom":
+            raise DomainError(
+                "Select an owned model and image through the preference workflow", 503
+            )
         if provider != "mock":
             raise DomainError("Model provider unavailable; real inference not installed", 503)
         if self.settings.api_environment == "production":
@@ -57,39 +61,75 @@ class ResearchQueue:
                 if existing.provider != provider:
                     raise DomainError("Research request key conflict", 409)
                 return existing
-            pending = (
-                session.scalar(
-                    select(func.count())
-                    .select_from(ResearchJob)
-                    .where(
-                        ResearchJob.user_id == user_id,
-                        ResearchJob.status.in_(["QUEUED", "RUNNING"]),
-                    )
+            return self.add_job(session, user_id, provider, "SCORE", request_key, None)
+
+    def add_job(
+        self,
+        session: Session,
+        user_id: UUID,
+        provider: str,
+        kind: str,
+        request_key: str,
+        payload: dict[str, JsonValue] | None,
+    ) -> ResearchJob:
+        # Caller must hold the User lock and verify authorization/idempotency first.
+        pending = (
+            session.scalar(
+                select(func.count())
+                .select_from(ResearchJob)
+                .where(
+                    ResearchJob.user_id == user_id,
+                    ResearchJob.status.in_(["QUEUED", "RUNNING"]),
                 )
-                or 0
             )
-            daily = (
-                session.scalar(
-                    select(func.count())
-                    .select_from(ResearchJob)
-                    .where(
-                        ResearchJob.user_id == user_id,
-                        ResearchJob.created_at >= now() - timedelta(days=1),
-                    )
+            or 0
+        )
+        daily = (
+            session.scalar(
+                select(func.count())
+                .select_from(ResearchJob)
+                .where(
+                    ResearchJob.user_id == user_id,
+                    ResearchJob.created_at >= now() - timedelta(days=1),
                 )
-                or 0
             )
-            if (
-                pending >= self.settings.research_max_pending
-                or daily >= self.settings.research_daily_limit
-            ):
-                raise DomainError("Research resource limit reached", 429)
-            job = ResearchJob(
-                user_id=user_id, request_key=request_key, provider=provider, queue="cpu"
+            or 0
+        )
+        if (
+            pending >= self.settings.research_max_pending
+            or daily >= self.settings.research_daily_limit
+        ):
+            raise DomainError("Research resource limit reached", 429)
+        job = ResearchJob(
+            user_id=user_id,
+            request_key=request_key,
+            provider=provider,
+            kind=kind,
+            queue="cpu",
+            payload=payload,
+        )
+        session.add(job)
+        session.flush()
+        return job
+
+    def progress(self, lease: JobLease, percent: int, phase: str) -> bool:
+        with self.sessions.begin() as session:
+            job = session.scalar(
+                select(ResearchJob)
+                .where(
+                    ResearchJob.id == lease.id,
+                    ResearchJob.user_id == lease.user_id,
+                    ResearchJob.status == "RUNNING",
+                    ResearchJob.lease_token == lease.token,
+                    ResearchJob.lease_until > now(),
+                )
+                .with_for_update()
             )
-            session.add(job)
-            session.flush()
-            return job
+            if job is None or not authorized(session, lease.user_id):
+                return False
+            job.progress = max(job.progress, min(99, max(0, percent)))
+            job.phase = phase[:100]
+            return True
 
     def claim(self) -> JobLease | None:
         if not self.settings.research_mode:
@@ -160,14 +200,21 @@ class ResearchQueue:
                 # Preserve Phase 4A's wire/status vocabulary and fence completion immediately.
                 job.status = "FAILED"
                 job.failure_reason = "Cancelled by owner"
+                job.phase = "Cancelled"
                 job.completed_at = now()
                 job.lease_token = None
                 job.lease_until = None
                 job.result = None
             return job
 
-    def finish(self, lease: JobLease, result: dict[str, JsonValue] | None) -> bool:
+    def finish(
+        self,
+        lease: JobLease,
+        result: dict[str, JsonValue] | None,
+        publish: Callable[[Session], None] | None = None,
+    ) -> bool:
         with self.sessions.begin() as session:
+            session.scalar(select(User).where(User.id == lease.user_id).with_for_update())
             job = session.scalar(
                 select(ResearchJob).where(ResearchJob.id == lease.id).with_for_update()
             )
@@ -179,11 +226,15 @@ class ResearchQueue:
             if deadline is None or deadline < now():
                 return False
             allowed = authorized(session, job.user_id)
+            if allowed and result is not None and publish is not None:
+                publish(session)
             job.result = result if allowed else None
             job.status = "COMPLETED" if result is not None and allowed else "FAILED"
             job.failure_reason = (
                 None if job.status == "COMPLETED" else "Research execution unavailable or failed"
             )
+            job.progress = 100 if job.status == "COMPLETED" else job.progress
+            job.phase = "Completed" if job.status == "COMPLETED" else "Failed"
             job.completed_at = now()
             job.lease_until = None
             job.lease_token = None

@@ -34,6 +34,7 @@ export interface Account {user: AccountUser; wallet: {balance: number; transacti
 export interface CreditProduct {slug: string; name: string; credit_cost: number; available: boolean}
 export interface RedemptionResult {credits_added: number; balance: number}
 export interface ResearchJob {
+  progress: number; phase: string; payload: Record<string, unknown> | null;
   id: string;
   provider: string;
   kind: string;
@@ -68,4 +69,18 @@ export interface PreferencePair {
 }
 export interface PreferenceDetail {
   dataset: PreferenceDataset; images: PreferenceImage[]; pairs: PreferencePair[];
+}
+
+export interface PersonalModel {
+  id: string; dataset_id: string | null; project_id: string; version: number;
+  state: "TRAINING" | "READY" | "FAILED" | "ARCHIVED" | "DELETED";
+  training_job_id: string; extractor: string; implementation: string;
+  configuration: Record<string, unknown>; metrics: Record<string, unknown> | null;
+  limitations: string[]; created_at: string; completed_at: string | null; expires_at: string;
+}
+
+export interface EngineMetadata {
+  slug: string; display_name: string; version: string; licensing_status: string;
+  provenance: string; commercial_allowed: boolean; research_allowed: boolean;
+  production_enabled: boolean; synthetic: boolean;
 }

@@ -12,6 +12,7 @@ class EngineMetadata(BaseModel):
     licensing_status: str
     provenance: str
     commercial_allowed: bool
+    research_allowed: bool = False
     production_enabled: bool
     synthetic: bool
 

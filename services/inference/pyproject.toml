@@ -2,7 +2,11 @@
 name = "auvylen-inference"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["auvylen-contracts"]
+dependencies = [
+    "auvylen-contracts",
+    "numpy>=2.3,<3",
+    "pillow>=12,<13",
+]
 
 [tool.uv.sources]
 auvylen-contracts = { workspace = true }

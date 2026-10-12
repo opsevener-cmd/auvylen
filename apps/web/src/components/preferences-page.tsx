@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {PersonalModels} from "@/components/personal-models";
 import {useEffect, useState} from "react";
 import {z} from "zod";
 import type {PreferenceDataset, PreferenceDetail, PreferenceImage, PreferencePair, PreferenceProject} from "@auvylen/contracts";
@@ -38,7 +39,7 @@ export function PreferencesPage() {
     <Link className="underline" href="/research">Research workspace</Link>
     <h1 className="text-3xl font-medium">Personal preference datasets</h1>
     <p>Your ratings describe your subjective preferences. Research does not spend Credits. Only upload authorized adult photographs.</p>
-    <p>Private images expire after the selected retention period. Deletion blocks access immediately; the research worker removes stored files. Custom training and predictions are not available yet.</p>
+    <p>Private images expire after the selected retention period. Deletion blocks access immediately; the research worker removes stored files. Train a personal model from your numerical ratings and score new uploads below.</p>
     {error && <p role="alert">{error} <Link className="underline" href="/login">Sign in</Link></p>}
     <fieldset disabled={busy} className="space-y-5">
       <form className="rounded border p-4" onSubmit={event => {event.preventDefault(); const form = event.currentTarget; const values = new FormData(form); void perform(async () => {
@@ -167,6 +168,7 @@ function DatasetEditor({initial, onChange, onDelete}: {initial: PreferenceDetail
       </>}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">{images.map((image, position) => <button key={image.id} className="rounded border p-1" aria-label={`Select image ${position + 1}`} onClick={() => {setIndex(position); setMode("rating");}}><PrivatePhoto image={image} thumbnail /><span>{image.excluded ? "Excluded" : image.score ?? (image.rating_recorded ? "Skipped" : "Unrated")}</span></button>)}</div>
     </fieldset>
+    <PersonalModels dataset={dataset} images={images} />
   </section>;
 }
 
