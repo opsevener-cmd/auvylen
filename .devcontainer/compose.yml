@@ -1,0 +1,50 @@
+# Codespaces only: one forwarded frontend; no host-published database/cache/API ports.
+services:
+  workspace:
+    build: {context: .., dockerfile: .devcontainer/Dockerfile}
+    volumes:
+      - ..:/workspaces/auvylen
+      - preview_secrets:/run/auvylen-preview-secrets:ro
+    command: [sleep, infinity]
+    init: true
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [preview, data]
+  postgres:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    entrypoint: [/bin/sh, /preview/postgres-entrypoint.sh]
+    environment:
+      POSTGRES_USER: aevyra
+      POSTGRES_DB: aevyra
+      POSTGRES_PASSWORD_FILE: /run/auvylen-preview-secrets/postgres-password
+    volumes:
+      - ./postgres-entrypoint.sh:/preview/postgres-entrypoint.sh:ro
+      - preview_postgres:/var/lib/postgresql
+      - preview_secrets:/run/auvylen-preview-secrets
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    security_opt: [no-new-privileges:true]
+    networks: [data]
+  redis:
+    image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, 128mb, --maxmemory-policy, noeviction]
+    volumes: [preview_redis:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    security_opt: [no-new-privileges:true]
+    networks: [data]
+networks:
+  preview:
+  data: {internal: true}
+volumes:
+  preview_postgres:
+  preview_redis:
+  preview_secrets:

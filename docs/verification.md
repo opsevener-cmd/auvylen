@@ -257,3 +257,14 @@ were checksum-verified and kept outside Git. Static checks and production builds
 500-image real PostgreSQL worker/caching/quota/cleanup tests passed; 1,000-image
 extraction-only measurements do not raise the existing quota. Synthetic results make
 no facial accuracy claim. The full report records licenses, timings and resolved failures.
+
+## Private Codespaces preview — 2026-10-14
+
+[Configuration and measured verification](codespaces-preview-report.md): 155 backend/
+integration/model tests, 32 frontend tests and one complete HTTPS preview browser flow
+passed. The non-root preview image, first-time licensed model restoration, official
+Dev Containers configuration validation, exact-Origin/CSRF/Secure-cookie checks,
+explicit grants, upload/rating/training/retraining/prediction, restart preservation and
+encrypted backup/database restoration were exercised on managed remote Linux.
+No external Codespace or public preview was created; the owner follows the
+[GitHub opening steps](codespaces-private-preview.md) using included quota.

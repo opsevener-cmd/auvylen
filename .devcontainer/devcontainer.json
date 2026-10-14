@@ -1,0 +1,23 @@
+{
+  "name": "Auvylen private preview",
+  "dockerComposeFile": "compose.yml",
+  "service": "workspace",
+  "workspaceFolder": "/workspaces/auvylen",
+  "remoteUser": "auvylen",
+  "updateRemoteUserUID": false,
+  "runServices": ["workspace", "postgres", "redis"],
+  "shutdownAction": "stopCompose",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {"label": "Auvylen (keep Private)", "onAutoForward": "openBrowser", "protocol": "http"},
+    "8000": {"onAutoForward": "ignore"},
+    "5432": {"onAutoForward": "ignore"},
+    "6379": {"onAutoForward": "ignore"}
+  },
+  "otherPortsAttributes": {"onAutoForward": "ignore"},
+  "customizations": {"vscode": {"settings": {"remote.autoForwardPorts": false}}},
+  "hostRequirements": {"cpus": 2, "memory": "8gb", "storage": "32gb"},
+  "postCreateCommand": "python scripts/codespaces-preview.py setup",
+  "postStartCommand": "python scripts/codespaces-preview.py start",
+  "waitFor": "postCreateCommand"
+}

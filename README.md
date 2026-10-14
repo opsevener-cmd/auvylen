@@ -310,3 +310,7 @@ image/domain representations before accepting untrusted content.
 Phase 4B also supports the independent frozen MobileNetV3-Small representation. See
 [pretrained model setup and licenses](docs/pretrained-representation.md) and
 [measured verification](docs/phase4b-representation-report.md).
+
+For immediate personal browser use without a VPS, follow
+[the private GitHub Codespaces preview guide](docs/codespaces-private-preview.md).
+The default configuration forwards only private port 3000; no local Windows server is used.

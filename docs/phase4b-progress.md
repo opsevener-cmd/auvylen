@@ -1,5 +1,7 @@
 # Phase 4B cloud verification and first implementation increment
 
+For immediate browser use: [private Codespaces preview](codespaces-private-preview.md).
+
 Current pretrained-extractor milestone: [implementation and licensing](pretrained-representation.md) and [verification report](phase4b-representation-report.md). Historical results below remain unchanged.
 
 Current continuation: [core training report](phase4b-training-report.md) and

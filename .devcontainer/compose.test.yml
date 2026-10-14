@@ -1,0 +1,21 @@
+# Remote test-only TLS edge simulating GitHub's HTTPS -> HTTP private forwarding.
+services:
+  workspace:
+    image: auvylen-codespaces:test
+    environment:
+      AUVYLEN_PREVIEW_TEST: "1"
+      AUVYLEN_PREVIEW_TEST_ORIGIN: https://localhost:19443
+      AUVYLEN_PREVIEW_TEST_DATA: /workspaces/auvylen/private-data/codespaces-test
+      AUVYLEN_PREVIEW_TEST_SECRETS: /run/auvylen-preview-secrets
+      SSL_CERT_FILE: /run/preview-ca.pem
+      NODE_EXTRA_CA_CERTS: /run/preview-ca.pem
+    volumes:
+      - /etc/ssl/certs/ca-certificates.crt:/run/preview-ca.pem:ro
+  tls-test:
+    environment:
+      NO_PROXY: localhost,127.0.0.1,::1,workspace
+      no_proxy: localhost,127.0.0.1,::1,workspace
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    ports: ["127.0.0.1:19443:443"]
+    volumes: ["./Caddyfile.test:/etc/caddy/Caddyfile:ro"]
+    networks: [preview]
