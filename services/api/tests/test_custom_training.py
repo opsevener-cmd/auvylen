@@ -1,5 +1,6 @@
 from uuid import UUID, uuid4
 
+import pytest
 from aevyra_api.preferences.training import ModelService
 from aevyra_api.preferences.training_models import CustomModel, ImageEmbedding
 from aevyra_api.research.jobs import ResearchQueue
@@ -288,3 +289,90 @@ def test_deleting_model_preserves_annotations_and_erases_checkpoint(credits):
         assert deleted.snapshot == {}
         assert "training_image_ids" not in deleted.metrics
         assert "validation_image_ids" not in deleted.metrics
+
+
+def test_extractor_availability_ownership_and_no_missing_weight_fallback(credits):
+    from aevyra_inference.extractors import MOBILENET
+
+    dataset = populated(credits)
+    options = credits.client.get(BASE + "/extractors")
+    assert options.status_code == 200
+    assert options.json()[0]["available"] is True
+    assert options.json()[1]["available"] is False
+    assert options.json()[1]["manifest"]["weight_license"] == "Apache-2.0"
+    rejected = post(
+        credits,
+        "/train",
+        {"dataset_id": dataset, "idempotency_key": str(uuid4()), "extractor": MOBILENET},
+    )
+    assert rejected.status_code == 503
+    assert models(credits) == []
+    rejected = post(
+        credits,
+        "/train",
+        {"dataset_id": dataset, "idempotency_key": str(uuid4()), "extractor": "unknown"},
+    )
+    assert rejected.status_code == 422
+    credits.client.cookies.clear()
+    assert credits.client.get(BASE + "/extractors").status_code == 401
+
+
+@pytest.mark.pretrained
+def test_pretrained_job_matched_comparison_cached_retraining_and_old_checkpoint(
+    credits, pretrained_root
+):
+    import shutil
+
+    from aevyra_inference.extractors import MOBILENET, WEIGHT_FILE
+
+    dataset = populated(credits)
+    train_job(credits, dataset)
+    execute(credits)
+    legacy = models(credits)[0]
+    settings = credits.client.app.state.settings
+    target = settings.private_model_root / "pretrained"
+    target.mkdir(parents=True)
+    shutil.copyfile(pretrained_root / WEIGHT_FILE, target / WEIGHT_FILE)
+    train_job(credits, dataset, extractor=MOBILENET)
+    execute(credits)
+    first = models(credits)[0]
+    assert first["state"] == "READY", credits.client.get("/api/v1/research/jobs").json()
+    assert first["version"] == 2 and first["extractor"] == MOBILENET
+    metrics = first["metrics"]
+    assert metrics["training_image_ids"] == legacy["metrics"]["training_image_ids"]
+    assert metrics["validation_image_ids"] == legacy["metrics"]["validation_image_ids"]
+    assert metrics["handcrafted_baseline_mae"] == legacy["metrics"]["validation_mae"]
+    assert metrics["handcrafted_baseline_rmse"] == legacy["metrics"]["validation_rmse"]
+    assert metrics["mean_baseline_mae"] == legacy["metrics"]["mean_baseline_mae"]
+    assert metrics["embedding_cache_hits"] == 10 and metrics["embedding_cache_misses"] == 10
+    train_job(credits, dataset, extractor=MOBILENET)
+    execute(credits)
+    assert models(credits)[0]["metrics"]["embedding_cache_hits"] == 20
+    assert models(credits)[0]["metrics"]["embedding_cache_misses"] == 0
+    image = upload(credits, dataset, (125, 40, 50)).json()
+
+    def predict(model):
+        job = post(
+            credits,
+            "/predict",
+            {
+                "model_id": model["id"],
+                "dataset_id": dataset,
+                "image_id": image["id"],
+                "idempotency_key": str(uuid4()),
+            },
+        ).json()
+        execute(credits)
+        return credits.client.get(f"/api/v1/research/jobs/{job['id']}").json()
+
+    predicted = predict(first)
+    assert predicted["status"] == "COMPLETED" and predicted["result"]["synthetic"] is False
+    assert predicted["result"]["seen_in_training_snapshot"] is False
+    assert predicted["result"]["raw_score"] == predict(first)["result"]["raw_score"]
+    assert predict(legacy)["status"] == "COMPLETED"
+    (target / WEIGHT_FILE).write_bytes(b"corrupted")
+    assert predict(first)["status"] == "FAILED"
+    assert predict(legacy)["status"] == "COMPLETED"  # Legacy unaffected by pretrained removal.
+    with credits.sessions() as session:
+        assert session.scalar(select(func.count()).select_from(ImageEmbedding)) == 22
+    assert credits.client.get("/api/v1/account").json()["wallet"]["balance"] == 0

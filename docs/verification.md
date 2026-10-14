@@ -244,3 +244,16 @@ retraining preserves both versions. Registry research/commercial permissions are
 Ruff, formatting, mypy, ESLint, TypeScript, host/container builds and migration checks pass.
 See [training report](phase4b-training-report.md) and [model workflow](custom-preference-models.md)
 for actual behavior, license evidence, accuracy limitations and remaining work.
+
+
+## Phase 4B pretrained representation verification — 2026-10-14
+
+See [the detailed measured report](phase4b-representation-report.md). On remote Linux,
+`uv run pytest --integration --pretrained -q` passed **152 tests with no skips**;
+frontend tests passed **32**; development Playwright passed **5**; loopback HTTPS
+Playwright passed **4**, including both extractors across container recreation with
+forced embedding recomputation and identical raw predictions. Real MobileNetV3 weights
+were checksum-verified and kept outside Git. Static checks and production builds passed.
+500-image real PostgreSQL worker/caching/quota/cleanup tests passed; 1,000-image
+extraction-only measurements do not raise the existing quota. Synthetic results make
+no facial accuracy claim. The full report records licenses, timings and resolved failures.

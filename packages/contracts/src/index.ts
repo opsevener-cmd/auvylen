@@ -84,3 +84,7 @@ export interface EngineMetadata {
   provenance: string; commercial_allowed: boolean; research_allowed: boolean;
   production_enabled: boolean; synthetic: boolean;
 }
+
+export interface FeatureExtractor {
+  id: string; available: boolean; reason: string; manifest: Record<string, unknown>;
+}

@@ -1,6 +1,7 @@
 import {expect, test} from "@playwright/test";
 import {execFileSync} from "node:child_process";
 import path from "node:path";
+import {mkdirSync, writeFileSync} from "node:fs";
 
 const root = path.resolve(__dirname, "../../..");
 function compose(...args: string[]) {
@@ -9,7 +10,8 @@ function compose(...args: string[]) {
     "--profile", "research", ...args], {cwd: root, stdio: "pipe"}).toString();
 }
 
-test("real model checkpoints and predictions persist across container recreation", async ({page}) => {
+for (const extractor of process.env.E2E_PRETRAINED === "true" ? ["rgb-grid-texture-v1", "mobilenetv3-small-imagenet-onnx-v1"] : ["rgb-grid-texture-v1"]) {
+test(`real model checkpoints and predictions persist across container recreation (${extractor})`, async ({page}) => {
   const api = page.request;
   async function post(route: string, data: object, status = 200) {
     const csrf = await api.get("/api/v1/auth/csrf").then(r => r.json());
@@ -31,7 +33,7 @@ test("real model checkpoints and predictions persist across container recreation
     const image = await post(`${base}/datasets/${dataset.id}/images`, {content_base64: payloads[i], adult_authorized_consent: true, subject_group: `person-${Math.floor(i/2)}`});
     await post(`${base}/datasets/${dataset.id}/images/${image.id}/rating`, {score: 1 + i * 0.8});
   }
-  const queued = await post(`${base}/train`, {dataset_id: dataset.id, idempotency_key: crypto.randomUUID()}, 202);
+  const queued = await post(`${base}/train`, {dataset_id: dataset.id, idempotency_key: crypto.randomUUID(), extractor}, 202);
   const trained = await completed(queued.id);
   expect(trained.result.metrics.labeled_images).toBe(10);
   expect(trained.result.synthetic).toBe(false);
@@ -46,15 +48,30 @@ test("real model checkpoints and predictions persist across container recreation
   expect(before.synthetic).toBe(false);
   expect(Number.isFinite(before.raw_score)).toBe(true);
   compose("up", "-d", "--force-recreate", "--no-deps", "--wait", "api", "worker", "web");
+  // Recompute only this test image's disposable embedding after recreation; do not
+  // let cache reuse mask a changed extractor or missing private weight volume.
+  compose("exec", "-T", "api", "python", "-c", "import sys; from uuid import UUID; from sqlalchemy import delete; from aevyra_api.config import Settings; from aevyra_api.database import DependencyChecks; from aevyra_api.preferences.training_models import ImageEmbedding; db=DependencyChecks(Settings())\nwith db.sessions.begin() as session: session.execute(delete(ImageEmbedding).where(ImageEmbedding.image_id == UUID(sys.argv[1])))\ndb.close()", unseen.id);
   const after = await predict();
   expect(after.raw_score).toBe(before.raw_score);
   expect(after.model_id).toBe(modelId);
+  if (process.env.AUVYLEN_BENCHMARK_REPORT) {
+    const destination = path.resolve(process.env.AUVYLEN_BENCHMARK_REPORT);
+    mkdirSync(destination, {recursive: true});
+    writeFileSync(path.join(destination, `cloud-inference-${extractor}.json`), JSON.stringify({
+      synthetic_only: true, extractor, samples: 2,
+      before_recreation_processing_ms: before.processing_duration_ms,
+      after_recreation_recomputed_processing_ms: after.processing_duration_ms,
+      identical_raw_prediction: after.raw_score === before.raw_score,
+      embedding_recomputed_after_recreation: true,
+      excludes_queue_wait_and_browser_polling: true,
+    }, null, 2) + "\n");
+  }
   await page.goto("/research/preferences");
   await page.getByRole("button", {name: "Model persistence · 11 images · 10 rated", exact: true}).click();
-  await expect(page.getByText("Version 1 · READY · rgb-grid-texture-v1", {exact: true})).toBeVisible();
+  await expect(page.getByText(`Version 1 · READY · ${extractor}`, {exact: true})).toBeVisible();
   await expect(page.getByRole("heading", {name: "Validation for version 1"})).toBeVisible();
   await post(`${base}/datasets/${dataset.id}/images/${unseen.id}/rating`, {score: 5.5});
-  const retrain = await post(`${base}/train`, {dataset_id: dataset.id, idempotency_key: crypto.randomUUID()}, 202);
+  const retrain = await post(`${base}/train`, {dataset_id: dataset.id, idempotency_key: crypto.randomUUID(), extractor}, 202);
   expect((await completed(retrain.id)).result.model_version).toBe(2);
   const versions = await api.get(`/api/v1${base}/models`).then(r => r.json());
   expect(versions.map((m: {version: number}) => m.version)).toEqual([2, 1]);
@@ -66,3 +83,4 @@ test("real model checkpoints and predictions persist across container recreation
   compose("up", "-d", "--wait");
   expect((await api.get(`/api/v1${base}/models`).then(r => r.json())).every((m: {state: string}) => m.state === "DELETED")).toBe(true);
 });
+}

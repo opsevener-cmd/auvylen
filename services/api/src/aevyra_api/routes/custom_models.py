@@ -2,7 +2,13 @@ from uuid import UUID
 
 from aevyra_contracts.commercial import EmptyRequest
 from aevyra_contracts.research import ResearchJobView
-from aevyra_contracts.training import ModelEdit, ModelView, PredictRequest, TrainRequest
+from aevyra_contracts.training import (
+    ExtractorView,
+    ModelEdit,
+    ModelView,
+    PredictRequest,
+    TrainRequest,
+)
 from fastapi import APIRouter, Depends, Request
 
 from aevyra_api.preferences.training import ModelService
@@ -13,6 +19,11 @@ router = APIRouter(prefix="/api/v1/research/preferences", tags=["personal rating
 
 def service(request: Request) -> ModelService:
     return ModelService(sessions(request), config(request))
+
+
+@router.get("/extractors", response_model=list[ExtractorView])
+def extractors(request: Request, user: CurrentUser) -> list[ExtractorView]:
+    return service(request).extractors(user.id)
 
 
 @router.get("/models", response_model=list[ModelView])

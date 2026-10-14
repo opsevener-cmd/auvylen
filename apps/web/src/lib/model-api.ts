@@ -1,5 +1,5 @@
 import {z} from "zod";
-import type {PersonalModel} from "@auvylen/contracts";
+import type {FeatureExtractor, PersonalModel} from "@auvylen/contracts";
 export const modelSchema: z.ZodType<PersonalModel> = z.object({
   id: z.uuid(), dataset_id: z.uuid().nullable(), project_id: z.uuid(), version: z.number().int().positive(),
   state: z.enum(["TRAINING", "READY", "FAILED", "ARCHIVED", "DELETED"]), training_job_id: z.uuid(),
@@ -14,3 +14,7 @@ export const predictionSchema = z.object({
   synthetic: z.literal(false), prediction_type: z.literal("subjective_rating"), timestamp: z.string(),
 });
 export function metric(value: unknown): string {return typeof value === "number" && Number.isFinite(value) ? value.toFixed(3) : "Unavailable";}
+
+export const extractorSchema: z.ZodType<FeatureExtractor> = z.object({
+  id: z.string(), available: z.boolean(), reason: z.string(), manifest: z.record(z.string(), z.unknown()),
+});

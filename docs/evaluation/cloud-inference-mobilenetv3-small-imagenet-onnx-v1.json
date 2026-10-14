@@ -1,0 +1,10 @@
+{
+  "synthetic_only": true,
+  "extractor": "mobilenetv3-small-imagenet-onnx-v1",
+  "samples": 2,
+  "before_recreation_processing_ms": 60.3234650000104,
+  "after_recreation_recomputed_processing_ms": 132.33376200003022,
+  "identical_raw_prediction": true,
+  "embedding_recomputed_after_recreation": true,
+  "excludes_queue_wait_and_browser_polling": true
+}

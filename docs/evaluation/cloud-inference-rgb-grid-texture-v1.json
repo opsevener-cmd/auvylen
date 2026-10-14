@@ -1,0 +1,10 @@
+{
+  "synthetic_only": true,
+  "extractor": "rgb-grid-texture-v1",
+  "samples": 2,
+  "before_recreation_processing_ms": 21.94196199999965,
+  "after_recreation_recomputed_processing_ms": 34.24173100000871,
+  "identical_raw_prediction": true,
+  "embedding_recomputed_after_recreation": true,
+  "excludes_queue_wait_and_browser_polling": true
+}

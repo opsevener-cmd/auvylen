@@ -63,3 +63,5 @@ logs
 **/*.tif
 **/*.tiff
 **/*.avif
+
+.venv-extractor-export/

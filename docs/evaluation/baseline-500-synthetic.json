@@ -1,0 +1,49 @@
+{
+  "dataset": "generated synthetic texture images; arbitrary simulated ratings; NOT faces",
+  "measured_at": "2026-10-14T03:22:27.494747+00:00",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "cpu_quota": "200000 100000",
+  "memory_limit_bytes": 8589934592,
+  "facial_accuracy_evidence": false,
+  "count": 500,
+  "extractor": "rgb-grid-texture-v1",
+  "manifest": {
+    "id": "rgb-grid-texture-v1",
+    "dimension": 230,
+    "preprocessing": "rgb-grid-texture-v1"
+  },
+  "initialization_seconds": 2.075999987027899e-06,
+  "batch_size": 8,
+  "extraction_wall_seconds": 0.41539658900001086,
+  "extraction_cpu_seconds": 0.4140644339999999,
+  "extraction_images_per_second": 1203.6690074987278,
+  "single_extraction_p50_ms": 0.7601290000138761,
+  "single_extraction_p95_ms": 0.9280243499802053,
+  "compressed_synthetic_input_bytes": 4143071,
+  "embedding_float32_bytes": 460000,
+  "embedding_json_bytes": 2307290,
+  "application_quota": 500,
+  "fit_validation_seconds": 0.01587681099999827,
+  "synthetic_validation": {
+    "labeled_images": 500,
+    "training_images": 400,
+    "validation_images": 100,
+    "training_groups": 200,
+    "validation_groups": 50,
+    "validation_mae": 3.1238366810458955,
+    "validation_rmse": 3.9207184695976687,
+    "raw_validation_mae": 3.284508170221374,
+    "mean_baseline_mae": 2.6224000000000003,
+    "mean_baseline_rmse": 2.932984827782101
+  },
+  "training_images": 400,
+  "heldout_images": 100,
+  "checkpoint_bytes": 13369,
+  "cached_regression_p50_ms": 0.0239125000121021,
+  "peak_process_rss_mib": 62.1796875,
+  "runtime_distribution_bytes": {
+    "onnxruntime": 64533788,
+    "numpy": 56387386,
+    "pillow": 19667984
+  }
+}

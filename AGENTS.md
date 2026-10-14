@@ -33,7 +33,7 @@ back to Windows/WSL or local Docker. No cloud environment or paid server is assu
 - Keep custom-model contracts independent from removable third-party providers. Missing adapters/weights must report unavailable; never fabricate real predictions.
 - The mock engine must remain explicitly synthetic and disabled in production.
   Phase 4B now includes the reviewed first-party visual rating baseline; see
-  docs/custom-preference-models.md. Custom training and inference are non-commercial
+  docs/custom-preference-models.md and docs/pretrained-representation.md. Custom training and inference are non-commercial
   research operations and use the registry research policy gate. Unavailable external
   models must stay unavailable.
 - Every future execution must use the registry policy gate; new engines require explicit

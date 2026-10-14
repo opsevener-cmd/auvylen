@@ -1,0 +1,11 @@
+{
+  "synthetic_only": true,
+  "images": 500,
+  "extractor": "rgb-grid-texture-v1",
+  "ingestion_and_annotations_seconds": 14.138270758999994,
+  "first_job_wall_seconds": 9.128361732000002,
+  "cached_job_wall_seconds": 8.023922676999973,
+  "cache_hits": 500,
+  "private_upload_bytes": 769257,
+  "quota_501_rejected": true
+}

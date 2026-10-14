@@ -1,0 +1,11 @@
+{
+  "synthetic_only": true,
+  "images": 500,
+  "extractor": "mobilenetv3-small-imagenet-onnx-v1",
+  "ingestion_and_annotations_seconds": 13.922752115999998,
+  "first_job_wall_seconds": 12.374738227999984,
+  "cached_job_wall_seconds": 7.019738215999979,
+  "cache_hits": 1000,
+  "private_upload_bytes": 769257,
+  "quota_501_rejected": true
+}

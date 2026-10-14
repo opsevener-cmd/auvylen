@@ -306,3 +306,7 @@ remain provider-neutral, but public deployment is not performed. Shared TypeScri
 maintained explicitly alongside Python models; update both and tests when routes change.
 Engine inputs are opaque bytes; later phases must define safe input limits and validated
 image/domain representations before accepting untrusted content.
+
+Phase 4B also supports the independent frozen MobileNetV3-Small representation. See
+[pretrained model setup and licenses](docs/pretrained-representation.md) and
+[measured verification](docs/phase4b-representation-report.md).

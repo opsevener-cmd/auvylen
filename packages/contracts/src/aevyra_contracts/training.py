@@ -8,6 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 class TrainRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     dataset_id: UUID
+    extractor: Literal["rgb-grid-texture-v1", "mobilenetv3-small-imagenet-onnx-v1"] = (
+        "rgb-grid-texture-v1"
+    )
     idempotency_key: UUID
     alpha: float = Field(default=10.0, gt=0, le=1000, allow_inf_nan=False)
     seed: int = Field(default=42, ge=0, le=2147483647)
@@ -43,3 +46,10 @@ class ModelView(BaseModel):
     created_at: datetime
     completed_at: datetime | None
     expires_at: datetime
+
+
+class ExtractorView(BaseModel):
+    id: str
+    available: bool
+    reason: str
+    manifest: dict[str, JsonValue]

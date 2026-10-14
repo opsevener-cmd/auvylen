@@ -6,7 +6,8 @@ from typing import cast
 from uuid import UUID
 
 from aevyra_contracts.research import ResearchJobView
-from aevyra_contracts.training import ModelView, PredictRequest, TrainRequest
+from aevyra_contracts.training import ExtractorView, ModelView, PredictRequest, TrainRequest
+from aevyra_inference.extractors import MOBILENET, availability, manifest
 from aevyra_inference.preference import EXTRACTOR, IMPLEMENTATION, split_groups
 from pydantic import BaseModel, ConfigDict, JsonValue
 from sqlalchemy import func, select
@@ -55,6 +56,21 @@ class ModelService:
         self.data = PreferenceService(sessions, settings)
         self.queue = ResearchQueue(sessions, settings)
         self.store = PrivateArtifactStore(settings.private_model_root / "custom")
+
+    def extractors(self, user: UUID) -> list[ExtractorView]:
+        with self.sessions() as session:
+            self.data.access(session, user)
+        result = []
+        for identifier in (EXTRACTOR, MOBILENET):
+            available, reason = availability(
+                identifier, self.settings.private_model_root / "pretrained"
+            )
+            result.append(
+                ExtractorView(
+                    id=identifier, available=available, reason=reason, manifest=manifest(identifier)
+                )
+            )
+        return result
 
     def existing(
         self, session: Session, user: UUID, key: UUID, payload: dict[str, JsonValue]
@@ -114,11 +130,19 @@ class ModelService:
             "seed": body.seed,
             "validation_fraction": body.validation_fraction,
         }
+        # Preserve idempotency of baseline requests submitted before extractor selection existed.
+        if body.extractor != EXTRACTOR:
+            payload["extractor"] = body.extractor
         with self.sessions.begin() as session:
             self.data.access(session, user, lock=True)
             previous = self.existing(session, user, body.idempotency_key, payload)
             if previous:
                 return ResearchJobView.model_validate(previous)
+            available, reason = availability(
+                body.extractor, self.settings.private_model_root / "pretrained"
+            )
+            if not available:
+                raise DomainError(reason, 503)
             dataset = self.data.dataset(session, user, body.dataset_id, writable=True)
             rows = session.execute(
                 select(Image, Rating)
@@ -195,9 +219,10 @@ class ModelService:
                 dataset_id=dataset.id,
                 version=version,
                 training_job_id=job.id,
-                extractor=EXTRACTOR,
+                extractor=body.extractor,
                 implementation=IMPLEMENTATION,
                 configuration={
+                    "extractor": body.extractor,
                     "alpha": body.alpha,
                     "seed": body.seed,
                     "validation_fraction": body.validation_fraction,
@@ -206,8 +231,12 @@ class ModelService:
                 snapshot_sha256=digest(snapshot),
                 expires_at=dataset.expires_at,
                 limitations=[
-                    "Handcrafted visual features; no pretrained facial representation. "
-                    "Scores are subjective preferences, not objective beauty.",
+                    (
+                        "Handcrafted visual features; no pretrained facial representation. "
+                        if body.extractor == EXTRACTOR
+                        else "Frozen ImageNet MobileNetV3-Small; not trained for faces or beauty. "
+                    )
+                    + "Scores are subjective preferences, not objective beauty.",
                     "Small personal holdout; metrics do not establish reliable generalization.",
                     "Unknown identities can cause leakage; assign person/group IDs.",
                 ],

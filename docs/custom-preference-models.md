@@ -1,5 +1,7 @@
 # Personal rating models — Phase 4B core
 
+Current pretrained-extractor milestone: [implementation and licensing](pretrained-representation.md) and [verification report](phase4b-representation-report.md). Historical results below remain unchanged.
+
 Updated 2026-10-12. The existing Auvylen website now supports the complete numerical-rating
 training and prediction workflow. This is a genuine **CPU visual baseline**, not a
 pretrained facial attractiveness network. It learns from the owner's saved numerical

@@ -1,0 +1,13 @@
+MobileNetV3-Small 1.0 pretrained visual feature extractor
+Model: timm mobilenetv3_small_100.lamb_in1k
+Source code: huggingface/pytorch-image-models v1.0.30, commit 0df212b369a5385b16dfe513d5143a7311ea1ddc
+Author credited upstream: Ross Wightman / timm contributors
+The exact pretrained configuration declares license='apache-2.0' in timm/models/mobilenetv3.py.
+Checkpoint: github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/mobilenetv3_small_100_lamb-266a294c.pth
+Source SHA-256: 266a294cbf3d119000a760bf5664a4d80a9674d0616b5cc0836b093d20c38249
+Training data identified upstream: ImageNet-1k. No ImageNet photographs are distributed here.
+Auvylen modifications: reset_classifier(0), frozen evaluation mode, ONNX opset 17
+export with dynamic batch. Output is a 1024-dimensional penultimate representation,
+not ImageNet class scores or attractiveness predictions. Source weights are unchanged.
+Upstream Apache-2.0 license is provided alongside this notice. This file records
+provenance and Auvylen modifications; it is not an upstream NOTICE claim.

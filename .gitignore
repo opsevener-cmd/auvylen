@@ -73,3 +73,5 @@ logs/
 *.avif
 # Review any future synthetic image fixture or public branding asset before adding a
 # narrowly scoped exception. Never force-add private images or real checkpoints.
+
+.venv-extractor-export/

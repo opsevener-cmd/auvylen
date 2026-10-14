@@ -1,0 +1,61 @@
+{
+  "dataset": "generated synthetic texture images; arbitrary simulated ratings; NOT faces",
+  "measured_at": "2026-10-14T03:22:34.093987+00:00",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "cpu_quota": "200000 100000",
+  "memory_limit_bytes": 8589934592,
+  "facial_accuracy_evidence": false,
+  "count": 1000,
+  "extractor": "mobilenetv3-small-imagenet-onnx-v1",
+  "manifest": {
+    "id": "mobilenetv3-small-imagenet-onnx-v1",
+    "dimension": 1024,
+    "architecture": "MobileNetV3-Small width 1.0, frozen ImageNet ILSVRC2012",
+    "model_version": "timm mobilenetv3_small_100.lamb_in1k; timm 1.0.30; ONNX opset 17",
+    "source": "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/mobilenetv3_small_100_lamb-266a294c.pth",
+    "source_revision": "0df212b369a5385b16dfe513d5143a7311ea1ddc",
+    "source_weight_sha256": "266a294cbf3d119000a760bf5664a4d80a9674d0616b5cc0836b093d20c38249",
+    "source_weight_bytes": 10256237,
+    "weight_sha256": "164c481657afe9d36e08ff58693df24e511b5bf1a07de9b9389dfc468eedd2a6",
+    "weight_bytes": 6078515,
+    "weight_license": "Apache-2.0",
+    "code_licenses": "timm/ONNX Apache-2.0; PyTorch/TorchVision BSD-3-Clause; ONNX Runtime MIT; NumPy BSD-3-Clause; Pillow MIT-CMU",
+    "preprocessing": "exif-transpose RGB; shorter edge 256 bicubic; center crop 224; float32 /255; NCHW",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "output": "1024 penultimate features; global average pooling, conv_head, hardswish; classifier removed",
+    "graph_transform": "timm reset_classifier(0); torch 2.10.0+cpu legacy export; dynamic batch; opset 17",
+    "export_toolchain": "timm==1.0.30; torch==2.10.0+cpu; torchvision==0.25.0+cpu; onnx==1.22.0",
+    "runtime": "onnxruntime==1.31.0; CPUExecutionProvider; sequential; 1 thread",
+    "pillow": "12.3.0",
+    "numpy": "2.5.4",
+    "batch_size": 8,
+    "telemetry": "disabled"
+  },
+  "initialization_seconds": 0.06790173399997457,
+  "batch_size": 8,
+  "extraction_wall_seconds": 2.892248381999991,
+  "extraction_cpu_seconds": 2.88950409,
+  "extraction_images_per_second": 345.75177091412166,
+  "single_extraction_p50_ms": 2.6185895000025994,
+  "single_extraction_p95_ms": 2.7922427499987634,
+  "compressed_synthetic_input_bytes": 8282471,
+  "embedding_float32_bytes": 4096000,
+  "embedding_json_bytes": 20195219,
+  "application_quota": 500,
+  "training": "Not attempted: existing application quota remains 500. Extraction scaling only.",
+  "peak_process_rss_mib": 209.41015625,
+  "runtime_distribution_bytes": {
+    "onnxruntime": 64533788,
+    "numpy": 56387386,
+    "pillow": 19667984
+  }
+}

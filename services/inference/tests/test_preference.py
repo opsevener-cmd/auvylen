@@ -1,3 +1,4 @@
+import hashlib
 from io import BytesIO
 
 import numpy as np
@@ -37,6 +38,10 @@ def test_real_regression_generalizes_to_unseen_values_and_roundtrips():
         snapshot_sha256="a" * 64,
         check=lambda: None,
     )
+    # Golden bytes and prediction measured from preserved commit b37d2b8.
+    assert hashlib.sha256(checkpoint.model_dump_json().encode()).hexdigest() == (
+        "3367c2b36f603972bd45c4089d1f3c10bf07eabdbdedd057cb808967a9d388e9"
+    )
     assert metrics["validation_mae"] < 0.02
     assert metrics["validation_mae"] < metrics["mean_baseline_mae"]
     assert set(training).isdisjoint(validation)
@@ -47,6 +52,7 @@ def test_real_regression_generalizes_to_unseen_values_and_roundtrips():
     )
     with pytest.raises(EnginePolicyError):
         EngineRegistry([engine]).score("custom", picture(125), production=True)
+    assert score.raw_score == 5.411773755501414
     assert score.synthetic is False
     assert abs(score.raw_score - (1 + 9 * 125 / 255)) < 0.02
     assert len(extract(picture(125))) == DIMENSION

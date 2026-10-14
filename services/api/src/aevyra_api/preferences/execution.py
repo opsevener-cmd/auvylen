@@ -2,18 +2,27 @@
 
 import hashlib
 import logging
+import math
 import time
 from uuid import UUID
 
 from aevyra_contracts.training import PredictRequest, TrainRequest
 from aevyra_inference.engine import EngineRegistry
+from aevyra_inference.extractors import (
+    BATCH_SIZE,
+    FeatureExtractor,
+    create_extractor,
+    dimension,
+    manifest,
+)
 from aevyra_inference.preference import (
     DIMENSION,
     EXTRACTOR,
     PersonalRatingEngine,
-    RidgeCheckpoint,
-    baseline_metadata,
+    RatingCheckpoint,
+    checkpoint_adapter,
     extract,
+    rating_metadata,
     train,
 )
 from pydantic import JsonValue
@@ -36,6 +45,8 @@ class CustomExecution:
     def __init__(self, queue: ResearchQueue, lease: JobLease, heartbeat: LeaseHeartbeat):
         self.queue, self.lease, self.heartbeat = queue, lease, heartbeat
         self.service = ModelService(queue.sessions, queue.settings)
+        self.cache_hits = 0
+        self.cache_misses = 0
 
     def check(self, percent: int, phase: str) -> None:
         self.heartbeat.check()
@@ -65,8 +76,15 @@ class CustomExecution:
                     ImageEmbedding.image_id == id, ImageEmbedding.extractor == EXTRACTOR
                 )
             )
-            if cached and cached.source_sha256 == sha256 and len(cached.features) == DIMENSION:
+            if (
+                cached
+                and cached.source_sha256 == sha256
+                and len(cached.features) == DIMENSION
+                and all(math.isfinite(v) for v in cached.features)
+            ):
+                self.cache_hits += 1
                 return cached.features
+            self.cache_misses += 1
             vector = extract(payload)
             if cached:
                 cached.features, cached.source_sha256 = vector, sha256
@@ -77,6 +95,75 @@ class CustomExecution:
                     )
                 )
             return vector
+
+    def batch_embeddings(self, ids: list[UUID], extractor: FeatureExtractor) -> list[list[float]]:
+        if not 1 <= len(ids) <= BATCH_SIZE or len(ids) != len(set(ids)):
+            raise ValueError("Embedding batch limit")
+        self.heartbeat.check()
+        with self.queue.sessions.begin() as session:
+            self.service.data.access(session, self.lease.user_id)
+            candidates = list(
+                session.scalars(select(PreferenceImage).where(PreferenceImage.id.in_(ids)))
+            )
+            if len(candidates) != len(ids):
+                raise DomainError("Source image removed", 409)
+            # Follow the same dataset-before-image lock order as retention/deletion.
+            for dataset_id in sorted({image.dataset_id for image in candidates}):
+                self.service.data.dataset(session, self.lease.user_id, dataset_id)
+            images = list(
+                session.scalars(
+                    select(PreferenceImage)
+                    .where(PreferenceImage.id.in_(ids), PreferenceImage.deleted_at.is_(None))
+                    .order_by(PreferenceImage.id)
+                    .with_for_update()
+                )
+            )
+            if len(images) != len(ids):
+                raise DomainError("Source image removed", 409)
+            found = {
+                row.image_id: row
+                for row in session.scalars(
+                    select(ImageEmbedding).where(
+                        ImageEmbedding.image_id.in_(ids),
+                        ImageEmbedding.extractor == extractor.identifier,
+                    )
+                )
+            }
+            values: dict[UUID, list[float]] = {}
+            missing = []
+            for image in images:
+                payload = self.service.data.store.read(self.lease.user_id, image.artifact_id)
+                sha = hashlib.sha256(payload).hexdigest()
+                cached = found.get(image.id)
+                if (
+                    cached
+                    and cached.source_sha256 == sha
+                    and len(cached.features) == dimension(extractor.identifier)
+                    and all(math.isfinite(v) for v in cached.features)
+                ):
+                    values[image.id] = cached.features
+                    self.cache_hits += 1
+                else:
+                    missing.append((image.id, sha, payload))
+            if missing:
+                vectors = extractor.extract_batch([item[2] for item in missing])
+                self.heartbeat.check()
+                for (id, sha, _), vector in zip(missing, vectors, strict=True):
+                    cached = found.get(id)
+                    if cached:
+                        cached.features, cached.source_sha256 = vector, sha
+                    else:
+                        session.add(
+                            ImageEmbedding(
+                                image_id=id,
+                                extractor=extractor.identifier,
+                                source_sha256=sha,
+                                features=vector,
+                            )
+                        )
+                    values[id] = vector
+                    self.cache_misses += 1
+            return [values[id] for id in ids]
 
     def train(self) -> bool:
         started = time.monotonic()
@@ -105,31 +192,74 @@ class CustomExecution:
                 }
             )
         EngineRegistry.check_policy(
-            baseline_metadata(str(model.version), model.snapshot_sha256),
+            rating_metadata(str(model.version), model.snapshot_sha256, model.extractor),
             production=self.queue.settings.api_environment == "production",
             purpose="research",
         )
+        if request.extractor != model.extractor:
+            raise ValueError("Saved extractor configuration mismatch")
         self.check(1, "Extracting visual features")
         features: list[list[float]] = []
-        for index, example in enumerate(snapshot.examples):
-            self.check(1 + int(70 * index / len(snapshot.examples)), "Extracting visual features")
-            features.append(self.embedding(example.image_id))
+        handcrafted: list[list[float]] = []
+        if model.extractor == EXTRACTOR:
+            for index, example in enumerate(snapshot.examples):
+                self.check(
+                    1 + int(70 * index / len(snapshot.examples)), "Extracting visual features"
+                )
+                features.append(self.embedding(example.image_id))
+        else:
+            extractor = create_extractor(
+                model.extractor, self.queue.settings.private_model_root / "pretrained"
+            )
+            for index in range(0, len(snapshot.examples), BATCH_SIZE):
+                self.check(
+                    1 + int(70 * index / len(snapshot.examples)),
+                    "Extracting pretrained batches and baseline",
+                )
+                examples = snapshot.examples[index : index + BATCH_SIZE]
+                features.extend(self.batch_embeddings([e.image_id for e in examples], extractor))
+                handcrafted.extend(self.embedding(e.image_id) for e in examples)
+        extraction_seconds = time.monotonic() - started
         self.check(75, "Fitting rating regression")
-        checkpoint, measured, training, validation = train(
-            features,
-            [e.score for e in snapshot.examples],
-            [e.group for e in snapshot.examples],
-            alpha=request.alpha,
-            seed=request.seed,
-            validation_fraction=request.validation_fraction,
-            rating_min=snapshot.rating_min,
-            rating_max=snapshot.rating_max,
-            snapshot_sha256=model.snapshot_sha256,
-            check=lambda: self.check(75, "Fitting and validating grouped split"),
-        )
+
+        def fit(
+            vectors: list[list[float]], identifier: str
+        ) -> tuple[RatingCheckpoint, dict[str, float | int], list[int], list[int]]:
+            return train(
+                vectors,
+                [e.score for e in snapshot.examples],
+                [e.group for e in snapshot.examples],
+                alpha=request.alpha,
+                seed=request.seed,
+                validation_fraction=request.validation_fraction,
+                rating_min=snapshot.rating_min,
+                rating_max=snapshot.rating_max,
+                snapshot_sha256=model.snapshot_sha256,
+                extractor=identifier,
+                check=lambda: self.check(75, "Fitting and validating grouped split"),
+            )
+
+        checkpoint, measured, training, validation = fit(features, model.extractor)
+        if handcrafted:
+            _, baseline, baseline_train, baseline_validation = fit(handcrafted, EXTRACTOR)
+            if (training, validation) != (baseline_train, baseline_validation):
+                raise ValueError("Comparison split mismatch")
+        else:
+            baseline = measured
         metrics: dict[str, JsonValue] = dict(measured)
         metrics.update(
             {
+                "representation": manifest(model.extractor),
+                "handcrafted_baseline_mae": baseline["validation_mae"],
+                "handcrafted_baseline_rmse": baseline["validation_rmse"],
+                "comparison_protocol": (
+                    "identical snapshot, groups, seed, alpha and held-out images; "
+                    "training-only normalization"
+                ),
+                "extraction_duration_seconds": extraction_seconds,
+                "fit_and_validation_seconds": time.monotonic() - started - extraction_seconds,
+                "embedding_cache_hits": self.cache_hits,
+                "embedding_cache_misses": self.cache_misses,
                 "known_subject_groups": len(
                     {e.group for e in snapshot.examples if e.subject_known}
                 ),
@@ -163,7 +293,7 @@ class CustomExecution:
                 "provider": "custom",
                 "prediction_type": "subjective_rating",
                 "metrics": metrics,
-                "extractor": EXTRACTOR,
+                "extractor": model.extractor,
                 "synthetic": False,
             }
             saved = self.queue.finish(self.lease, result, publish)
@@ -193,14 +323,30 @@ class CustomExecution:
             raw = self.service.store.read(self.lease.user_id, model.artifact_id)
             if hashlib.sha256(raw).hexdigest() != model.artifact_sha256:
                 raise ValueError("Checkpoint integrity failure")
-            checkpoint = RidgeCheckpoint.model_validate_json(raw)
-            if checkpoint.snapshot_sha256 != model.snapshot_sha256:
+            checkpoint = checkpoint_adapter.validate_json(raw)
+            if (
+                checkpoint.snapshot_sha256 != model.snapshot_sha256
+                or checkpoint.extractor != model.extractor
+            ):
                 raise ValueError("Checkpoint snapshot mismatch")
             payload = self.service.data.store.read(self.lease.user_id, image.artifact_id)
             snapshot = TrainingSnapshot.model_validate(model.snapshot)
             seen = any(e.content_hash == image.content_hash for e in snapshot.examples)
         self.check(50, "Predicting with saved model")
-        score = EngineRegistry([PersonalRatingEngine(checkpoint, str(model.version))]).score(
+        root = self.queue.settings.private_model_root / "pretrained"
+        EngineRegistry.check_policy(
+            rating_metadata(str(model.version), model.snapshot_sha256, model.extractor),
+            production=self.queue.settings.api_environment == "production",
+            purpose="research",
+        )
+        # Verify installed pretrained weights even when the image embedding is cached.
+        if model.extractor != EXTRACTOR:
+            features = self.batch_embeddings([image.id], create_extractor(model.extractor, root))[0]
+        else:
+            features = self.embedding(image.id)
+        score = EngineRegistry(
+            [PersonalRatingEngine(checkpoint, str(model.version), root, features)]
+        ).score(
             "custom",
             payload,
             production=self.queue.settings.api_environment == "production",
@@ -214,6 +360,7 @@ class CustomExecution:
                 "model_version": model.version,
                 "provider": "custom",
                 "input_image_id": str(image.id),
+                "extractor": model.extractor,
                 "prediction_type": "subjective_rating",
                 "score_min": checkpoint.rating_min,
                 "score_max": checkpoint.rating_max,

@@ -3,11 +3,12 @@ import {execFileSync, spawn} from "node:child_process";
 import path from "node:path";
 
 test.use({trace: "off", screenshot: "off", video: "off"});
-test("train ratings, predict unseen upload and retrain a persisted model version", async ({page}) => {
+for (const extractor of process.env.E2E_PRETRAINED === "true" ? ["rgb-grid-texture-v1", "mobilenetv3-small-imagenet-onnx-v1"] : ["rgb-grid-texture-v1"]) {
+test(`train ratings, predict unseen upload and retrain a persisted model version (${extractor})`, async ({page}) => {
   test.skip(process.env.E2E_RESEARCH !== "true", "Requires explicit private research test mode");
   test.setTimeout(90000);
   const root = path.resolve(__dirname, "../../..");
-  const worker = spawn("uv", ["run", "python", "-m", "aevyra_api.research.worker"], {cwd: root,
+  const worker = spawn(path.join(root, ".venv/bin/python"), ["-m", "aevyra_api.research.worker"], {cwd: root,
     env: {...process.env, RESEARCH_MODE: "true", PRIVATE_UPLOAD_ROOT: path.join(root, "private-data/e2e-uploads"), PRIVATE_MODEL_ROOT: path.join(root, "private-data/e2e-models"), OPENBLAS_NUM_THREADS: "1"}, stdio: "ignore"});
   try {
     await page.goto("/register");
@@ -39,8 +40,9 @@ test("train ratings, predict unseen upload and retrain a persisted model version
       if (i < 9) await expect(page.getByText(`Image ${i + 2} of 10`, {exact: true})).toBeVisible();
     }
     await expect(page.getByText("10 images · 10 rated · 0 comparisons · 0 awaiting rating", {exact: true})).toBeVisible();
+    await page.getByRole("combobox", {name: "Visual feature extractor", exact: true}).selectOption(extractor);
     await page.getByRole("button", {name: "Train new version", exact: true}).click();
-    await expect(page.getByText("Version 1 · READY · rgb-grid-texture-v1", {exact: true})).toBeVisible({timeout: 20000});
+    await expect(page.getByText(`Version 1 · READY · ${extractor}`, {exact: true})).toBeVisible({timeout: 20000});
     await expect(page.getByRole("heading", {name: "Validation for version 1"})).toBeVisible();
     await page.getByLabel("Adult photographs", {exact: true}).setInputFiles(files[10]);
     await page.getByLabel("I confirm every subject").last().check();
@@ -55,15 +57,20 @@ test("train ratings, predict unseen upload and retrain a persisted model version
     await page.getByRole("button", {name: "Save and next", exact: true}).click();
     await expect(page.getByText("11 images · 11 rated · 0 comparisons · 0 awaiting rating", {exact: true})).toBeVisible();
     await page.getByRole("button", {name: "Train new version", exact: true}).click();
-    await expect(page.getByText("Version 2 · READY · rgb-grid-texture-v1", {exact: true})).toBeVisible({timeout: 20000});
+    await expect(page.getByText(`Version 2 · READY · ${extractor}`, {exact: true})).toBeVisible({timeout: 20000});
     await page.reload();
     await page.getByRole("button", {name: "Training fixture · 11 images · 11 rated", exact: true}).click();
-    await expect(page.getByText("Version 1 · READY · rgb-grid-texture-v1", {exact: true})).toBeVisible();
-    await expect(page.getByText("Version 2 · READY · rgb-grid-texture-v1", {exact: true})).toBeVisible();
+    await expect(page.getByText(`Version 1 · READY · ${extractor}`, {exact: true})).toBeVisible();
+    await expect(page.getByText(`Version 2 · READY · ${extractor}`, {exact: true})).toBeVisible();
     await page.goto("/account");
     await expect(page.getByText("Balance: 0 Credits", {exact: true})).toBeVisible();
   } finally {
-    worker.kill("SIGTERM");
-    await new Promise<void>(resolve => {if (worker.exitCode !== null) resolve(); else worker.once("exit", () => resolve());});
+    await new Promise<void>(resolve => {
+      if (worker.exitCode !== null) {resolve(); return;}
+      const timeout = setTimeout(() => worker.kill("SIGKILL"), 10000);
+      worker.once("exit", () => {clearTimeout(timeout); resolve();});
+      worker.kill("SIGTERM");
+    });
   }
 });
+}
