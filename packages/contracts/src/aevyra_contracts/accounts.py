@@ -25,6 +25,7 @@ class UserView(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     public_user_id: str
     login_identifier: str
+    role: str
 
 
 class SessionView(BaseModel):

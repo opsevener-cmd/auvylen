@@ -198,7 +198,7 @@ def credit_products(request: Request, user: CurrentUser) -> list[CreditProductVi
             CreditProductView(
                 slug=product.slug,
                 name="Auvylen Analysis",
-                credit_cost=product.credit_cost,
+                credit_cost=0 if user.role == "owner" else product.credit_cost,
                 available=config(request).api_environment != "production",
             )
             for product in session.scalars(

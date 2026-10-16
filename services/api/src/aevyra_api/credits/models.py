@@ -25,6 +25,7 @@ class User(Timestamped, Base):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     public_user_id: Mapped[str] = mapped_column(String(40), unique=True)
     login_identifier: Mapped[str] = mapped_column(String(120), unique=True)
+    role: Mapped[str] = mapped_column(String(16), default="user", server_default="user")
     password_hash: Mapped[str] = mapped_column(String(255))
     disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

@@ -21,6 +21,7 @@ from aevyra_api.config import Settings
 from aevyra_api.credits.codes import aware
 from aevyra_api.credits.models import AccountSession, User, Wallet
 
+OWNER_LOGIN = "owner_god"  # Reserved; only the terminal can provision this identity.
 COOKIE = "auvylen_session"
 CSRF_COOKIE = "auvylen_csrf"
 HASHER = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=1)
@@ -90,6 +91,8 @@ class AccountService:
             return user
 
     def register(self, identifier: str, password: str) -> tuple[User, str]:
+        if identifier.strip().lower() == OWNER_LOGIN:
+            raise DomainError("Account could not be created with this identifier", 409)
         hashed = HASHER.hash(password)
         try:
             with self.sessions.begin() as session:

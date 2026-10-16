@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from aevyra_api.commercial.models import Analysis, AnalysisResult, Product, now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.credits.ledger import append_credit, lock_wallet
+from aevyra_api.credits.models import User
 from aevyra_api.credits.models import CreditTransaction
 
 logger = logging.getLogger("aevyra.credit_fulfillment")
@@ -32,6 +33,8 @@ class CreditAnalysisService:
             raise DomainError("Synthetic analysis is unavailable in production", 404)
         with self.sessions.begin() as session:
             wallet = lock_wallet(session, user_id)
+            account = session.get(User, user_id)
+            owner = bool(account and account.role == "owner" and account.disabled_at is None)
             existing = session.scalar(
                 select(Analysis).where(
                     Analysis.user_id == user_id, Analysis.credit_request_key == request_key
@@ -44,7 +47,10 @@ class CreditAnalysisService:
                         CreditTransaction.idempotency_key == f"analysis:{existing.id}",
                     )
                 )
-                if debit is None or debit.transaction_metadata.get("product_slug") != product_slug:
+                if owner:
+                    if debit is not None:
+                        raise DomainError("Analysis request key conflict", 409)
+                elif debit is None or debit.transaction_metadata.get("product_slug") != product_slug:
                     raise DomainError("Analysis request key conflict", 409)
                 analysis_id = existing.id
             else:
@@ -66,16 +72,17 @@ class CreditAnalysisService:
                 )
                 session.add(analysis)
                 session.flush()
-                debit = append_credit(
-                    session,
-                    wallet,
-                    amount=-product.credit_cost,
-                    kind="ANALYSIS",
-                    reference_type="analysis",
-                    reference_id=str(analysis.id),
-                    key=f"analysis:{analysis.id}",
-                    metadata={"product_slug": product.slug},
-                )
+                if not owner:
+                    append_credit(
+                        session,
+                        wallet,
+                        amount=-product.credit_cost,
+                        kind="ANALYSIS",
+                        reference_type="analysis",
+                        reference_id=str(analysis.id),
+                        key=f"analysis:{analysis.id}",
+                        metadata={"product_slug": product.slug},
+                    )
                 analysis_id = analysis.id
         self.fulfill(analysis_id)
         return analysis_id
@@ -146,8 +153,13 @@ class CreditAnalysisService:
                 CreditTransaction.idempotency_key == f"analysis:{analysis.id}",
             )
         )
-        if debit is None or debit.amount >= 0:
+        if debit is None:
+            account = session.get(User, analysis.user_id)
+            if account and account.role == "owner":
+                return  # Free Owner analysis does not need a refund.
             raise DomainError("Analysis debit missing; reconciliation required", 503)
+        if debit.amount >= 0:
+            raise DomainError("Analysis debit invalid; reconciliation required", 503)
         append_credit(
             session,
             wallet,

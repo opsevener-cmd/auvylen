@@ -28,7 +28,7 @@ export interface AnalysisResult {
   engine_version: string; calibration_version: string | null; created_at: string;
   metadata: {synthetic: true; scored_at: string; [key: string]: unknown};
 }
-export interface AccountUser {public_user_id: string; login_identifier: string}
+export interface AccountUser {public_user_id: string; login_identifier: string; role: "user" | "owner"}
 export interface CreditEntry {id: string; amount: number; transaction_type: string; balance_after: number; created_at: string}
 export interface Account {user: AccountUser; wallet: {balance: number; transactions: CreditEntry[]}; analyses: Analysis[]}
 export interface CreditProduct {slug: string; name: string; credit_cost: number; available: boolean}

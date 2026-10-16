@@ -422,13 +422,13 @@ def backup(data: Path, env: dict[str, str]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=["setup", "start", "stop", "status", "grant", "backup", "run"]
+        "action", choices=["setup", "start", "stop", "status", "grant", "backup", "run", "owner-init"]
     )
     parser.add_argument("value", nargs="?")
     args = parser.parse_args()
     data, origin, secret_dir = context()
     data.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if args.action in {"setup", "start", "stop", "backup"}:
+    if args.action in {"setup", "start", "stop", "backup", "owner-init"}:
         import fcntl
 
         with (data / "control.lock").open("a") as lock:
@@ -450,6 +450,8 @@ def dispatch(args: argparse.Namespace, data: Path, origin: str, secret_dir: Path
     env = environment(data, origin, secret_dir)
     if args.action == "setup":
         setup(data, env)
+    elif args.action == "owner-init":
+        call([python(data), "-m", "aevyra_api.owner"], env)
     elif args.action == "start":
         start(data, origin, env)
     elif args.action == "backup":

@@ -19,7 +19,10 @@ from aevyra_api.research.models import ResearchAccess, ResearchJob
 def authorized(session: Session, user_id: UUID) -> bool:
     user = session.get(User, user_id)
     access = session.get(ResearchAccess, user_id)
-    return bool(user and user.disabled_at is None and access and access.enabled)
+    return bool(
+        user and user.disabled_at is None
+        and (user.role == "owner" or (access and access.enabled))
+    )
 
 
 @dataclass(frozen=True)
