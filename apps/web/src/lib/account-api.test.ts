@@ -5,7 +5,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("account contracts and mutations", () => {
   it("validates integer balances and transaction history", () => {
-    const account = {user: {public_user_id: "usr_example", login_identifier: "pilot"},
+    const account = {user: {public_user_id: "usr_example", login_identifier: "pilot", role: "user"},
       wallet: {balance: 9, transactions: []}, analyses: []};
     expect(accountSchema.parse(account).wallet.balance).toBe(9);
     expect(() => accountSchema.parse({...account, wallet: {...account.wallet, balance: -1}})).toThrow();

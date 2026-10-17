@@ -28,7 +28,7 @@ export interface AnalysisResult {
   engine_version: string; calibration_version: string | null; created_at: string;
   metadata: {synthetic: true; scored_at: string; [key: string]: unknown};
 }
-export interface AccountUser {public_user_id: string; login_identifier: string}
+export interface AccountUser {public_user_id: string; login_identifier: string; role: "user" | "owner"}
 export interface CreditEntry {id: string; amount: number; transaction_type: string; balance_after: number; created_at: string}
 export interface Account {user: AccountUser; wallet: {balance: number; transactions: CreditEntry[]}; analyses: Analysis[]}
 export interface CreditProduct {slug: string; name: string; credit_cost: number; available: boolean}
@@ -87,4 +87,14 @@ export interface EngineMetadata {
 
 export interface FeatureExtractor {
   id: string; available: boolean; reason: string; manifest: Record<string, unknown>;
+}
+
+export type AdminValue = string | number | boolean | null | AdminValue[] | {[key: string]: AdminValue};
+export interface AdminPage {items: Record<string, AdminValue>[]; total: number; page: number; page_size: number}
+export interface AdminResult {data: Record<string, AdminValue>}
+export interface OwnerOverview {
+  counts: Record<string, number>; jobs: Record<string, number>; credits: Record<string, number>;
+  health: Record<string, AdminValue>; providers: Record<string, AdminValue>[];
+  extractors: Record<string, AdminValue>[]; usage: Record<string, AdminValue>[]; quotas: Record<string, number>;
+  environment: string; research_enabled: boolean; free_product_access: true;
 }

@@ -17,6 +17,7 @@ from aevyra_api.commercial.models import now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.config import Settings
 from aevyra_api.credits.models import User
+from aevyra_api.entitlements import research_limits
 from aevyra_api.preferences.models import PreferenceDataset as Dataset
 from aevyra_api.preferences.models import PreferenceImage as Image
 from aevyra_api.preferences.models import PreferenceRating as Rating
@@ -155,6 +156,8 @@ class ModelService:
                 )
                 .order_by(Image.id)
             ).all()
+            if len(rows) > 500:
+                raise DomainError("Training supports at most 500 rated images per version", 422)
             examples = [
                 Example(
                     image_id=image.id,
@@ -193,8 +196,10 @@ class ModelService:
                     .where(CustomModel.user_id == user, CustomModel.state != "DELETED")
                 )
                 or 0
-            ) >= 100:
-                raise DomainError("Model version limit reached (100); delete unused versions", 429)
+            ) >= research_limits(session, user, self.settings).models:
+                raise DomainError(
+                    "Model version resource limit reached; delete unused versions", 429
+                )
             version = (
                 session.scalar(
                     select(func.max(CustomModel.version)).where(
@@ -282,8 +287,9 @@ class ModelService:
                 for row in session.scalars(
                     select(CustomModel)
                     .where(CustomModel.user_id == user)
-                    .order_by(CustomModel.created_at.desc())
-                    .limit(200)
+                    # Keep every retained version manageable even after many deletions.
+                    .order_by((CustomModel.state == "DELETED").asc(), CustomModel.created_at.desc())
+                    .limit(research_limits(session, user, self.settings).models + 100)
                 )
             ]
 

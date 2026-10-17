@@ -222,3 +222,11 @@ A final idle snapshot of the six application containers used approximately 286 M
 aggregate reported memory (API 86, web 73, worker 67, PostgreSQL 35, Redis 6, Caddy 18 MiB).
 This excludes build peaks, Docker/runtime overhead and any future ML work; it is not
 a production capacity guarantee.
+
+## Owner administration (separate review branch)
+
+`codex/owner-god-provisioning` extends PR #1 with persistent Owner identity, centralized
+free-product entitlement, bounded research quotas, administration and audit history.
+See [Owner operations](owner-account.md) and [verification](owner-verification.md).
+The Phase 4B learning engines and private artifacts are preserved. This branch is not
+automatically merged or deployed into the existing private Codespace.

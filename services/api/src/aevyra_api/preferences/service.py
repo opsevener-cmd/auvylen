@@ -23,6 +23,7 @@ from aevyra_api.commercial.models import now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.config import Settings
 from aevyra_api.credits.models import User
+from aevyra_api.entitlements import research_limits
 from aevyra_api.preferences.images import CONSENT_VERSION, DecodedImage
 from aevyra_api.preferences.models import (
     PreferenceDataset as Dataset,
@@ -106,8 +107,8 @@ class PreferenceService:
                     select(func.count()).select_from(Project).where(Project.user_id == user)
                 )
                 or 0
-            ) >= 20:
-                raise DomainError("Project limit reached (20)", 429)
+            ) >= research_limits(session, user, self.settings).projects:
+                raise DomainError("Project resource limit reached", 429)
             row = Project(user_id=user, name=name)
             session.add(row)
             session.flush()
@@ -195,8 +196,8 @@ class PreferenceService:
                 )
                 or 0
             )
-            if count >= 100:
-                raise DomainError("Dataset limit reached (100)", 429)
+            if count >= research_limits(session, user, self.settings).datasets:
+                raise DomainError("Dataset resource limit reached", 429)
             row = Dataset(
                 project_id=project.id,
                 name=body.name,
@@ -286,8 +287,9 @@ class PreferenceService:
                     .where(Project.user_id == user)
                 ).one()
                 size = len(decoded.image) + len(decoded.thumbnail)
-                if count >= 500 or used + size > 512 * 1024 * 1024:
-                    raise DomainError("Private image quota reached (500 images / 512 MiB)", 429)
+                limits = research_limits(session, user, self.settings)
+                if count >= limits.images or used + size > limits.storage_bytes:
+                    raise DomainError("Private image resource quota reached", 429)
                 artifact, _ = self.store.put(user, decoded.image)
                 artifacts.append(artifact)
                 thumbnail, _ = self.store.put(user, decoded.thumbnail)
@@ -374,8 +376,8 @@ class PreferenceService:
                         select(func.count()).select_from(Pair).where(Pair.dataset_id == dataset_id)
                     )
                     or 0
-                ) >= 10000:
-                    raise DomainError("Pair annotation limit reached (10000)", 429)
+                ) >= research_limits(session, user, self.settings).pairs:
+                    raise DomainError("Pair annotation resource limit reached", 429)
                 row = Pair(dataset_id=dataset_id, left_id=left, right_id=right, choice=choice)
                 session.add(row)
             else:

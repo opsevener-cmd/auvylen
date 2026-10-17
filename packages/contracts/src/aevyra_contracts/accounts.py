@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -25,6 +26,7 @@ class UserView(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     public_user_id: str
     login_identifier: str
+    role: Literal["user", "owner"]
 
 
 class SessionView(BaseModel):

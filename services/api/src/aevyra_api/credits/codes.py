@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from aevyra_api.admin_models import AdminAudit
 from aevyra_api.commercial.models import now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.credits.ledger import append_credit, lock_wallet
@@ -55,6 +56,7 @@ def generate_batch(
     quantity: int,
     output: Path,
     expires_at: datetime | None = None,
+    audit_terminal: bool = False,
 ) -> str:
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", channel):
         raise DomainError("Channel must be a lowercase identifier", 422)
@@ -124,6 +126,20 @@ def generate_batch(
                 export.flush()
                 os.fsync(export.fileno())
                 batch.active = True
+                if audit_terminal:
+                    session.add(
+                        AdminAudit(
+                            actor_id=None,
+                            action="terminal.batch.create",
+                            target=public_id,
+                            outcome="success",
+                            details={
+                                "control": "deployment-terminal",
+                                "quantity": quantity,
+                                "credits_per_code": credits,
+                            },
+                        )
+                    )
     except BaseException:
         output.unlink(missing_ok=True)
         raise

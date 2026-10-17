@@ -74,6 +74,9 @@ def main() -> None:
                     ModelService(checks.sessions, settings).purge()
                     PreferenceService(checks.sessions, settings).purge()
                     last_cleanup = time.monotonic()
+                checks.redis.set(
+                    "auvylen:worker:heartbeat:" + settings.worker_queue, str(time.time()), ex=120
+                )
                 run_one(queue)
                 HEARTBEAT.touch(mode=0o600)
             except Exception as exc:

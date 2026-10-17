@@ -9,10 +9,12 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,9 +24,21 @@ from aevyra_api.database import Base
 
 class User(Timestamped, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("role IN ('user','owner')", name="ck_user_role"),
+        CheckConstraint("role != 'owner' OR login_identifier = 'owner_god'", name="ck_owner_login"),
+        Index(
+            "uq_users_single_owner",
+            "role",
+            unique=True,
+            postgresql_where=text("role = 'owner'"),
+            sqlite_where=text("role = 'owner'"),
+        ),
+    )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     public_user_id: Mapped[str] = mapped_column(String(40), unique=True)
     login_identifier: Mapped[str] = mapped_column(String(120), unique=True)
+    role: Mapped[str] = mapped_column(String(16), default="user", server_default="user")
     password_hash: Mapped[str] = mapped_column(String(255))
     disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

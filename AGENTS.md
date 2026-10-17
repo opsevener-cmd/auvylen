@@ -87,7 +87,12 @@ codes or session tokens. Plaintext exports belong only in gitignored exports/ an
 also be excluded from Docker builds. Operators must protect exports and back up the pepper.
 Require account ownership, exact Origin and CSRF validation for account mutations.
 
-Research execution requires explicit RESEARCH_MODE and an operator-granted user access record.
+Research execution requires explicit RESEARCH_MODE and an operator-granted user access record
+for standard users; the unique database-backed Owner receives permanent research entitlement
+through `entitlements.py`. Future product features must integrate with this central policy
+without bypassing registry licensing, availability, private ownership or resource safeguards.
+Owner administration requires explicit server-side authorization and recent authentication;
+mutations must commit their append-only audit records with financial/state changes.
 Research jobs never mutate Credits. Durable jobs are owned by PostgreSQL; workers execute
 outside HTTP requests, fence stale completions, and enforce bounded retries. At the Phase
 4A baseline, no training algorithm or real inference is implemented. Private upload/model

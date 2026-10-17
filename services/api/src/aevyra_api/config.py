@@ -36,6 +36,16 @@ class Settings(BaseSettings):
     private_model_root: Path = Path("/var/lib/auvylen/models")
     research_max_pending: int = Field(default=2, ge=1, le=10)
     research_daily_limit: int = Field(default=50, ge=1, le=1000)
+    owner_max_projects: int = Field(default=100, ge=20, le=200)
+    owner_max_datasets: int = Field(default=300, ge=100, le=500)
+    owner_max_images: int = Field(default=1000, ge=500, le=2000)
+    owner_storage_mib: int = Field(default=2048, ge=512, le=4096)
+    owner_max_pairs: int = Field(default=50000, ge=10000, le=100000)
+    owner_max_models: int = Field(default=300, ge=100, le=500)
+    owner_max_pending: int = Field(default=4, ge=2, le=8)
+    owner_daily_limit: int = Field(default=200, ge=50, le=500)
+    research_max_running: int = Field(default=1, ge=1, le=2)
+    owner_fresh_auth_seconds: int = Field(default=600, ge=60, le=900)
     worker_queue: Literal["cpu", "gpu"] = "cpu"
     job_lease_seconds: int = Field(default=60, ge=30, le=3600)
 

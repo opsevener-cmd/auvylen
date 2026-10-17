@@ -4,7 +4,7 @@ import {analysisSchema} from "./api-schemas";
 
 const credits = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 export const accountSchema: z.ZodType<Account> = z.object({
-  user: z.object({public_user_id: z.string(), login_identifier: z.string()}),
+  user: z.object({public_user_id: z.string(), login_identifier: z.string(), role: z.enum(["user", "owner"])}),
   wallet: z.object({balance: credits, transactions: z.array(z.object({
     id: z.uuid(), amount: z.number().int(), transaction_type: z.string(),
     balance_after: credits, created_at: z.string(),
@@ -15,7 +15,7 @@ export const creditProductsSchema: z.ZodType<CreditProduct[]> = z.array(z.object
 }));
 export const redemptionSchema: z.ZodType<RedemptionResult> = z.object({credits_added: credits, balance: credits});
 export const sessionSchema = z.object({
-  user: z.object({public_user_id: z.string(), login_identifier: z.string()}), csrf_token: z.string(),
+  user: z.object({public_user_id: z.string(), login_identifier: z.string(), role: z.enum(["user", "owner"])}), csrf_token: z.string(),
 });
 
 export class AccountError extends Error {

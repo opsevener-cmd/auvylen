@@ -314,3 +314,11 @@ Phase 4B also supports the independent frozen MobileNetV3-Small representation. 
 For immediate personal browser use without a VPS, follow
 [the private GitHub Codespaces preview guide](docs/codespaces-private-preview.md).
 The default configuration forwards only private port 3000; no local Windows server is used.
+
+## Owner administration
+
+The reserved `owner_god` account is provisioned interactively after an approved incremental
+deployment. See [Owner system and safe Codespaces update](docs/owner-account.md) and
+[verification evidence](docs/owner-verification.md). Never put passwords in Git, command
+arguments or chat. `/owner` uses server-side authorization; private model ownership remains
+unchanged. Owner product usage is free, while bounded resource and provider policies apply.

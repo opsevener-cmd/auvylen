@@ -1,4 +1,5 @@
 import logging
+import re
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -9,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
-from aevyra_api.accounts import RedisRateLimiter
+from aevyra_api.accounts import COOKIE, RedisRateLimiter
 from aevyra_api.commercial.events import PaymentEventProcessor
 from aevyra_api.commercial.fulfillment import SynchronousFulfillment
 from aevyra_api.commercial.orders import OrderService
@@ -23,6 +24,7 @@ from aevyra_api.routes import (
     commercial,
     custom_models,
     health,
+    owner,
     preferences,
     research,
     scoring,
@@ -86,6 +88,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             response = await call_next(request)
             response.headers["X-Request-ID"] = request_id
+            if request.url.path.startswith("/api/v1/owner") and response.status_code >= 400:
+                from starlette.concurrency import run_in_threadpool
+
+                from aevyra_api.administration import audit
+
+                def record_denial() -> None:
+                    try:
+                        # Bound unauthenticated audit floods; do not store attacker paths/bodies.
+                        request.app.state.rate_limiter.check("owner-audit-failures", 100, 60)
+                        with request.app.state.sessions.begin() as session:
+                            route = request.scope.get("route")
+                            action = getattr(route, "name", "unknown")
+                            actor = getattr(request.state, "admin_actor_id", None)
+                            if actor is None:
+                                try:
+                                    actor = (
+                                        accounts.account_service(request)
+                                        .authenticate(request.cookies.get(COOKIE))
+                                        .id
+                                    )
+                                except DomainError:
+                                    pass  # Unknown/expired identity is recorded as anonymous.
+                            target = request.path_params.get("public_id", "")
+                            if not re.fullmatch(r"(?:usr|batch)_[0-9a-f]{32}", target):
+                                target = "owner-api"
+                            audit(
+                                session,
+                                actor,
+                                "http." + action,
+                                target,
+                                outcome="failure",
+                                details={"status": response.status_code},
+                            )
+                    except Exception as exc:
+                        logging.getLogger("aevyra.audit").warning(
+                            "admin_denial_audit_unavailable",
+                            extra={"error_type": type(exc).__name__},
+                        )
+
+                await run_in_threadpool(record_denial)
             if request.url.path.startswith(
                 (
                     "/api/v1/auth",
@@ -93,6 +135,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "/api/v1/redeem",
                     "/api/v1/credit-",
                     "/api/v1/research",
+                    "/api/v1/owner",
                 )
             ):
                 response.headers["Cache-Control"] = "no-store"
@@ -132,6 +175,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(scoring.router)
     application.include_router(commercial.router)
     application.include_router(accounts.router)
+    application.include_router(owner.router)
     application.include_router(research.router)
     application.include_router(preferences.router)
     application.include_router(custom_models.router)

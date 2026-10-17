@@ -64,9 +64,9 @@ export function AccountPage({historyOnly = false}: {historyOnly?: boolean}) {
   return <section className="max-w-2xl">
     <h1 className="text-3xl font-medium">{historyOnly ? "Analysis history" : "Your account"}</h1>
     {!historyOnly && <>
-      <p className="mt-5">{account.user.login_identifier}</p>
-      <p className="mt-6 text-2xl">Balance: {account.wallet.balance} Credits</p>
-      <div className="mt-5 flex gap-5"><Link href="/redeem" className="underline">Redeem Code</Link><Link href="/analyze" className="underline">Run Analysis</Link></div>
+      <p className="mt-5">{account.user.login_identifier}{account.user.role === "owner" ? " · OWNER" : ""}</p>
+      <p className="mt-6 text-2xl">{account.user.role === "owner" ? "Owner access · No Credit charge" : `Balance: ${account.wallet.balance} Credits`}</p>
+      <div className="mt-5 flex gap-5">{account.user.role === "owner" ? <Link href="/owner" className="underline">Owner dashboard</Link> : <Link href="/redeem" className="underline">Redeem Code</Link>}<Link href="/analyze" className="underline">Run Analysis</Link></div>
       <h2 className="mt-10 text-xl">Recent credit transactions</h2>
       <ul className="mt-4 divide-y divide-black/10">{account.wallet.transactions.map(entry => <li key={entry.id} className="py-3">
         {entry.amount > 0 ? "+" : ""}{entry.amount} · {entry.transaction_type} · Balance {entry.balance_after}
@@ -128,7 +128,7 @@ export function AccountAnalyze({children}: {children: React.ReactNode}) {
   const product = products[0];
   return <section className="max-w-xl">
     <h1 className="text-3xl font-medium">Auvylen Analysis</h1>
-    <p className="mt-6 text-xl">Balance: {account.wallet.balance} Credits</p>
+    <p className="mt-6 text-xl">{account.user.role === "owner" ? "Owner · No Credit charge" : `Balance: ${account.wallet.balance} Credits`}</p>
     {product && <>
       <p className="mt-5">Cost: {product.credit_cost} Credit{product.credit_cost === 1 ? "" : "s"}</p>
       <p className="mt-5">Development / Synthetic Result. No photo or real facial model is used.</p>
@@ -141,6 +141,6 @@ export function AccountAnalyze({children}: {children: React.ReactNode}) {
       }}>Run Analysis</button>}
     </>}
     {error && <p role="alert" className="mt-5">{error}</p>}
-    <Link href="/redeem" className="mt-8 inline-block underline">Redeem Code</Link>
+    {account.user.role === "owner" ? <Link href="/owner" className="mt-8 inline-block underline">Owner dashboard</Link> : <Link href="/redeem" className="mt-8 inline-block underline">Redeem Code</Link>}
   </section>;
 }

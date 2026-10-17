@@ -20,6 +20,7 @@ from aevyra_api.commercial.state import DomainError
 from aevyra_api.config import Settings
 from aevyra_api.credits.codes import aware
 from aevyra_api.credits.models import AccountSession, User, Wallet
+from aevyra_api.entitlements import OWNER_LOGIN
 
 COOKIE = "auvylen_session"
 CSRF_COOKIE = "auvylen_csrf"
@@ -90,6 +91,8 @@ class AccountService:
             return user
 
     def register(self, identifier: str, password: str) -> tuple[User, str]:
+        if identifier.strip().lower() == OWNER_LOGIN:
+            raise DomainError("Account could not be created with this identifier", 409)
         hashed = HASHER.hash(password)
         try:
             with self.sessions.begin() as session:
@@ -108,7 +111,9 @@ class AccountService:
 
     def login(self, identifier: str, password: str) -> tuple[User, str]:
         with self.sessions.begin() as session:
-            user = session.scalar(select(User).where(User.login_identifier == identifier))
+            user = session.scalar(
+                select(User).where(User.login_identifier == identifier).with_for_update()
+            )
             try:
                 HASHER.verify(user.password_hash if user else DUMMY_HASH, password)
             except VerificationError:

@@ -268,3 +268,14 @@ explicit grants, upload/rating/training/retraining/prediction, restart preservat
 encrypted backup/database restoration were exercised on managed remote Linux.
 No external Codespace or public preview was created; the owner follows the
 [GitHub opening steps](codespaces-private-preview.md) using included quota.
+
+## Owner administration, 2026-10-17
+
+Remote Linux verification on `codex/owner-god-provisioning`: full backend/integration/
+pretrained suite **171 passed** (115.61s), plus **1 additional PR #1 upgrade test passed**;
+frontend **35 passed**; two isolated private-HTTPS Owner workflow/encrypted-restore tests
+**2 passed** (46.7s). Ruff check/format, mypy (66 sources), ESLint, TypeScript, production
+Next build and Alembic upgrade/check passed. A cloud restart interrupted an earlier run;
+that run is not counted. See [complete evidence and limits](owner-verification.md) and
+[Owner initialization / approved existing-Codespace deployment](owner-account.md).
+No merge or live Codespace update was performed. No public port or paid resource was created.
