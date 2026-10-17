@@ -35,6 +35,7 @@ from aevyra_api.config import Settings
 from aevyra_api.credits.analysis import CreditAnalysisService
 from aevyra_api.credits.codes import redeem
 from aevyra_api.credits.models import CreditTransaction, User, Wallet
+from aevyra_api.entitlements import credit_cost
 
 router = APIRouter(prefix="/api/v1", tags=["accounts and Credits"])
 
@@ -82,7 +83,7 @@ def rate(request: Request, scope: str, limit: int, identity: str = "") -> None:
     # ceiling, with the existing tighter per-account limit, rather than trusting XFF.
     shared_limits = {"register": 60, "login": 120, "redeem": 120, "analysis": 180}
     shared_proxy = config(request).public_pilot or config(request).shared_proxy_rate_limits
-    ip_limit = shared_limits[scope] if shared_proxy else limit
+    ip_limit = shared_limits.get(scope, limit) if shared_proxy else limit
     limiter.check(f"{scope}:ip:{key}", ip_limit, 300)
     if identity:
         key = hmac.new(
@@ -198,7 +199,7 @@ def credit_products(request: Request, user: CurrentUser) -> list[CreditProductVi
             CreditProductView(
                 slug=product.slug,
                 name="Auvylen Analysis",
-                credit_cost=0 if user.role == "owner" else product.credit_cost,
+                credit_cost=credit_cost(user, product.credit_cost),
                 available=config(request).api_environment != "production",
             )
             for product in session.scalars(

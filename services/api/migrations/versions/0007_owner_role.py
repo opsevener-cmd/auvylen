@@ -10,10 +10,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("role", sa.String(length=16), nullable=False, server_default="user"))
-    op.create_index("uq_users_single_owner", "users", ["role"], unique=True,
-                    postgresql_where=sa.text("role = 'owner'"),
-                    sqlite_where=sa.text("role = 'owner'"))
+    op.add_column(
+        "users", sa.Column("role", sa.String(length=16), nullable=False, server_default="user")
+    )
+    op.create_index(
+        "uq_users_single_owner",
+        "users",
+        ["role"],
+        unique=True,
+        postgresql_where=sa.text("role = 'owner'"),
+        sqlite_where=sa.text("role = 'owner'"),
+    )
 
 
 def downgrade() -> None:

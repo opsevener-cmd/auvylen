@@ -5,11 +5,12 @@ from aevyra_inference.engine import EngineRegistry
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from aevyra_api.admin_models import FreeAnalysisGrant
 from aevyra_api.commercial.models import Analysis, AnalysisResult, Product, now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.credits.ledger import append_credit, lock_wallet
-from aevyra_api.credits.models import User
-from aevyra_api.credits.models import CreditTransaction
+from aevyra_api.credits.models import CreditTransaction, User
+from aevyra_api.entitlements import is_owner
 
 logger = logging.getLogger("aevyra.credit_fulfillment")
 
@@ -32,9 +33,11 @@ class CreditAnalysisService:
         if self.production:
             raise DomainError("Synthetic analysis is unavailable in production", 404)
         with self.sessions.begin() as session:
+            account = session.scalar(select(User).where(User.id == user_id).with_for_update())
+            if account is None or account.disabled_at is not None:
+                raise DomainError("Sign in required", 401)
             wallet = lock_wallet(session, user_id)
-            account = session.get(User, user_id)
-            owner = bool(account and account.role == "owner" and account.disabled_at is None)
+            owner = is_owner(account)
             existing = session.scalar(
                 select(Analysis).where(
                     Analysis.user_id == user_id, Analysis.credit_request_key == request_key
@@ -47,10 +50,13 @@ class CreditAnalysisService:
                         CreditTransaction.idempotency_key == f"analysis:{existing.id}",
                     )
                 )
-                if owner:
-                    if debit is not None:
+                free = session.get(FreeAnalysisGrant, existing.id)
+                if free is not None:
+                    if debit is not None or free.product_slug != product_slug:
                         raise DomainError("Analysis request key conflict", 409)
-                elif debit is None or debit.transaction_metadata.get("product_slug") != product_slug:
+                elif (
+                    debit is None or debit.transaction_metadata.get("product_slug") != product_slug
+                ):
                     raise DomainError("Analysis request key conflict", 409)
                 analysis_id = existing.id
             else:
@@ -72,7 +78,13 @@ class CreditAnalysisService:
                 )
                 session.add(analysis)
                 session.flush()
-                if not owner:
+                if owner:
+                    session.add(
+                        FreeAnalysisGrant(
+                            analysis_id=analysis.id, user_id=user_id, product_slug=product.slug
+                        )
+                    )
+                else:
                     append_credit(
                         session,
                         wallet,
@@ -117,7 +129,11 @@ class CreditAnalysisService:
                     },
                 )
                 analysis.status = "FAILED"
-                analysis.failure_reason = "Synthetic analysis failed; Credits refunded"
+                analysis.failure_reason = (
+                    "Synthetic analysis failed; no Credits charged"
+                    if session.get(FreeAnalysisGrant, analysis.id)
+                    else "Synthetic analysis failed; Credits refunded"
+                )
                 analysis.completed_at = now()
                 self._refund(session, analysis)
                 return
@@ -154,8 +170,7 @@ class CreditAnalysisService:
             )
         )
         if debit is None:
-            account = session.get(User, analysis.user_id)
-            if account and account.role == "owner":
+            if session.get(FreeAnalysisGrant, analysis.id) is not None:
                 return  # Free Owner analysis does not need a refund.
             raise DomainError("Analysis debit missing; reconciliation required", 503)
         if debit.amount >= 0:

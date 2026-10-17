@@ -20,8 +20,8 @@ from aevyra_api.commercial.state import DomainError
 from aevyra_api.config import Settings
 from aevyra_api.credits.codes import aware
 from aevyra_api.credits.models import AccountSession, User, Wallet
+from aevyra_api.entitlements import OWNER_LOGIN
 
-OWNER_LOGIN = "owner_god"  # Reserved; only the terminal can provision this identity.
 COOKIE = "auvylen_session"
 CSRF_COOKIE = "auvylen_csrf"
 HASHER = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=1)
@@ -111,7 +111,9 @@ class AccountService:
 
     def login(self, identifier: str, password: str) -> tuple[User, str]:
         with self.sessions.begin() as session:
-            user = session.scalar(select(User).where(User.login_identifier == identifier))
+            user = session.scalar(
+                select(User).where(User.login_identifier == identifier).with_for_update()
+            )
             try:
                 HASHER.verify(user.password_hash if user else DUMMY_HASH, password)
             except VerificationError:

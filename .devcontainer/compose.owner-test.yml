@@ -1,0 +1,6 @@
+# Only for isolated cloud verification, never apply to the user's running Codespace.
+# Use with compose.yml + compose.test.yml, project name auvylen-owner-test.
+services:
+  workspace:
+    environment:
+      AUVYLEN_PREVIEW_TEST_DATA: /workspaces/auvylen/private-data/owner-test

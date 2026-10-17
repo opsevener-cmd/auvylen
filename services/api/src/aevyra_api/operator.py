@@ -10,6 +10,8 @@ from uuid import UUID
 from sqlalchemy import func, select
 
 from aevyra_api.accounts import pepper
+from aevyra_api.admin_models import AdminAudit
+from aevyra_api.administration import audit
 from aevyra_api.commercial.models import now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.config import Settings
@@ -71,6 +73,7 @@ def main() -> int:
                 quantity=args.quantity,
                 output=args.output,
                 expires_at=args.expires_at,
+                audit_terminal=True,
             )
             print(
                 json.dumps(
@@ -95,6 +98,14 @@ def main() -> int:
                     batch.active = False
                 elif args.command == "expire-batch":
                     batch.expires_at = now()
+                if args.command != "batch-summary":
+                    audit(
+                        session,
+                        None,
+                        "terminal." + args.command,
+                        batch.public_batch_id,
+                        details={"control": "deployment-terminal"},
+                    )
                 redeemed = session.scalar(
                     select(func.count())
                     .select_from(RedemptionCode)
@@ -122,6 +133,14 @@ def main() -> int:
                 service.fulfill(args.analysis_id)
             else:
                 service.refund_failed(args.analysis_id)
+            with sessions.begin() as session:
+                audit(
+                    session,
+                    None,
+                    "terminal." + args.command,
+                    str(args.analysis_id),
+                    details={"control": "deployment-terminal"},
+                )
             print(json.dumps({"analysis": str(args.analysis_id), "operation": args.command}))
         else:
             with sessions.begin() as session:
@@ -146,6 +165,24 @@ def main() -> int:
                         key=f"operator:{args.key}",
                         reason=args.reason,
                     )
+                    audit_key = f"operator:{args.key}"
+                    if not session.scalar(
+                        select(AdminAudit).where(AdminAudit.request_key == audit_key)
+                    ):
+                        session.add(
+                            AdminAudit(
+                                actor_id=None,
+                                action="terminal." + args.command,
+                                target=user.public_user_id,
+                                outcome="success",
+                                request_key=audit_key,
+                                details={
+                                    "control": "deployment-terminal",
+                                    "reason": args.reason,
+                                    "amount": args.amount,
+                                },
+                            )
+                        )
                 balance = session.scalar(
                     select(func.coalesce(func.sum(CreditTransaction.amount), 0)).where(
                         CreditTransaction.wallet_id == wallet.id

@@ -88,3 +88,13 @@ export interface EngineMetadata {
 export interface FeatureExtractor {
   id: string; available: boolean; reason: string; manifest: Record<string, unknown>;
 }
+
+export type AdminValue = string | number | boolean | null | AdminValue[] | {[key: string]: AdminValue};
+export interface AdminPage {items: Record<string, AdminValue>[]; total: number; page: number; page_size: number}
+export interface AdminResult {data: Record<string, AdminValue>}
+export interface OwnerOverview {
+  counts: Record<string, number>; jobs: Record<string, number>; credits: Record<string, number>;
+  health: Record<string, AdminValue>; providers: Record<string, AdminValue>[];
+  extractors: Record<string, AdminValue>[]; usage: Record<string, AdminValue>[]; quotas: Record<string, number>;
+  environment: string; research_enabled: boolean; free_product_access: true;
+}

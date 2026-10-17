@@ -129,7 +129,7 @@ function DatasetEditor({initial, onChange, onDelete}: {initial: PreferenceDetail
           } finally {await reload();}
         });}}>
           <label>Adult photographs<input name="photos" type="file" accept="image/jpeg,image/png" multiple required className={field} /></label>
-          <p>JPEG or PNG, up to 4 MiB each, 4096px per side and 16 megapixels. Up to 500 private images per account. Originals are replaced by metadata-free JPEG copies.</p>
+          <p>JPEG or PNG, up to 4 MiB each, 4096px per side and 16 megapixels. Standard accounts allow 500 private images; Owner capacity is shown in the Owner dashboard. Each training version supports up to 500 rated images. Originals are replaced by metadata-free JPEG copies.</p>
           <label>Person/group identifier (optional; same person must use the same identifier)<input name="group" maxLength={120} className={field} /></label>
           <label className="block my-3"><input name="consent" type="checkbox" required /> {consentText}</label>
           <button className={button}>Upload photographs</button>

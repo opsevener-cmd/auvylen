@@ -23,7 +23,7 @@ pytestmark = pytest.mark.integration
 
 
 @contextmanager
-def postgres_services():
+def postgres_services(revision="head"):
     settings = Settings()
     schema = f"aevyra_test_{uuid4().hex}"
     admin = create_engine(
@@ -42,8 +42,9 @@ def postgres_services():
         config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
         with database.begin() as connection:
             config.attributes["connection"] = connection
-            command.upgrade(config, "head")
-            command.check(config)
+            command.upgrade(config, revision)
+            if revision == "head":
+                command.check(config)
         sessions = sessionmaker(database, expire_on_commit=False)
         provider = MockPaymentProvider(b"isolated-postgres-test-key")
         engine = MockScoringEngine()

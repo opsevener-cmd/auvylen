@@ -6,23 +6,21 @@ from datetime import UTC, timedelta
 from uuid import UUID, uuid4
 
 from pydantic import JsonValue
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from aevyra_api.commercial.models import now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.config import Settings
 from aevyra_api.credits.models import User
+from aevyra_api.entitlements import product_access, research_limits
 from aevyra_api.research.models import ResearchAccess, ResearchJob
 
 
 def authorized(session: Session, user_id: UUID) -> bool:
     user = session.get(User, user_id)
     access = session.get(ResearchAccess, user_id)
-    return bool(
-        user and user.disabled_at is None
-        and (user.role == "owner" or (access and access.enabled))
-    )
+    return bool(user and product_access(user, standard_allowed=bool(access and access.enabled)))
 
 
 @dataclass(frozen=True)
@@ -98,10 +96,8 @@ class ResearchQueue:
             )
             or 0
         )
-        if (
-            pending >= self.settings.research_max_pending
-            or daily >= self.settings.research_daily_limit
-        ):
+        limits = research_limits(session, user_id, self.settings)
+        if pending >= limits.pending or daily >= limits.daily:
             raise DomainError("Research resource limit reached", 429)
         job = ResearchJob(
             user_id=user_id,
@@ -138,6 +134,20 @@ class ResearchQueue:
         if not self.settings.research_mode:
             return None
         with self.sessions.begin() as session:
+            # Cross-process admission cap, including multiple worker replicas. Expired
+            # leases can be reclaimed; the existing token fencing still applies.
+            if session.bind is not None and session.bind.dialect.name == "postgresql":
+                session.execute(text("SELECT pg_advisory_xact_lock(518927406)"))
+            running = (
+                session.scalar(
+                    select(func.count())
+                    .select_from(ResearchJob)
+                    .where(ResearchJob.status == "RUNNING", ResearchJob.lease_until > now())
+                )
+                or 0
+            )
+            if running >= self.settings.research_max_running:
+                return None
             while True:
                 job = session.scalar(
                     select(ResearchJob)

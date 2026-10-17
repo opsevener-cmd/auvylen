@@ -4,6 +4,7 @@ import argparse
 
 from sqlalchemy import select
 
+from aevyra_api.administration import Administration, audit
 from aevyra_api.config import Settings
 from aevyra_api.credits.models import User
 from aevyra_api.database import DependencyChecks
@@ -26,12 +27,25 @@ def main() -> None:
             )
             if user is None:
                 raise SystemExit("User not found")
+            if user.role == "owner":
+                raise SystemExit(
+                    "Owner research entitlement is permanent; use RESEARCH_MODE for global shutdown"
+                )
             access = session.get(ResearchAccess, user.id)
             if access is None:
                 access = ResearchAccess(user_id=user.id)
                 session.add(access)
             access.enabled = args.action == "grant"
             access.reason = args.reason
+            if not access.enabled:
+                Administration.cancel_work(session, user.id)
+            audit(
+                session,
+                None,
+                "terminal.research." + args.action,
+                user.public_user_id,
+                details={"control": "deployment-terminal", "reason": args.reason},
+            )
         print("Research authorization updated; no Credits changed")
     finally:
         checks.close()
