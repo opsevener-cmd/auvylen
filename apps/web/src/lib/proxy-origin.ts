@@ -2,7 +2,7 @@ type ProxyEnvironment = Readonly<Record<string, string | undefined>>;
 
 type OriginDecision = {allowed: true; origin: string | null} | {allowed: false};
 
-/** Restore only the documented Codespaces port-3000 rewrite, never arbitrary Origins.
+/** Restore only the captured Codespaces port-3000 rewrite, never arbitrary Origins.
  * Host/Fetch Metadata/Referer are consistency checks, not authentication. FastAPI
  * still validates the exact Origin, session-bound CSRF token and account session.
  */
@@ -23,18 +23,26 @@ export function proxyOrigin(headers: Headers, method: string, env: ProxyEnvironm
   let configured: unknown;
   try {configured = JSON.parse(env.CORS_ORIGINS ?? "");} catch {return {allowed: false};}
   if (!Array.isArray(configured) || configured.length !== 1 || configured[0] !== canonical ||
-      headers.get("host") !== host ||
-      (headers.has("x-forwarded-host") && headers.get("x-forwarded-host") !== host)) {
+      (headers.has("x-forwarded-host") && headers.get("x-forwarded-host") !== host) ||
+      (headers.has("x-forwarded-proto") && headers.get("x-forwarded-proto") !== "https")) {
     return {allowed: false};
   }
   const site = headers.get("sec-fetch-site");
   if (site !== null && site !== "same-origin") return {allowed: false};
-  if (incoming === canonical) return {allowed: true, origin: incoming};
-  // Do not broaden this to other localhost names, schemes, ports, or missing Origin.
-  if (incoming !== "http://localhost:3000" || site !== "same-origin") return {allowed: false};
-  try {
-    const referer = new URL(headers.get("referer") ?? "");
-    if (referer.origin !== canonical || referer.username || referer.password) return {allowed: false};
-  } catch {return {allowed: false};}
+  const referer = headers.get("referer");
+  if (referer !== null) {
+    // Reject combined duplicate headers and parser-normalized ambiguous URL forms.
+    if (/[\s,\\]/.test(referer)) return {allowed: false};
+    try {
+      const url = new URL(referer);
+      if (url.origin !== canonical || url.username || url.password || url.hash) return {allowed: false};
+    } catch {return {allowed: false};}
+  }
+  if (headers.get("host") === host && incoming === canonical) return {allowed: true, origin: incoming};
+  // Captured GitHub ingress rewrites BOTH Host and Origin. The forwarded headers
+  // must agree with server configuration; they never supply the canonical origin.
+  if (headers.get("host") !== "localhost:3000" || incoming !== "http://localhost:3000" ||
+      headers.get("x-forwarded-host") !== host || headers.get("x-forwarded-proto") !== "https" ||
+      site !== "same-origin" || referer === null) return {allowed: false};
   return {allowed: true, origin: canonical};
 }
