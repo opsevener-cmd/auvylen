@@ -1,5 +1,6 @@
 import hashlib
 from io import BytesIO
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -38,21 +39,45 @@ def test_real_regression_generalizes_to_unseen_values_and_roundtrips():
         snapshot_sha256="a" * 64,
         check=lambda: None,
     )
-    # Golden bytes and prediction measured from preserved commit b37d2b8.
-    assert hashlib.sha256(checkpoint.model_dump_json().encode()).hexdigest() == (
+    # Preserve the exact b37d2b8 synthetic checkpoint, rather than expecting newly
+    # fitted floats to be bit-identical across OpenBLAS CPU kernels. Haswell/Zen
+    # differ from SkylakeX by ~3.5e-18 in coefficients with an identical prediction.
+    golden_bytes = (
+        Path(__file__).parent / "fixtures/rgb-grid-texture-v1-synthetic.json"
+    ).read_bytes()
+    assert hashlib.sha256(golden_bytes).hexdigest() == (
         "3367c2b36f603972bd45c4089d1f3c10bf07eabdbdedd057cb808967a9d388e9"
     )
+    golden = RidgeCheckpoint.model_validate_json(golden_bytes)
+    assert golden.model_dump_json().encode() == golden_bytes
+    for field in ("mean", "scale", "coefficients", "intercept"):
+        np.testing.assert_allclose(
+            getattr(checkpoint, field), getattr(golden, field), rtol=0, atol=1e-14
+        )
+    for field in (
+        "format",
+        "extractor",
+        "implementation",
+        "snapshot_sha256",
+        "rating_min",
+        "rating_max",
+    ):
+        assert getattr(checkpoint, field) == getattr(golden, field)
     assert metrics["validation_mae"] < 0.02
     assert metrics["validation_mae"] < metrics["mean_baseline_mae"]
     assert set(training).isdisjoint(validation)
     restored = RidgeCheckpoint.model_validate_json(checkpoint.model_dump_json())
+    assert restored.model_dump_json() == checkpoint.model_dump_json()
     engine = PersonalRatingEngine(restored, "1")
     score = EngineRegistry([engine]).score(
         "custom", picture(125), production=True, purpose="research"
     )
     with pytest.raises(EnginePolicyError):
         EngineRegistry([engine]).score("custom", picture(125), production=True)
-    assert score.raw_score == 5.411773755501414
+    assert score.raw_score == pytest.approx(5.411773755501414, rel=0, abs=1e-12)
+    assert PersonalRatingEngine(golden, "legacy").predict(picture(125)) == pytest.approx(
+        score.raw_score, rel=0, abs=1e-12
+    )
     assert score.synthetic is False
     assert abs(score.raw_score - (1 + 9 * 125 / 255)) < 0.02
     assert len(extract(picture(125))) == DIMENSION
