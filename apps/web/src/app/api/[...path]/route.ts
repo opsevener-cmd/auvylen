@@ -1,6 +1,7 @@
 import {NextRequest} from "next/server";
 import {allowedApiPath} from "@/lib/api-proxy-policy";
 import {getApiUrl} from "@/lib/environment";
+import {proxyOrigin} from "@/lib/proxy-origin";
 
 // Development same-origin proxy. Production Caddy routes /api directly to FastAPI.
 // Explicit account and research routes only; no arbitrary URLs or operator routes.
@@ -10,11 +11,18 @@ async function proxy(request: NextRequest, context: {params: Promise<{path: stri
   if (!allowedApiPath(joined)) {
     return Response.json({detail: "Not found"}, {status: 404});
   }
+  const origin = proxyOrigin(request.headers, request.method, process.env);
+  if (!origin.allowed) {
+    return Response.json({detail: "Request origin rejected"}, {
+      status: 403, headers: {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    });
+  }
   const headers = new Headers();
-  for (const name of ["cookie", "content-type", "origin", "x-csrf-token"]) {
+  for (const name of ["cookie", "content-type", "x-csrf-token"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
+  if (origin.origin !== null) headers.set("origin", origin.origin);
   try {
     let body: Uint8Array | undefined;
     if (request.method === "POST") {

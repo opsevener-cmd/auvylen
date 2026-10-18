@@ -55,6 +55,10 @@ Codespace name, without wildcard CORS, forwarded-host trust or a public-pilot se
 Wrong origins and missing CSRF tokens are rejected. Commercial/mock checkout is disabled;
 research mode requires an explicit grant and never spends Credits.
 
+For Codespaces' localhost Origin rewrite, the web proxy uses a narrowly validated
+[compatibility rule](codespaces-login-origin.md) before forwarding POSTs. The same
+document covers regression results and updating an existing preview after approval.
+
 The preview is available while the Codespace is running. It is a personal development
 preview, with the existing account/annotation limitations and retention rules, not a
 permanent production host. No real face dataset is automatically downloaded. The reviewed
