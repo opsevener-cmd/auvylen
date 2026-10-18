@@ -31,8 +31,9 @@ NAME = "opulent-umbrella-6v5456gw9jx5hrg69"
 HOST = f"{NAME}-3000.app.github.dev"
 ORIGIN = f"https://{HOST}"
 FORWARDED = {
-    "host": HOST,
+    "host": "localhost:3000",
     "x-forwarded-host": HOST,
+    "x-forwarded-proto": "https",
     "origin": "http://localhost:3000",
     "sec-fetch-site": "same-origin",
     "referer": f"{ORIGIN}/account",
@@ -134,10 +135,12 @@ def csrf(client):
     }
 
 
-@pytest.mark.parametrize("origin", ["http://localhost:3000", ORIGIN])
-def test_login_session_logout_and_expiry_through_codespaces_proxy(proxy, origin):
+@pytest.mark.parametrize(
+    "host,origin", [("localhost:3000", "http://localhost:3000"), (HOST, ORIGIN)]
+)
+def test_login_session_logout_and_expiry_through_codespaces_proxy(proxy, host, origin):
     client, sessions, _ = proxy
-    headers = {**csrf(client), "origin": origin}
+    headers = {**csrf(client), "host": host, "origin": origin}
     bad_password = client.post(
         "/api/v1/auth/login",
         headers=headers,
@@ -188,15 +191,29 @@ def test_forged_missing_and_unauthorized_origin_rejected_before_login(proxy):
         {"origin": "https://other-space-3000.app.github.dev"},
         {"origin": "http://localhost:3001"},
         {"origin": "http://127.0.0.1:3000"},
-        {"host": "localhost:3000"},
+        {"host": HOST},
+        {"host": "localhost:3001"},
+        {"host": "127.0.0.1:3000"},
+        {"origin": ORIGIN},
         {"host": f"{HOST}.evil.test"},
+        {"x-forwarded-host": None},
         {"x-forwarded-host": "attacker.example"},
         {"x-forwarded-host": f"{HOST}, attacker.example"},
+        {"x-forwarded-host": f"{HOST}, {HOST}"},
+        {"x-forwarded-proto": None},
+        {"x-forwarded-proto": "http"},
+        {"x-forwarded-proto": "https, http"},
+        {"x-forwarded-proto": "https, https"},
         {"referer": None},
         {"referer": "https://attacker.example/account"},
+        {"referer": f"{ORIGIN}/account, https://attacker.example/"},
         {"sec-fetch-site": None},
         {"sec-fetch-site": "cross-site"},
         {"sec-fetch-site": "same-site"},
+        {"host": HOST, "origin": ORIGIN, "x-forwarded-host": "attacker.example"},
+        {"host": HOST, "origin": ORIGIN, "x-forwarded-proto": "http"},
+        {"host": HOST, "origin": ORIGIN, "referer": "https://attacker.example/account"},
+        {"host": HOST, "origin": ORIGIN, "sec-fetch-site": "cross-site"},
     ]
     for override in attacks:
         headers = {k: v for k, v in {**valid, **override}.items() if v is not None}

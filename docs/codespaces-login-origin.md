@@ -1,7 +1,8 @@
 # Private Codespaces login Origin compatibility
 
-Verified in remote Codex Linux on 2026-10-18, starting from Phase 4B `7b95795`
-(including the merged Owner implementation). No live Codespace was accessed or changed.
+Updated in remote Codex Linux on 2026-10-18, starting from Phase 4B `db6f429`
+(including merged PR #2). The implementation session did not access or change the
+live Codespace; the user supplied the captured ingress headers below.
 
 ## Finding and scope
 
@@ -10,11 +11,23 @@ preflight does not make a POST with a different Origin valid. The existing Next.
 API proxy forwarded the received Origin unchanged, so Codespaces' rewritten
 `http://localhost:3000` reached FastAPI and was correctly rejected.
 
-A [first-hand Codespaces reproduction](https://github.com/orgs/community/discussions/147513)
-reports this rewrite while preserving the external Host and HTTPS Referer; it also
-reports that nonmatching external Origins are not rewritten. This is observed
-behavior, not a documented stable GitHub forwarding contract. The reported Auvylen
-symptoms are consistent with it. We have not inspected the user's live inbound headers.
+The initial compatibility fix assumed GitHub retained the external Host, based on
+an earlier public reproduction. The user's actual private Codespace capture shows
+that **both Host and Origin are rewritten**:
+
+```text
+Host: localhost:3000
+Origin: http://localhost:3000
+X-Forwarded-Host: opulent-umbrella-6v5456gw9jx5hrg69-3000.app.github.dev
+X-Forwarded-Proto: https
+Sec-Fetch-Site: same-origin
+Referer origin: https://opulent-umbrella-6v5456gw9jx5hrg69-3000.app.github.dev
+```
+
+Requiring the external Host rejected this legitimate request before forwarding to
+FastAPI. The regression now replays this captured combination. Referer paths in
+tests are synthetic; only its captured origin is known. This is observed behavior,
+not a guaranteed stable GitHub forwarding contract.
 
 `apps/web/src/lib/proxy-origin.ts` now gates POST normalization on all of:
 
@@ -22,14 +35,18 @@ symptoms are consistent with it. We have not inspected the user's live inbound h
   forwarding domain exactly `app.github.dev` (the controller's existing default).
 - Canonical HTTPS Origin computed from that server-side identity and port 3000,
   matching the **single** configured `CORS_ORIGINS` value.
-- Incoming Host exactly equal to the canonical host. X-Forwarded-Host, if present,
-  must match exactly too; neither header selects the trusted hostname.
-- Incoming Origin either already canonical, or exactly `http://localhost:3000`.
-  Missing, `null`, multiple, alternate-loopback, other-port, other-Codespace and
-  unauthorized external Origins fail closed.
-- For the localhost rewrite only: `Sec-Fetch-Site: same-origin` and a valid Referer
-  with the canonical HTTPS origin and no URL credentials. Any supplied contradictory
-  Fetch Metadata also rejects an otherwise canonical Origin.
+- Either the unchanged canonical Host and HTTPS Origin pair, or exactly
+  `Host: localhost:3000` with `Origin: http://localhost:3000`. Mixed pairs, missing
+  Host/Origin, `null`, multiple values, alternate loopback addresses, other ports,
+  other Codespaces and unauthorized external Origins fail closed.
+- For the localhost pair, all four additional headers are mandatory:
+  X-Forwarded-Host exactly equals the configured canonical host,
+  X-Forwarded-Proto is exactly `https`, Sec-Fetch-Site is exactly `same-origin`,
+  and Referer is a single valid URL with the canonical HTTPS origin and no
+  credentials or fragment. No trusted origin is ever derived from request headers.
+- The unchanged canonical pair does not need forwarding headers. If forwarded
+  host/protocol, Fetch Metadata or Referer are supplied, they must agree with the
+  same policy. Combined duplicate values and ambiguous Referer forms are rejected.
 
 Validation precedes body reading and upstream forwarding. The existing controller
 already supplies the required environment; no new secrets or deployment flags are
@@ -39,7 +56,26 @@ authorization, rate limits and Secure/HttpOnly/SameSite cookies are unchanged.
 No backend localhost allowance, CORS expansion, schema migration or data mutation
 is introduced. No Owner provisioning or password rotation is required.
 
-## Executed verification
+## Captured-ingress correction verification
+
+Executed against the correction in remote Linux:
+
+- `npm test`: 114 passed, including 79 Origin-policy cases.
+- `npm run lint`, `npm run typecheck`, `npm run build`: passed.
+- `uv run pytest -q --integration services/api/tests/test_codespaces_login_proxy.py`:
+  4 passed. The production-built Next.js proxy and real FastAPI handler accept the
+  captured localhost pair and the unchanged canonical pair, while rejecting missing,
+  forged, multiple and contradictory forwarding values even with valid credentials
+  and CSRF. Session, cookie, CSRF and direct FastAPI Origin checks remain covered.
+- `uv run pytest -q services/api/tests/test_credits.py services/api/tests/test_owner.py`:
+  30 passed, 1 integration test skipped (covered by the CI integration run).
+- Ruff lint/format and mypy: passed (145 Python files formatted, 66 source files typed).
+
+The isolated integration uses only synthetic credentials and a migrated in-memory
+database. Replay is verified; a live browser login after approved rollout remains
+to be confirmed. The PR records the final commit's five GitHub Actions job results.
+
+## Original PR #2 verification (historical)
 
 | Command | Result |
 | --- | --- |
@@ -89,7 +125,8 @@ additional evidence for the otherwise ambiguous localhost Origin.
 
 Browsers/extensions that strip Referer or Fetch Metadata will fail closed on the
 rewrite path. If GitHub changes the scheme, host or rewrite behavior, login may fail
-closed again. Inspect only sanitized Host/Origin/Referer-origin/Fetch-Metadata values
+closed again. Inspect only sanitized Host/Origin/X-Forwarded-Host/X-Forwarded-Proto/
+Referer-origin/Fetch-Metadata values
 in the private terminal before changing this policy; never dump cookies, tokens or
 request bodies, or add wildcard/localhost exceptions to FastAPI. A live private
 Codespaces login check remains necessary after the user approves rollout.
