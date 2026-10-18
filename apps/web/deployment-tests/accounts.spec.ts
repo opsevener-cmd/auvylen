@@ -1,6 +1,6 @@
 import {expect, test} from "@playwright/test";
 import {execFileSync} from "node:child_process";
-import {mkdirSync, readFileSync} from "node:fs";
+import {mkdirSync, readFileSync, statSync} from "node:fs";
 import path from "node:path";
 
 test.use({trace: "off"});
@@ -9,13 +9,24 @@ test("HTTPS accounts protect sessions and support redemption with environment-ga
   const root = path.resolve(__dirname, "../../..");
   const stamp = Date.now().toString();
   const filename = `https-pilot-${stamp}.csv`;
-  mkdirSync(path.join(root, "exports"), {recursive: true});
+  const uid = process.getuid?.();
+  const gid = process.getgid?.();
+  if (uid === undefined || gid === undefined || uid === 0 || gid === 0) {
+    throw new Error("Deployment account tests require a non-root Linux runner");
+  }
+  mkdirSync(path.join(root, "exports"), {recursive: true, mode: 0o700});
+  // Bind mounts retain host ownership. Match the runner for this one-off command
+  // so it can create and the runner can read the operator's private 0600 CSV.
   execFileSync("docker", ["compose", "--env-file", ".env.production.local", "-p", "aevyra-phase2",
     "-f", "docker-compose.prod.yml", "-f", "docker-compose.prod.local.yml",
-    "run", "--rm", "--no-deps", "--volume", `${path.join(root, "exports")}:/app/exports`,
+    "run", "--rm", "--no-deps", "--user", `${uid}:${gid}`, "--volume", `${path.join(root, "exports")}:/app/exports`,
     "api", "python", "-m", "aevyra_api.operator", "generate-batch", "--name", "HTTPS pilot",
     "--channel", "manual", "--sku", "pilot-10", "--credits", "10", "--quantity", "1",
     "--output", `exports/${filename}`], {cwd: root, stdio: "pipe"});
+  const exported = statSync(path.join(root, "exports", filename));
+  expect(exported.uid).toBe(uid);
+  expect(exported.gid).toBe(gid);
+  expect(exported.mode & 0o777).toBe(0o600);
   const code = readFileSync(path.join(root, "exports", filename), "utf8").trim().split(/\r?\n/)[1].split(",")[0];
   await page.goto("/register");
   await page.getByLabel("Username or email-like identifier").fill(`https-pilot-${stamp}`);

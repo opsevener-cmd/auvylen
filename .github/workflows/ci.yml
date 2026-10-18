@@ -48,7 +48,8 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run alembic -c services/api/alembic.ini upgrade head
-      - run: uv run pytest --integration
+      # The built Next.js proxy test runs in commercial-browser below.
+      - run: uv run pytest --integration --ignore=services/api/tests/test_codespaces_login_proxy.py
       - run: uv run alembic -c services/api/alembic.ini check
   frontend:
     runs-on: ubuntu-latest
@@ -96,6 +97,7 @@ jobs:
       - run: npm ci
       - run: uv run alembic -c services/api/alembic.ini upgrade head
       - run: npm run build
+      - run: uv run pytest --integration services/api/tests/test_codespaces_login_proxy.py
       - run: npm exec --workspace @auvylen/web -- playwright install --with-deps chromium
       - run: npm run test:e2e --workspace @auvylen/web
   deployment:
