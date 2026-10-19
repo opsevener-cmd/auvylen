@@ -6,5 +6,5 @@ import nextTypescript from "eslint-config-next/typescript";
 export default defineConfig([
   // Preserve plugin rules while adapting their legacy APIs to current ESLint.
   ...fixupConfigRules([...nextVitals, ...nextTypescript]),
-  globalIgnores([".next/**", "next-env.d.ts"]),
+  globalIgnores([".next/**", "next-env.d.ts", "test-results/**", "playwright-report/**"]),
 ]);

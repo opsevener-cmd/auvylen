@@ -48,9 +48,11 @@ test(`train ratings, predict unseen upload and retrain a persisted model version
     await page.getByLabel("I confirm every subject").last().check();
     await page.getByRole("button", {name: "Upload photographs"}).click();
     await expect(page.getByText("11 images · 10 rated · 0 comparisons · 1 awaiting rating", {exact: true})).toBeVisible();
-    await page.getByLabel("Photograph to predict").selectOption({label: "Image 11 · unrated"});
-    await page.getByRole("button", {name: "Predict personal rating", exact: true}).click();
-    await expect(page.getByText("Predicted personal rating:", {exact: false})).toBeVisible({timeout: 20000});
+    await page.getByRole("button", {name: "中文", exact: true}).click();
+    await page.getByLabel("选择待预测照片").selectOption({label: "照片 11 · 未评分"});
+    await page.getByRole("button", {name: "预测个人评分", exact: true}).click();
+    await expect(page.getByText("预测个人评分：", {exact: false})).toBeVisible({timeout: 20000});
+    await page.getByRole("button", {name: "English", exact: true}).click();
     await expect(page.getByText("This photograph was unseen in the model's annotation snapshot.", {exact: true})).toBeVisible();
     await page.getByRole("button", {name: "Select image 11", exact: true}).click();
     await page.getByLabel("Your rating").fill("5.5");

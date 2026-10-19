@@ -54,10 +54,13 @@ class DatasetView(ProjectView):
     compared_count: int
 
 
-class ImageUpload(Input):
-    content_base64: str = Field(min_length=1, max_length=5592408)
+class ImageUploadMetadata(Input):
     adult_authorized_consent: Literal[True]
     subject_group: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+class ImageUpload(ImageUploadMetadata):
+    content_base64: str = Field(min_length=1, max_length=5592408)
 
 
 class ImageEdit(Input):

@@ -152,10 +152,13 @@ def overview(request: Request, user: Owner) -> OwnerOverview:
         extractors=[
             {
                 "id": name,
-                "available": availability(name, settings.private_model_root / "pretrained")[0],
-                "reason": availability(name, settings.private_model_root / "pretrained")[1],
+                "available": available,
+                "reason": reason,
             }
             for name in (EXTRACTOR, MOBILENET)
+            for available, reason in [
+                availability(name, settings.private_model_root / "pretrained")
+            ]
         ],
         usage=usage,
         quotas=quotas,

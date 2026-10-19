@@ -1,5 +1,7 @@
 "use client";
+import {useI18n} from "@/components/i18n/provider";
 
+import {pollWhileVisible} from "@/lib/polling";
 import {useEffect, useState} from "react";
 import {z} from "zod";
 import type {FeatureExtractor, PersonalModel, PreferenceDataset, PreferenceImage, ResearchJob} from "@auvylen/contracts";
@@ -11,6 +13,7 @@ import {researchJobSchema} from "@/lib/research-api";
 const button = "rounded border border-black/20 px-3 py-2 disabled:opacity-40";
 const input = "block rounded border border-black/20 p-2 mt-1 mb-3 w-full";
 export function PersonalModels({dataset, images}: {dataset: PreferenceDataset; images: PreferenceImage[]}) {
+  const {t, locale} = useI18n();
   const [extractors, setExtractors] = useState<FeatureExtractor[]>([]);
   const [models, setModels] = useState<PersonalModel[]>([]);
   const [selected, setSelected] = useState("");
@@ -43,21 +46,22 @@ export function PersonalModels({dataset, images}: {dataset: PreferenceDataset; i
   useEffect(() => {
     if (!running || !jobId) return;
     let active = true;
-    const timer = setInterval(() => {
-      accountRequest(`/research/jobs/${jobId}`, researchJobSchema).then(async updated => {
-        if (!active) return;
-        if (!["QUEUED", "RUNNING"].includes(updated.status)) {
-          clearInterval(timer);
-          const all = await accountRequest(`${base}/models`, z.array(modelSchema));
-          if (active) {
-            const versions = all.filter(m => m.dataset_id === datasetId);
-            setModels(versions); setSelected(current => updated.kind === "TRAIN" && typeof updated.result?.model_id === "string" ? updated.result.model_id : current || versions.find(m => m.state === "READY")?.id || "");
-            setJob(updated);
-          }
-        } else {setJob(updated);}
-      }).catch(e => {if (active) {clearInterval(timer); setError(e instanceof Error ? e.message : "Cannot check the saved job. Reload to resume.");}});
-    }, 1000);
-    return () => {active = false; clearInterval(timer);};
+    const stop = pollWhileVisible(async () => {
+      const updated = await accountRequest(`/research/jobs/${jobId}`, researchJobSchema);
+      if (!active) return false;
+      if (!["QUEUED", "RUNNING"].includes(updated.status)) {
+        const all = await accountRequest(`${base}/models`, z.array(modelSchema));
+        if (active) {
+          const versions = all.filter(m => m.dataset_id === datasetId);
+          setModels(versions); setSelected(current => updated.kind === "TRAIN" && typeof updated.result?.model_id === "string" ? updated.result.model_id : current || versions.find(m => m.state === "READY")?.id || "");
+        }
+        if (active) setJob(updated);
+        return false;
+      }
+      setJob(updated);
+      return true;
+    }, e => {if (active) setError(e instanceof Error ? e.message : "Cannot check the saved job. Reload to resume.");});
+    return () => {active = false; stop();};
   }, [running, jobId, datasetId]);
   async function perform(action: () => Promise<void>) {
     setBusy(true); setError("");
@@ -66,71 +70,78 @@ export function PersonalModels({dataset, images}: {dataset: PreferenceDataset; i
   }
   const prediction = predictionSchema.safeParse(job?.result);
   const current = models.find(m => m.id === selected);
-  const rated = images.filter(image => !image.excluded && image.score !== null).length;
+  const eligible = images.filter(image => !image.excluded && image.score !== null);
+  const rated = eligible.length;
+  const groups = new Set(eligible.map(image => image.subject_group ? `subject:${image.subject_group}` : `image:${image.id}`)).size;
   return <section className="mt-8 space-y-4 border-t pt-6">
-    <h2 className="text-2xl">Your preference models</h2>
-    <p>Models learn from your numerical ratings using handcrafted features or frozen pretrained MobileNetV3-Small features. MobileNet was trained on general ImageNet objects, not facial preferences. Small personal datasets may generalize poorly; these scores express your preference, not objective beauty.</p>
-    <p>At least 8 rated images and 5 independent groups are required. Give photographs of the same person a shared group identifier before training. Each version keeps an immutable annotation snapshot and a separate validation split.</p>
-    {error && <p role="alert">{error}</p>}
+    <h2 className="text-2xl">{t("Your preference models")}</h2>
+    <p>{t("Models learn from your numerical ratings using handcrafted features or frozen pretrained MobileNetV3-Small features. MobileNet was trained on general ImageNet objects, not facial preferences. Small personal datasets may generalize poorly; these scores express your preference, not objective beauty.")}</p>
+    <p>{t("At least 8 rated images and 5 independent groups are required. Give photographs of the same person a shared group identifier before training. Each version keeps an immutable annotation snapshot and a separate validation split.")}</p>
+    {error && <p role="alert">{t(error)}</p>}
     <fieldset disabled={busy || running} className="space-y-4">
       <form onSubmit={event => {event.preventDefault(); const values = new FormData(event.currentTarget); void perform(async () => {
         const queued = await accountRequest(`${base}/train`, researchJobSchema, {dataset_id: datasetId, idempotency_key: crypto.randomUUID(), extractor: String(values.get("extractor")), alpha: Number(values.get("alpha")), seed: Number(values.get("seed")), validation_fraction: Number(values.get("fraction"))}); await refresh(); setJob(queued);
       });}}>
-        <label>Visual feature extractor<select className={input} name="extractor" defaultValue="rgb-grid-texture-v1">
-          <option value="rgb-grid-texture-v1">Handcrafted color and texture baseline</option>
-          <option value="mobilenetv3-small-imagenet-onnx-v1" disabled={!extractors.some(e => e.id === "mobilenetv3-small-imagenet-onnx-v1" && e.available)}>Pretrained MobileNetV3-Small · ImageNet · CPU</option>
+        <label>{t("Visual feature extractor")}<select className={input} name="extractor" defaultValue="rgb-grid-texture-v1">
+          <option value="rgb-grid-texture-v1">{t("Handcrafted color and texture baseline")}</option>
+          <option value="mobilenetv3-small-imagenet-onnx-v1" disabled={!extractors.some(e => e.id === "mobilenetv3-small-imagenet-onnx-v1" && e.available)}>{t("Pretrained MobileNetV3-Small · ImageNet · CPU")}</option>
         </select></label>
-        {extractors.filter(e => !e.available).map(e => <p key={e.id}>{e.id}: {e.reason}</p>)}
-        <p>MobileNet training also evaluates the handcrafted and mean-rating baselines on exactly the same held-out groups. Lower error on your holdout alone does not establish facial prediction accuracy.</p>
+        {extractors.filter(e => !e.available).map(e => <p key={e.id}>{e.id}: {t(e.reason)}</p>)}
+        <p>{t("MobileNet training also evaluates the handcrafted and mean-rating baselines on exactly the same held-out groups. Lower error on your holdout alone does not establish facial prediction accuracy.")}</p>
+        <details className="rounded border p-4"><summary>{t("Training settings explained")}</summary><p className="mt-3">{t("Regularization limits how strongly a small dataset can influence the model. A value of 10 is a sensible starting point.")}</p><p className="mt-2">{t("The random seed makes the group split reproducible. The validation fraction reserves a share of people for evaluation instead of learning.")}</p><p className="mt-2">{t("Handcrafted features describe colors and textures cheaply. MobileNet provides a richer general image representation, requires installed weights and uses more CPU. Neither is a validated facial attractiveness model.")}</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <label>Regularization strength<input className={input} name="alpha" type="number" defaultValue={10} min={0.001} max={1000} step="0.001" required /></label>
-          <label>Random seed<input className={input} name="seed" type="number" defaultValue={42} min={0} max={2147483647} required /></label>
-          <label>Validation group fraction<input className={input} name="fraction" type="number" defaultValue={0.2} min={0.1} max={0.4} step="0.05" required /></label>
+          <label>{t("Regularization strength")}<input className={input} name="alpha" type="number" defaultValue={10} min={0.001} max={1000} step="0.001" required /></label>
+          <label>{t("Random seed")}<input className={input} name="seed" type="number" defaultValue={42} min={0} max={2147483647} required /></label>
+          <label>{t("Validation group fraction")}<input className={input} name="fraction" type="number" defaultValue={0.2} min={0.1} max={0.4} step="0.05" required /></label>
         </div>
-        <button className={button} disabled={dataset.archived || rated < 8}>Train new version</button>
-        <p className="mt-2">{rated} eligible numerical ratings. Add/edit ratings, then train another version to retrain. Validation photographs are held out from fitting and preprocessing.</p>
+        </details>
+        <button className={button} aria-describedby="training-readiness" disabled={dataset.archived || rated < 8 || groups < 5}>{t("Train new version")}</button>
+        <p id="training-readiness" className="mt-3">{dataset.archived ? t("Restore this dataset before training.") : rated < 8 || groups < 5 ? t("Training needs at least 8 ratings and 5 independent groups. Add ratings and check person identifiers.") : t("Ready to train. The server also checks score variety and the validation split.")}</p>
+        <p>{groups} {t("independent groups ·")} {rated} {t("numerical ratings")}</p>
+        <p className="mt-2">{rated} {t("eligible numerical ratings. Add/edit ratings, then train another version to retrain. Validation photographs are held out from fitting and preprocessing.")}</p>
       </form>
-      <label>Model version<select className={input} value={selected} onChange={event => setSelected(event.target.value)}>
-        <option value="">Select a ready model</option>{models.filter(m => m.state === "READY").map(m => <option key={m.id} value={m.id}>Version {m.version} · {m.extractor} · {new Date(m.created_at).toLocaleString()}</option>)}
+      <label>{t("Model version")}<select className={input} value={selected} onChange={event => setSelected(event.target.value)}>
+        <option value="">{t("Select a ready model")}</option>{models.filter(m => m.state === "READY").map(m => <option key={m.id} value={m.id}>{t("Version")} {m.version} · {m.extractor} · {new Date(m.created_at).toLocaleString(locale)}</option>)}
       </select></label>
-      <label>Photograph to predict<select className={input} value={imageId} onChange={event => setImageId(event.target.value)}>
-        <option value="">Upload/select a new photograph</option>{images.filter(i => !i.excluded).map((image, index) => <option key={image.id} value={image.id}>Image {index + 1}{image.score === null ? " · unrated" : " · rated"}</option>)}
+      <label>{t("Photograph to predict")}<select className={input} value={imageId} onChange={event => setImageId(event.target.value)}>
+        <option value="">{t("Upload/select a new photograph")}</option>{images.filter(i => !i.excluded).map((image, index) => <option key={image.id} value={image.id}>{t("Image")} {index + 1}{image.score === null ? t(" · unrated") : t(" · rated")}</option>)}
       </select></label>
       <button className={button} disabled={!selected || !imageId} onClick={() => void perform(async () => {
         setJob(await accountRequest(`${base}/predict`, researchJobSchema, {model_id: selected, dataset_id: datasetId, image_id: imageId, idempotency_key: crypto.randomUUID()}));
-      })}>Predict personal rating</button>
+      })}>{t("Predict personal rating")}</button>
     </fieldset>
     {job && <div className="rounded border p-4" aria-live="polite">
-      <p>Custom job: {job.status} · {job.phase} · {job.progress}%</p>
-      {running && <button className={button} disabled={busy} onClick={() => void perform(async () => {setJob(await accountRequest(`/research/jobs/${job.id}/cancel`, researchJobSchema, {})); await refresh();})}>Cancel custom job</button>}
-      {job.failure_reason && <p>{job.failure_reason}</p>}
+      <progress max={100} value={job.progress} aria-label={t("Server-reported job progress")}/><p>{t("Custom job:")} {t(job.status)} · {t(job.phase)} · {job.progress}%</p>
+      {running && <button className={button} disabled={busy} onClick={() => void perform(async () => {setJob(await accountRequest(`/research/jobs/${job.id}/cancel`, researchJobSchema, {})); await refresh();})}>{t("Cancel custom job")}</button>}
+      {job.failure_reason && <p>{t(job.failure_reason)}</p>}
       {prediction.success && <>
-        <p className="text-2xl mt-3">Predicted personal rating: {prediction.data.display_score.toFixed(2)} / {prediction.data.score_max}</p>
-        <p>Raw prediction: {prediction.data.raw_score.toFixed(3)} · Version {prediction.data.model_version} · {prediction.data.processing_duration_ms.toFixed(1)} ms</p>
-        <p>{prediction.data.seen_in_training_snapshot ? "This photograph was included in the saved annotation snapshot." : "This photograph was unseen in the model's annotation snapshot."}</p>
+        <p className="text-2xl mt-3">{t("Predicted personal rating:")} {prediction.data.display_score.toFixed(2)} / {prediction.data.score_max}</p>
+        <p>{t("Raw prediction:")} {prediction.data.raw_score.toFixed(3)} {t("· Version")} {prediction.data.model_version} · {prediction.data.processing_duration_ms.toFixed(1)} {t("ms")}</p>
+        <p>{prediction.data.seen_in_training_snapshot ? t("This photograph was included in the saved annotation snapshot.") : t("This photograph was unseen in the model's annotation snapshot.")}</p>
       </>}
     </div>}
     {current?.metrics && <div className="rounded border p-4">
-      <h3 className="text-xl">Validation for version {current.version}</h3>
-      <p>{String(current.metrics.training_images)} training images · {String(current.metrics.validation_images)} validation images</p>
-      <p>{String(current.metrics.known_subject_groups)} known subject groups · {String(current.metrics.unknown_subject_images)} images with unknown subject identity</p>
-      <p>Validation MAE: {metric(current.metrics.validation_mae)} · RMSE: {metric(current.metrics.validation_rmse)} · Mean-rating baseline MAE: {metric(current.metrics.mean_baseline_mae)}</p>
-      <p>Extractor: {current.extractor}</p>
-      <table className="w-full text-left"><caption>Identical grouped holdout comparison</caption><thead><tr><th>Predictor</th><th>MAE</th><th>RMSE</th></tr></thead><tbody>
-        <tr><td>Selected model</td><td>{metric(current.metrics.validation_mae)}</td><td>{metric(current.metrics.validation_rmse)}</td></tr>
-        <tr><td>Handcrafted baseline</td><td>{metric(current.metrics.handcrafted_baseline_mae)}</td><td>{metric(current.metrics.handcrafted_baseline_rmse)}</td></tr>
-        <tr><td>Training-mean predictor</td><td>{metric(current.metrics.mean_baseline_mae)}</td><td>{metric(current.metrics.mean_baseline_rmse)}</td></tr>
+      <h3 className="text-xl">{t("Validation for version")} {current.version}</h3>
+      <p>{String(current.metrics.training_images)} {t("training images ·")} {String(current.metrics.validation_images)} {t("validation images")}</p>
+      <p>{String(current.metrics.known_subject_groups)} {t("known subject groups ·")} {String(current.metrics.unknown_subject_images)} {t("images with unknown subject identity")}</p>
+      <p>{t("MAE is the average distance between predicted and saved ratings; RMSE gives larger errors more weight. Lower values are better on the same held-out people, but a small validation set cannot establish broad accuracy.")}</p>
+      <p>{t("Validation MAE:")} {t(metric(current.metrics.validation_mae))} {t("· RMSE:")} {t(metric(current.metrics.validation_rmse))} {t("· Mean-rating baseline MAE:")} {t(metric(current.metrics.mean_baseline_mae))}</p>
+      <p>{t("Extractor:")} {current.extractor}</p>
+      <table className="w-full text-left"><caption>{t("Identical grouped holdout comparison")}</caption><thead><tr><th>{t("Predictor")}</th><th>{t("MAE")}</th><th>{t("RMSE")}</th></tr></thead><tbody>
+        <tr><td>{t("Selected model")}</td><td>{t(metric(current.metrics.validation_mae))}</td><td>{t(metric(current.metrics.validation_rmse))}</td></tr>
+        <tr><td>{t("Handcrafted baseline")}</td><td>{t(metric(current.metrics.handcrafted_baseline_mae))}</td><td>{t(metric(current.metrics.handcrafted_baseline_rmse))}</td></tr>
+        <tr><td>{t("Training-mean predictor")}</td><td>{t(metric(current.metrics.mean_baseline_mae))}</td><td>{t(metric(current.metrics.mean_baseline_rmse))}</td></tr>
       </tbody></table>
-      <p>Unavailable comparison metrics on older versions were not measured when those versions were trained.</p>
-      <p>Training duration: {metric(current.metrics.training_duration_seconds)} seconds · Extraction: {metric(current.metrics.extraction_duration_seconds)} seconds · Cached embeddings reused: {String(current.metrics.embedding_cache_hits ?? "Unavailable")}</p>
-      <ul className="list-disc pl-5 mt-3">{current.limitations.map(text => <li key={text}>{text}</li>)}</ul>
+      <p>{t("Unavailable comparison metrics on older versions were not measured when those versions were trained.")}</p>
+      <p>{t("Training duration:")} {t(metric(current.metrics.training_duration_seconds))} {t("seconds · Extraction:")} {t(metric(current.metrics.extraction_duration_seconds))} {t("seconds · Cached embeddings reused:")} {String(current.metrics.embedding_cache_hits ?? t("Unavailable"))}</p>
+      <ul className="list-disc pl-5 mt-3">{current.limitations.map(text => <li key={text}>{t(text)}</li>)}</ul>
     </div>}
-    <h3 className="text-xl">Saved model versions</h3>
+    <h3 className="text-xl">{t("Saved model versions")}</h3>{models.length === 0 && <p>{t("No model versions yet. Rate your photographs, then train your first version above.")}</p>}
     <ul className="space-y-3">{models.map(model => <li key={model.id} className="rounded border p-3">
-      <p>Version {model.version} · {model.state} · {model.extractor}</p>
-      {["READY", "ARCHIVED"].includes(model.state) && <button className={button} disabled={busy} onClick={() => void perform(async () => {await accountRequest(`${base}/models/${model.id}/edit`, modelSchema, {archived: model.state !== "ARCHIVED"}); await refresh();})}>{model.state === "ARCHIVED" ? "Restore model" : "Archive model"}</button>}
-      {model.state !== "DELETED" && <button className={`${button} ml-2`} disabled={busy} onClick={() => {if (window.confirm("Delete this model version and its checkpoint? Your annotations remain.")) void perform(async () => {await accountRequest(`${base}/models/${model.id}/delete`, z.object({deleted: z.boolean()}), {}); await refresh();});}}>Delete model version</button>}
+      <p>{t("Version")} {model.version} · {t(model.state)} · {model.extractor}</p>
+      {["READY", "ARCHIVED"].includes(model.state) && <button className={button} disabled={busy} onClick={() => void perform(async () => {await accountRequest(`${base}/models/${model.id}/edit`, modelSchema, {archived: model.state !== "ARCHIVED"}); await refresh();})}>{model.state === "ARCHIVED" ? t("Restore model") : t("Archive model")}</button>}
+      {model.state !== "DELETED" && <button className={`${button} ml-2`} disabled={busy} onClick={() => {if (window.confirm(t("Delete this model version and its checkpoint? Your annotations remain."))) void perform(async () => {await accountRequest(`${base}/models/${model.id}/delete`, z.object({deleted: z.boolean()}), {}); await refresh();});}}>{t("Delete model version")}</button>}
     </li>)}</ul>
-    <p>Models expire with their source dataset. Deleting a source image invalidates derived versions; the worker removes their checkpoints. Original annotations stay independent of model archive/delete.</p>
+    <p>{t("Models expire with their source dataset. Deleting a source image invalidates derived versions; the worker removes their checkpoints. Original annotations stay independent of model archive/delete.")}</p>
   </section>;
 }

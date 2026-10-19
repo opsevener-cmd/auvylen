@@ -353,3 +353,92 @@ def test_orphan_cleanup_preserves_recent_and_referenced_artifacts(credits):
     with pytest.raises(FileNotFoundError):
         data.store.read(owner, orphan)
     assert len(list(data.store.root.glob("*/*"))) == 3
+
+
+def test_binary_upload_matches_legacy_and_preserves_privacy(credits):
+    import json
+    from urllib.parse import quote
+
+    dataset = setup_dataset(credits)
+    path = f"{BASE}/datasets/{dataset}/images"
+    metadata = quote(json.dumps({"adult_authorized_consent": True, "subject_group": "人物-01"}))
+    headers = {
+        **{key.lower(): value for key, value in csrf_headers(credits.client).items()},
+        "content-type": "image/png",
+        "x-upload-metadata": metadata,
+    }
+    payload = base64.b64decode(encoded())
+    result = credits.client.post(path, content=payload, headers=headers)
+    assert result.status_code == 200
+    assert result.json()["subject_group"] == "人物-01"
+    # Same normalized image through either transport resolves to the same saved row.
+    assert upload(credits, dataset).json()["id"] == result.json()["id"]
+    content = credits.client.get(f"{path}/{result.json()['id']}/content?thumbnail=true")
+    assert content.status_code == 200
+    assert "no-store" in content.headers["cache-control"]
+    assert content.headers["x-content-type-options"] == "nosniff"
+    assert (
+        post(
+            credits, f"/datasets/{dataset}/images/{result.json()['id']}/rating", {"score": 7}
+        ).status_code
+        == 200
+    )
+    assert credits.client.post(path, content=payload, headers=headers).json()["score"] == 7
+    for override in ({"x-csrf-token": "invalid"}, {"origin": "https://attacker.example"}):
+        assert (
+            credits.client.post(path, content=payload, headers={**headers, **override}).status_code
+            == 403
+        )
+    assert post(credits, "/datasets/" + dataset + "/delete", {}).status_code == 200
+    assert credits.client.get(f"{path}/{result.json()['id']}/content").status_code == 404
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        "",
+        "%FF",
+        "{}",
+        '{"adult_authorized_consent":false}',
+        '{"adult_authorized_consent":true,"extra":1}',
+        "x" * 2049,
+    ],
+)
+def test_binary_upload_validates_consent_before_decode(credits, metadata):
+    dataset = setup_dataset(credits)
+    with patch("aevyra_api.routes.preferences.decode_image_bytes") as decoder:
+        response = credits.client.post(
+            f"{BASE}/datasets/{dataset}/images",
+            content=base64.b64decode(encoded()),
+            headers={
+                **csrf_headers(credits.client),
+                "content-type": "image/png",
+                "x-upload-metadata": metadata,
+            },
+        )
+    assert response.status_code == 422
+    decoder.assert_not_called()
+
+
+def test_binary_upload_limits_invalid_images_and_foreign_ownership(credits):
+    dataset = setup_dataset(credits)
+    headers = {
+        **csrf_headers(credits.client),
+        "content-type": "image/png",
+        "x-upload-metadata": '{"adult_authorized_consent":true}',
+    }
+    path = f"{BASE}/datasets/{dataset}/images"
+    for payload, status in [(b"not an image", 422), (b"a" * (4 * 1024 * 1024 + 1), 413)]:
+        assert credits.client.post(path, content=payload, headers=headers).status_code == status
+    other = str(uuid4())
+    assert (
+        credits.client.post(
+            f"{BASE}/datasets/{other}/images", content=b"invalid", headers=headers
+        ).status_code
+        == 404
+    )
+    # Failure does not poison the bounded processing semaphore.
+    assert (
+        credits.client.post(path, content=base64.b64decode(encoded()), headers=headers).status_code
+        == 200
+    )

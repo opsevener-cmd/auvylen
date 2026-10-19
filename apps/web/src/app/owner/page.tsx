@@ -1,3 +1,4 @@
+import {Text} from "@/components/i18n/provider";
 import Link from "next/link";
 import {cookies} from "next/headers";
 import {OwnerDashboard} from "@/components/owner-dashboard";
@@ -7,7 +8,7 @@ import {sessionSchema} from "@/lib/account-api";
 export const dynamic = "force-dynamic";
 export default async function OwnerPage() {
   const token = (await cookies()).get("auvylen_session")?.value;
-  if (!token || !/^[A-Za-z0-9_-]{1,100}$/.test(token)) return <p>Owner sign-in required. <Link href="/login" className="underline">Sign in</Link></p>;
+  if (!token || !/^[A-Za-z0-9_-]{1,100}$/.test(token)) return <p><Text>{"Owner sign-in required."}</Text> <Link href="/login" className="underline"><Text>{"Sign in"}</Text></Link></p>;
   let allowed = false;
   let unavailable = false;
   try {
@@ -18,7 +19,7 @@ export default async function OwnerPage() {
   } catch {
     unavailable = true;
   }
-  if (unavailable) return <p>Account verification is temporarily unavailable. Reload to retry.</p>;
+  if (unavailable) return <p><Text>{"Account verification is temporarily unavailable. Reload to retry."}</Text></p>;
   if (allowed) return <OwnerDashboard/>;
-  return <p>Owner access required. <Link href="/account" className="underline">Return to account</Link></p>;
+  return <p><Text>{"Owner access required."}</Text> <Link href="/account" className="underline"><Text>{"Return to account"}</Text></Link></p>;
 }

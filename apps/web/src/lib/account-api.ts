@@ -23,19 +23,38 @@ export class AccountError extends Error {
 }
 
 export async function accountRequest<T>(path: string, schema: z.ZodType<T>, body?: object): Promise<T> {
-  const headers: Record<string, string> = {};
-  if (body !== undefined) {
+  try {
+    const headers: Record<string, string> = {};
+    if (body !== undefined) {
+      headers["X-CSRF-Token"] = await csrfToken();
+      headers["Content-Type"] = "application/json";
+    }
+    const response = await fetch(`/api/v1${path}`, {
+      method: body === undefined ? "GET" : "POST", credentials: "same-origin", cache: "no-store",
+      headers, body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!response.ok) {
+      throw requestError(path, response.status);
+    }
+    return schema.parse(await response.json());
+  } catch (error) {
+    if (error instanceof AccountError) throw error;
+    throw new AccountError(0, "The response could not be verified. Check your connection and retry safely.");
+  }
+}
+
+export async function csrfToken(): Promise<string> {
+  try {
     const response = await fetch("/api/v1/auth/csrf", {cache: "no-store", credentials: "same-origin"});
     if (!response.ok) throw new AccountError(response.status, "Service temporarily unavailable.");
-    const csrf = z.object({csrf_token: z.string()}).parse(await response.json());
-    headers["X-CSRF-Token"] = csrf.csrf_token;
-    headers["Content-Type"] = "application/json";
+    return z.object({csrf_token: z.string()}).parse(await response.json()).csrf_token;
+  } catch (error) {
+    if (error instanceof AccountError) throw error;
+    throw new AccountError(0, "Service temporarily unavailable.");
   }
-  const response = await fetch(`/api/v1${path}`, {
-    method: body === undefined ? "GET" : "POST", credentials: "same-origin", cache: "no-store",
-    headers, body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!response.ok) {
+}
+
+export function requestError(path: string, status: number): AccountError {
     const messages: Record<number, string> = {
       400: "Code is invalid, expired or already used.", 401: "Sign in required or invalid credentials.",
       403: "Request could not be verified. Reload and try again.",
@@ -51,8 +70,6 @@ export async function accountRequest<T>(path: string, schema: z.ZodType<T>, body
       422: "Check consent, images and rating scale. Training needs 8 ratings, 5 independent groups and varied scores in the training split.",
       429: "Upload capacity, request rate or private storage quota reached. Try again later.",
     };
-    throw new AccountError(response.status, (path.startsWith("/research/preferences") ? preferenceMessages[response.status] : undefined)
-      ?? messages[response.status] ?? "Service temporarily unavailable.");
-  }
-  return schema.parse(await response.json());
+    return new AccountError(status, (path.startsWith("/research/preferences") ? preferenceMessages[status] : undefined)
+      ?? messages[status] ?? "Service temporarily unavailable.");
 }

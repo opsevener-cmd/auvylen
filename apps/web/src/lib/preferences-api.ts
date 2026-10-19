@@ -30,12 +30,3 @@ export function nextPair(images: PreferenceImage[], pairs: PreferencePair[]): [P
   }
   return null;
 }
-export async function encodeUpload(file: File): Promise<string> {
-  if (file.size > 4 * 1024 * 1024 || file.size === 0) throw new Error("Each image must be between 1 byte and 4 MiB.");
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1]);
-    reader.onerror = () => reject(new Error("Could not read this file."));
-    reader.readAsDataURL(file);
-  });
-}

@@ -1,0 +1,19 @@
+{
+  "fixture": "Deterministic 1024x1024 RGB noise PNG; no faces or personal data",
+  "repetitions": 5,
+  "binary_body_bytes": 3151219,
+  "legacy_body_bytes": 4201717,
+  "body_reduction_percent": 25.0,
+  "scope": "parse+sanitize; excludes network/database and native/Pillow allocations",
+  "legacy": {
+    "median_ms": 182.53,
+    "median_cpu_ms": 178.19,
+    "median_peak_python_bytes": 13656754
+  },
+  "binary": {
+    "median_ms": 96.36,
+    "median_cpu_ms": 95.62,
+    "median_peak_python_bytes": 6303081
+  },
+  "identical_normalized_pixels": true
+}
