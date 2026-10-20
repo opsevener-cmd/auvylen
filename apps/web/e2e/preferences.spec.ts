@@ -30,7 +30,7 @@ test("private adult-authorized dataset, ratings, pairs, resume and deletion", as
   await page.getByLabel("I confirm every subject").last().check();
   await page.getByRole("button", {name: "Upload photographs"}).click();
   await expect(page.getByText("2 images · 0 rated · 0 comparisons · 2 awaiting rating", {exact: true})).toBeVisible();
-  const photos = page.getByRole("img");
+  const photos = page.getByRole("img", {name: "Private photograph for your subjective annotation"});
   await expect(photos.first()).toBeVisible();
   expect(await photos.first().evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
   const privateUrl = await photos.first().getAttribute("src");

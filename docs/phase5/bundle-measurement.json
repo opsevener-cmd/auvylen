@@ -1,0 +1,13 @@
+{
+  "scope": "All emitted .next/static/chunks JavaScript, not per-route transfer; gzip level 9, same locked dependencies",
+  "before": {
+    "files": 16,
+    "bytes": 1048687,
+    "gzip_bytes": 292167
+  },
+  "after": {
+    "files": 19,
+    "bytes": 1128082,
+    "gzip_bytes": 323201
+  }
+}

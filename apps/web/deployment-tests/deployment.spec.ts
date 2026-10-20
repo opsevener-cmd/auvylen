@@ -16,8 +16,8 @@ test("proxy reaches web, API, PostgreSQL and Redis", async ({page, request}) => 
 test("production disables mock commercial functionality", async ({page, request}) => {
   test.skip(process.env.AEVYRA_TEST_MODE !== "production");
   await page.goto("/");
-  await expect(page.getByRole("link", {name: "Start Analysis"})).toHaveCount(0);
-  await expect(page.getByText(/checkout are currently unavailable/)).toBeVisible();
+  await expect(page.getByRole("link", {name: /View development demo/})).toHaveCount(0);
+  await expect(page.getByText("Synthetic analysis is unavailable in production.")).toBeVisible();
   expect((await request.get("/api/v1/products")).status()).toBe(404);
   expect((await request.post("/api/v1/orders", {data: {product_slug: "aevyra-test-analysis"}})).status()).toBe(404);
   expect((await request.post("/api/v1/dev/payments/00000000-0000-0000-0000-000000000000/simulate-success", {data: {}})).status()).toBe(404);
@@ -26,7 +26,7 @@ test("production disables mock commercial functionality", async ({page, request}
 test("staging mock checkout persists a synthetic result through HTTPS", async ({page, request}) => {
   test.skip(process.env.AEVYRA_TEST_MODE === "production");
   await page.goto("/");
-  await page.getByRole("link", {name: "Start Analysis"}).click();
+  await page.getByRole("link", {name: /View development demo/}).click();
   await expect(page.getByRole("heading", {name: "Auvylen Analysis", exact: true})).toBeVisible();
   await expect(page.getByText("¥1.00", {exact: true})).toBeVisible();
   await page.getByRole("button", {name: "Create order"}).click();

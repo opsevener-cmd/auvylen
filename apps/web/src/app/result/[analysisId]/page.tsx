@@ -1,3 +1,4 @@
+import {Text} from "@/components/i18n/provider";
 import {ServiceError} from "@/components/service-error";
 import {cookies} from "next/headers";
 import {getApiUrl} from "@/lib/environment";
@@ -25,20 +26,20 @@ export default async function Result({params, searchParams}: {params: Promise<{a
   if (!analysis) return <ServiceError />;
   const result = analysis.status === "COMPLETED" ? await load(`${path}/result`, resultSchema).catch(unavailable) : null;
   return <section className="max-w-2xl">
-    <p className="mb-5 text-xs uppercase tracking-[0.2em] text-[#537462]">Development / Synthetic Result</p>
-    <h1 className="text-4xl font-medium tracking-tight">Auvylen Analysis</h1>
-    <p className="mt-5 leading-7 text-[#63706a]">Synthetic test output. This score does not measure a face and is not a real AI assessment.</p>
+    <p className="mb-5 text-xs uppercase tracking-[0.2em] text-[#537462]"><Text>{"Development / Synthetic Result"}</Text></p>
+    <h1 className="text-4xl font-medium tracking-tight"><Text>{"Auvylen Analysis"}</Text></h1>
+    <p className="mt-5 leading-7 text-[#63706a]"><Text>{"Synthetic test output. This score does not measure a face and is not a real AI assessment."}</Text></p>
     <div className="mt-8 rounded-lg border border-black/10 bg-white/70 p-6">
-      <p className="text-sm text-[#63706a]">Analysis status: {analysis.status}</p>
+      <p className="text-sm text-[#63706a]"><Text>{"Analysis status:"}</Text> <Text>{analysis.status}</Text></p>
       {result ? <>
         <p className="mt-5 text-5xl font-medium">{result.display_score.toFixed(2)} <span className="text-lg text-[#63706a]">/ 10</span></p>
         <dl className="mt-7 space-y-3 text-sm">
-          <div className="flex justify-between"><dt>Raw score</dt><dd>{result.raw_score.toFixed(6)}</dd></div>
-          <div className="flex justify-between"><dt>Engine</dt><dd>{result.engine_slug}</dd></div>
-          <div className="flex justify-between"><dt>Version</dt><dd>{result.engine_version}</dd></div>
-          <div className="flex justify-between"><dt>Synthetic</dt><dd>Yes</dd></div>
+          <div className="flex justify-between"><dt><Text>{"Raw score"}</Text></dt><dd>{result.raw_score.toFixed(6)}</dd></div>
+          <div className="flex justify-between"><dt><Text>{"Engine"}</Text></dt><dd>{result.engine_slug}</dd></div>
+          <div className="flex justify-between"><dt><Text>{"Version"}</Text></dt><dd>{result.engine_version}</dd></div>
+          <div className="flex justify-between"><dt><Text>{"Synthetic"}</Text></dt><dd><Text>{"Yes"}</Text></dd></div>
         </dl>
-      </> : <p className="mt-5 leading-7 text-[#63706a]">{analysis.failure_reason ?? "Result is not yet available. Reload to check again."}</p>}
+      </> : <p className="mt-5 leading-7 text-[#63706a]"><Text>{analysis.failure_reason ?? "Result is not yet available. Reload to check again."}</Text></p>}
     </div>
   </section>;
 }

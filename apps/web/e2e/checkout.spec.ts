@@ -2,7 +2,7 @@ import {expect, test} from "@playwright/test";
 
 test("mobile mock checkout persists one synthetic result", async ({page, request}) => {
   await page.goto("/");
-  await page.getByRole("link", {name: "Start Analysis"}).click();
+  await page.getByRole("link", {name: /View development demo/}).click();
   await expect(page.getByRole("heading", {name: "Auvylen Analysis"})).toBeVisible();
   await expect(page.getByText("¥1.00", {exact: true})).toBeVisible();
   await page.getByRole("button", {name: "Create order"}).click();

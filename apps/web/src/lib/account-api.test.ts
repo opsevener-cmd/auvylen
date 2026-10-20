@@ -25,3 +25,10 @@ describe("account contracts and mutations", () => {
     await expect(accountRequest("/account", accountSchema)).rejects.toThrow("Sign in required");
   });
 });
+
+it("reports localized-safe connection and malformed-response errors without echoing data", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("private network detail")));
+  await expect(accountRequest("/account", accountSchema)).rejects.toThrow("The response could not be verified.");
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({private: "sensitive fixture"}))));
+  await expect(accountRequest("/account", accountSchema)).rejects.toThrow("The response could not be verified.");
+});

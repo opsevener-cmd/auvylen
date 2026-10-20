@@ -75,3 +75,11 @@ logs/
 # narrowly scoped exception. Never force-add private images or real checkpoints.
 
 .venv-extractor-export/
+
+# Reviewed original decorative asset; private image exclusions remain in force.
+!/apps/web/public/images/auvylen-synthetic-adults.webp
+
+# Reviewed browser evidence: public home and generated/mock research fixtures only.
+!/docs/phase5/home-en-desktop.webp
+!/docs/phase5/home-zh-mobile.webp
+!/docs/phase5/research-zh-mobile.webp

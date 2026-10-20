@@ -65,3 +65,6 @@ logs
 **/*.avif
 
 .venv-extractor-export/
+
+# Only this reviewed synthetic decorative image is shipped publicly.
+!apps/web/public/images/auvylen-synthetic-adults.webp

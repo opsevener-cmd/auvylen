@@ -1,50 +1,33 @@
 # Auvylen
 
-**Cloud-first development:** Phase 4A is preserved; Phase 4B custom preference learning
-is authorized but not implemented yet. Windows is for code review and browser access
-only. Do not run the service startup, dependency installation, build or integration-test
-commands below on the user's computer. Use [cloud development](docs/cloud-development.md)
-and [the recovery report](docs/recovery-cloud-transition.md). The older local instructions
-remain for reproducibility in disposable remote environments, not as a hosting requirement.
+Auvylen is a private personal aesthetic preference research application built with
+Next.js, FastAPI, PostgreSQL and Redis. It supports authorized adult-photo datasets,
+numerical ratings, pairwise comparisons, versioned personal model training and
+predictions with handcrafted or MobileNetV3-Small image features. Labels and predictions
+represent individual preferences, not objective beauty. Pairwise annotations are stored
+separately and are not currently used by the numerical-rating trainer.
 
-The provisional brand is Auvylen. Stable deployment/database identifiers and Python
-import paths retain their previous spelling for compatibility. See
-[rename audit](docs/brand-rename.md) before changing any legacy technical identifier.
+The separate `/analyze` workflow produces **synthetic development output** without
+analyzing a photograph. It remains disabled in production. Accounts, immutable Credits,
+redemption, privileged Owner administration and private research authorization are preserved.
 
-Auvylen is intended to become a cloud-hosted AI facial attractiveness research and evaluation platform,
-with multiple scoring engines and user-defined standards. **Implemented baseline is Phase 4A:
-Cloud-Ready Architecture and Project Recovery**, preserving Phase 3 first-party pilot accounts,
-channel-neutral redemption codes and an immutable credit ledger alongside the preserved
-development order/mock-payment flow. No real payments, facial models, uploads, subscriptions
-or platform-specific commerce integrations are implemented.
+Phase 5 adds English/Simplified Chinese presentation, a guided home page, responsive research
+workflows, confirmed per-file upload feedback and a backwards-compatible binary upload format.
+See [Phase 5 verification, limitations and safe rollout](docs/phase5-report.md),
+[personal model documentation](docs/custom-preference-models.md) and
+[pretrained feature provenance](docs/pretrained-representation.md).
 
-Start with [the Phase 4A audit and runnable cloud simulation](docs/phase4a.md). The new
-cloud override adds safe automatic migration gating, private artifact volumes and an
-optional CPU worker backed by PostgreSQL jobs. Authorized `/research` jobs do not spend
-Credits. Custom training and all four requested third-party models remain unavailable.
-Production must run on a future Linux VPS; resource-intensive development must run remotely.
-No VPS has been purchased or deployed. [Backup/restore](docs/cloud-backups.md).
+**Cloud-first development:** use a disposable remote environment for installation, builds,
+and tests; Windows is for code review and browser access. The existing private Codespace
+uses [the established preview controller](docs/codespaces-private-preview.md). Do not recreate
+it, reset its database, provision Owner again, or regenerate its credentials. Updates require
+review and a verified external encrypted backup. The commands below include historical
+fresh-development setup instructions; they are not a live Codespace update procedure.
 
-The provider-neutral single-VPS deployment adds production API/web images, internal
-PostgreSQL/Redis and a Caddy HTTPS proxy. Production checkout and mock-payment simulation
-are disabled. Private staging retains the synthetic Phase 1 flow. See
-[deployment instructions](docs/deployment.md), [security boundaries](docs/production-security.md)
-and [verification](docs/verification.md). Production mock inference remains disabled.
-Accounts and redemption do not enable production synthetic execution. No public tunnel is started.
-
-Production startup (after creating the protected env file as documented):
-
-```sh
-docker compose --env-file .env.production -f docker-compose.prod.yml build --pull
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --wait postgres redis
-docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps api alembic -c services/api/alembic.ini upgrade head
-docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps api alembic -c services/api/alembic.ini check
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --wait
-```
-
-Only TCP 80/443 are published. DNS and a final domain are required for public TLS.
-The separate local override binds 8080/8443 to loopback with a private TLS CA; exact
-production/staging test commands are in deployment.md. Development startup below is unchanged.
+Keep stable Python import paths, database/product identifiers and Compose names as documented
+in [brand compatibility](docs/brand-rename.md). Private photographs and checkpoints never belong
+in Git or public web assets. [Security](docs/production-security.md) and
+[backup/restore](docs/cloud-backups.md) remain part of the deployment contract.
 
 ## Structure
 

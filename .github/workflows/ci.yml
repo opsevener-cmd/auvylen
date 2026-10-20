@@ -68,6 +68,7 @@ jobs:
   commercial-browser:
     runs-on: ubuntu-latest
     env:
+      E2E_RESEARCH: "true"
       REDEMPTION_CODE_PEPPER: ci-testing-only-secret-not-for-deployment
     services:
       postgres:

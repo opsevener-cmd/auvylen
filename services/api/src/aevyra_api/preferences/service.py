@@ -10,7 +10,7 @@ from aevyra_contracts.preferences import (
     DatasetEdit,
     DatasetView,
     ImageEdit,
-    ImageUpload,
+    ImageUploadMetadata,
     ImageView,
     PairInput,
     PairView,
@@ -260,7 +260,9 @@ class PreferenceService:
             self.access(session, user)
             self.dataset(session, user, id, writable=True)
 
-    def upload(self, user: UUID, id: UUID, body: ImageUpload, decoded: DecodedImage) -> ImageView:
+    def upload(
+        self, user: UUID, id: UUID, body: ImageUploadMetadata, decoded: DecodedImage
+    ) -> ImageView:
         artifacts: list[UUID] = []
         try:
             with self.sessions.begin() as session:

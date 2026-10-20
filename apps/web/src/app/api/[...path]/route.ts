@@ -18,13 +18,13 @@ async function proxy(request: NextRequest, context: {params: Promise<{path: stri
     });
   }
   const headers = new Headers();
-  for (const name of ["cookie", "content-type", "x-csrf-token"]) {
+  for (const name of ["cookie", "content-type", "x-csrf-token", "x-upload-metadata"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
   if (origin.origin !== null) headers.set("origin", origin.origin);
   try {
-    let body: Uint8Array | undefined;
+    let body: Uint8Array<ArrayBuffer> | undefined;
     if (request.method === "POST") {
       const limit = joined.startsWith("v1/research/preferences/") ? 6 * 1024 * 1024 : 1024 * 1024;
       const chunks: Uint8Array[] = [];
@@ -48,7 +48,7 @@ async function proxy(request: NextRequest, context: {params: Promise<{path: stri
     }
     const response = await fetch(new URL(`/api/${joined}${request.nextUrl.search}`, getApiUrl()), {
       method: request.method, headers, cache: "no-store",
-      body: body ? Buffer.from(body) : undefined,
+      body,
       signal: AbortSignal.timeout(15000), redirect: "manual",
     });
     const outgoing = new Headers({"Content-Type": response.headers.get("content-type") ?? "application/json", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"});

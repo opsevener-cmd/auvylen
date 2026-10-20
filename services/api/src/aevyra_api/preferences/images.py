@@ -31,6 +31,10 @@ def decode_image(encoded: str) -> DecodedImage:
         payload = base64.b64decode(encoded, validate=True)
     except (ValueError, binascii.Error):
         raise DomainError("Invalid image encoding", 422) from None
+    return decode_image_bytes(payload)
+
+
+def decode_image_bytes(payload: bytes) -> DecodedImage:
     if not payload or len(payload) > MAX_UPLOAD_BYTES:
         raise DomainError("Image exceeds 4 MiB limit", 413)
     try:

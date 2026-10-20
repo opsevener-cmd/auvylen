@@ -1,4 +1,5 @@
 import threading
+from urllib.parse import unquote
 from uuid import UUID
 
 from aevyra_contracts.commercial import EmptyRequest
@@ -9,6 +10,7 @@ from aevyra_contracts.preferences import (
     DatasetView,
     ImageEdit,
     ImageUpload,
+    ImageUploadMetadata,
     ImageView,
     PairInput,
     PairView,
@@ -21,7 +23,12 @@ from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from aevyra_api.commercial.state import DomainError
-from aevyra_api.preferences.images import MAX_REQUEST_BYTES, decode_image
+from aevyra_api.preferences.images import (
+    MAX_REQUEST_BYTES,
+    MAX_UPLOAD_BYTES,
+    decode_image,
+    decode_image_bytes,
+)
 from aevyra_api.preferences.service import PreferenceService
 from aevyra_api.routes.accounts import CurrentUser, config, csrf, rate, sessions
 
@@ -78,11 +85,27 @@ async def upload(dataset_id: UUID, request: Request, user: CurrentUser) -> Image
     if not upload_slots.acquire(blocking=False):
         raise DomainError("Image processing busy; retry shortly", 429)
     try:
+        binary = request.headers.get("content-type") in {"image/jpeg", "image/png"}
+        metadata: ImageUploadMetadata
+        if binary:
+            header = request.headers.get("x-upload-metadata", "")
+            if len(header) > 2048:
+                raise DomainError("Invalid upload metadata", 422)
+            try:
+                metadata = ImageUploadMetadata.model_validate_json(unquote(header, errors="strict"))
+            except (ValidationError, UnicodeError):
+                raise DomainError(
+                    "Invalid upload fields or missing adult/authorization consent", 422
+                ) from None
+        limit = MAX_UPLOAD_BYTES if binary else MAX_REQUEST_BYTES
         payload = bytearray()
         async for chunk in request.stream():
-            if len(payload) + len(chunk) > MAX_REQUEST_BYTES:
+            if len(payload) + len(chunk) > limit:
                 raise DomainError("Upload request too large", 413)
             payload.extend(chunk)
+        if binary:
+            decoded = await run_in_threadpool(decode_image_bytes, bytes(payload))
+            return await run_in_threadpool(data.upload, user.id, dataset_id, metadata, decoded)
         try:
             body = ImageUpload.model_validate_json(payload)
         except ValidationError:

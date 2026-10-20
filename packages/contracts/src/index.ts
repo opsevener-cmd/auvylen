@@ -58,6 +58,10 @@ export interface PreferenceDataset extends PreferenceProject {
   rating_min: number; rating_max: number; archived: boolean; expires_at: string;
   image_count: number; rated_count: number; compared_count: number;
 }
+/** Percent-encoded JSON in X-Upload-Metadata for JPEG/PNG binary uploads. */
+export interface ImageUploadMetadata {
+  adult_authorized_consent: true; subject_group: string | null;
+}
 export interface PreferenceImage {
   id: string; dataset_id: string; width: number; height: number;
   subject_group: string | null; excluded: boolean; created_at: string;
