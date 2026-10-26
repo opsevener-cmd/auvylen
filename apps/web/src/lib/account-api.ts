@@ -70,6 +70,17 @@ export function requestError(path: string, status: number): AccountError {
       422: "Check consent, images and rating scale. Training needs 8 ratings, 5 independent groups and varied scores in the training split.",
       429: "Upload capacity, request rate or private storage quota reached. Try again later.",
     };
+    const aestheticMessages: Record<number, string> = {
+      403: "Research access or request verification required.",
+      404: "This analysis is unavailable or was deleted.",
+      409: "This request conflicts with an earlier analysis. Choose the photograph again.",
+      413: "Image upload exceeds the size limit.",
+      415: "Choose a JPEG or PNG image.",
+      422: "Check the confirmations and use a clear JPEG/PNG photograph of one adult, at least 224 pixels on the shorter side.",
+      429: "Upload capacity or request rate reached. Try again later.",
+      503: "Aesthetic scoring is unavailable: no validated model is installed.",
+    };
+    if (path.startsWith("/research/aesthetic")) return new AccountError(status, aestheticMessages[status] ?? messages[status] ?? "Service temporarily unavailable.");
     return new AccountError(status, (path.startsWith("/research/preferences") ? preferenceMessages[status] : undefined)
       ?? messages[status] ?? "Service temporarily unavailable.");
 }

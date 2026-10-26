@@ -1,4 +1,5 @@
 from aevyra_api import admin_models
+from aevyra_api.aesthetic import models as aesthetic_models
 from aevyra_api.commercial import models as commercial_models
 from aevyra_api.config import Settings
 from aevyra_api.credits import models as credit_models
@@ -17,6 +18,7 @@ assert credit_models.Wallet.__table__.metadata is target_metadata
 assert research_models.ResearchJob.__table__.metadata is target_metadata
 assert preference_models.PreferenceDataset.__table__.metadata is target_metadata
 assert training_models.CustomModel.__table__.metadata is target_metadata
+assert aesthetic_models.AestheticAnalysis.__table__.metadata is target_metadata
 
 
 def run_migrations() -> None:

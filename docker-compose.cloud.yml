@@ -12,6 +12,10 @@ x-cloud-environment: &cloud-environment
   RESEARCH_MODE: ${RESEARCH_MODE:-false}
   SHARED_PROXY_RATE_LIMITS: "true"
   ENABLED_MODEL_PROVIDERS: ${ENABLED_MODEL_PROVIDERS:-[]}
+  # Phase 6: stays off until an authorized, validated checkpoint is installed and pinned.
+  AESTHETIC_SCORING_ENABLED: ${AESTHETIC_SCORING_ENABLED:-false}
+  AESTHETIC_MODEL_VERSION: ${AESTHETIC_MODEL_VERSION:-}
+  AESTHETIC_MANIFEST_SHA256: ${AESTHETIC_MANIFEST_SHA256:-}
   PRIVATE_UPLOAD_ROOT: /var/lib/auvylen/uploads
   PRIVATE_MODEL_ROOT: /var/lib/auvylen/models
 services:

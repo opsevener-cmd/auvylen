@@ -11,6 +11,12 @@ The separate `/analyze` workflow produces **synthetic development output** witho
 analyzing a photograph. It remains disabled in production. Accounts, immutable Credits,
 redemption, privileged Owner administration and private research authorization are preserved.
 
+Phase 6 adds Auvylen's own [aesthetic rating-distribution model](docs/aesthetic-scoring.md)
+(`/research/aesthetic`): a frozen visual representation, a learned five-category human rating
+distribution, an expected 1–10 score, subject-independent validation and calibrated error ranges.
+It is **disabled until an authorized human-rated dataset trains a checkpoint that passes the
+release gate**; no simulated score is ever substituted. See the [Phase 6 report](docs/phase6-report.md).
+
 Phase 5 adds English/Simplified Chinese presentation, a guided home page, responsive research
 workflows, confirmed per-file upload feedback and a backwards-compatible binary upload format.
 See [Phase 5 verification, limitations and safe rollout](docs/phase5-report.md),

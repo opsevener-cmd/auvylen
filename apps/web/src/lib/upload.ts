@@ -1,4 +1,5 @@
 import type {ImageUploadMetadata, PreferenceImage} from "@auvylen/contracts";
+import type {z} from "zod";
 import {imageSchema} from "./preferences-api";
 import {requestError} from "./account-api";
 export type UploadStage = "waiting" | "preparing" | "uploading" | "processing" | "saved" | "failed";
@@ -10,11 +11,15 @@ export function validateUpload(file: File): void {
 }
 /** XHR supplies real browser-to-proxy byte progress. 100% is not a saved image. */
 export function uploadImage(path: string, file: File, metadata: ImageUploadMetadata, token: string, progress: (value: UploadProgress) => void, signal?: AbortSignal): Promise<PreferenceImage> {
+  return sendImage(path, file, metadata, imageSchema, token, progress, signal);
+}
+/** Binary JPEG/PNG body with percent-encoded JSON metadata; resolves only on a schema-verified response. */
+export function sendImage<T>(path: string, file: File, metadata: object, schema: z.ZodType<T>, token: string, progress: (value: UploadProgress) => void, signal?: AbortSignal): Promise<T> {
   validateUpload(file);
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     const abort = () => request.abort();
-    const finish = (error?: Error, image?: PreferenceImage) => {
+    const finish = (error?: Error, image?: T) => {
       signal?.removeEventListener("abort", abort);
       if (error) reject(error); else resolve(image!);
     };
@@ -27,7 +32,7 @@ export function uploadImage(path: string, file: File, metadata: ImageUploadMetad
     request.upload.onload = () => progress({stage: "processing"});
     request.onload = () => {
       if (request.status < 200 || request.status >= 300) {finish(requestError(path, request.status)); return;}
-      try {const image = imageSchema.parse(JSON.parse(request.responseText)); progress({stage: "saved"}); finish(undefined, image);}
+      try {const image = schema.parse(JSON.parse(request.responseText)); progress({stage: "saved"}); finish(undefined, image);}
       catch {finish(new Error("The save response could not be verified. Retry safely; identical images are reused."));}
     };
     request.onerror = () => finish(new Error("Connection interrupted. Retry safely; identical images are reused."));
