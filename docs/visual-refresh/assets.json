@@ -1,0 +1,69 @@
+{
+  "generated_on": "2026-10-27",
+  "provenance": "Original generated fictional adults; decorative UI artwork only; no private images or real-person references.",
+  "assets": [
+    {
+      "file": "hero-960.webp",
+      "width": 960,
+      "height": 640,
+      "bytes": 35352,
+      "sha256": "e34c3a44a6bcea87834e1d0a2da4212228ac6244ab6d3688d26a1d72f510df1f"
+    },
+    {
+      "file": "hero-1440.webp",
+      "width": 1440,
+      "height": 960,
+      "bytes": 63562,
+      "sha256": "3a4fd97c49bffd9829c34ccbdc154296081a431896e64d9c0cd33b56977f3870"
+    },
+    {
+      "file": "onboarding-480.webp",
+      "width": 480,
+      "height": 320,
+      "bytes": 18742,
+      "sha256": "a83f95e1615c21f20eeeb39c273f5471e573c538b9432d6453f6410c2ec1b291"
+    },
+    {
+      "file": "onboarding-960.webp",
+      "width": 960,
+      "height": 640,
+      "bytes": 46804,
+      "sha256": "93149b9223b0716e55151aca7571d113c36f387199ffde9afc21e22d6f5243d8"
+    },
+    {
+      "file": "analysis-480.webp",
+      "width": 480,
+      "height": 320,
+      "bytes": 12008,
+      "sha256": "a04c635d0004d0a8ec1452473925b9a23ab041ea9c917b618905436642594e46"
+    },
+    {
+      "file": "analysis-960.webp",
+      "width": 960,
+      "height": 640,
+      "bytes": 32926,
+      "sha256": "8703b4e52f0bb8b51cd4793ac8ff0240c823887af33863286ed59074f698a242"
+    },
+    {
+      "file": "hero-mobile-480.webp",
+      "width": 480,
+      "height": 418,
+      "bytes": 17568,
+      "sha256": "94a5f54ce25a532fe25cb3823517c03fa2156307fc0e47c40bc07dba40944b55"
+    },
+    {
+      "file": "hero-mobile-768.webp",
+      "width": 768,
+      "height": 669,
+      "bytes": 34804,
+      "sha256": "c61f2bb8f0e0baffd543d4a02f0ecbfa66ace09aae009d6fd63165274554ea85"
+    },
+    {
+      "file": "hero-mobile-1056.webp",
+      "width": 1056,
+      "height": 920,
+      "bytes": 54336,
+      "sha256": "4b0d2efb7380f1ff775fa6dc5dae1c8d0d350bdbf7af3aa813cb06640573e120"
+    }
+  ]
+}
