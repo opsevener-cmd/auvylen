@@ -103,3 +103,22 @@ logs/
 !/docs/visual-refresh/analysis-desktop.webp
 !/docs/visual-refresh/analysis-mobile.webp
 !/docs/visual-refresh/hero-desktop.webp
+
+# Premium UI refinement before/after evidence: public pages, generated artwork and synthetic fixtures only.
+!/docs/visual-refresh/premium/after-account-desktop-en.webp
+!/docs/visual-refresh/premium/after-analysis-desktop-en.webp
+!/docs/visual-refresh/premium/after-analysis-mobile-zh.webp
+!/docs/visual-refresh/premium/after-hero-desktop-en.webp
+!/docs/visual-refresh/premium/after-hero-mobile-zh.webp
+!/docs/visual-refresh/premium/after-hero-tablet-zh.webp
+!/docs/visual-refresh/premium/after-home-desktop-en.webp
+!/docs/visual-refresh/premium/after-home-mobile-zh.webp
+!/docs/visual-refresh/premium/after-research-desktop-en.webp
+!/docs/visual-refresh/premium/after-result-desktop-en.webp
+!/docs/visual-refresh/premium/after-result-mobile-zh.webp
+!/docs/visual-refresh/premium/before-account-desktop-en.webp
+!/docs/visual-refresh/premium/before-analysis-desktop-en.webp
+!/docs/visual-refresh/premium/before-analysis-mobile-zh.webp
+!/docs/visual-refresh/premium/before-home-desktop-en.webp
+!/docs/visual-refresh/premium/before-home-mobile-zh.webp
+!/docs/visual-refresh/premium/before-research-desktop-en.webp
