@@ -26,6 +26,9 @@ def main() -> None:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--source-file", type=Path)
     source.add_argument("--download", action="store_true")
+    parser.add_argument(
+        "--diagnose", action="store_true", help="Print public graph signatures on mismatch"
+    )
     args = parser.parse_args()
     if args.output.exists():
         if hashlib.sha256(args.output.read_bytes()).hexdigest() != EXPORT_SHA:
@@ -80,6 +83,29 @@ def main() -> None:
         )
         onnx.checker.check_model(onnx.load(staged))
         if hashlib.sha256(staged.read_bytes()).hexdigest() != EXPORT_SHA:
+            if args.diagnose:
+                import json
+
+                graph = onnx.load(staged)
+                signatures = {
+                    item.name: {
+                        "sha": hashlib.sha256(item.raw_data).hexdigest(),
+                        "first": onnx.numpy_helper.to_array(item).reshape(-1)[:4].tolist(),
+                    }
+                    for item in graph.graph.initializer
+                }
+                for item in graph.graph.initializer:
+                    item.raw_data = b""
+                print(
+                    json.dumps(
+                        {
+                            "tensors": signatures,
+                            "structure_sha256": hashlib.sha256(
+                                graph.SerializeToString()
+                            ).hexdigest(),
+                        }
+                    )
+                )
             raise SystemExit(
                 "Export differs from reviewed graph; do not silently change versions. "
                 f"Observed SHA-256: {hashlib.sha256(staged.read_bytes()).hexdigest()}"
