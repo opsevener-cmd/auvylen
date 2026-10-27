@@ -144,12 +144,12 @@ export function AestheticAnalysisPage() {
     }}>
       <h2 className="text-xl">{t("Analyze a photograph")}</h2>
       <p className="mt-2 text-sm">{t("One JPEG or PNG up to 4 MiB, at least 224 pixels on the shorter side, showing one adult. The private copy is deleted as soon as the analysis finishes.")}</p>
-      <label className="mt-4 block">{t("Photograph of one adult")}<input className="mt-2 block" type="file" accept="image/jpeg,image/png" required disabled={busy} onChange={event => {
+      <label className="analysis-file-picker">{t("Photograph of one adult")}<span className="analysis-file-picker-row"><span className="button-secondary">{t("Choose photograph")}</span><input aria-label={t("Photograph of one adult")} aria-describedby="analysis-selected-file" className="sr-only" type="file" accept="image/jpeg,image/png" required disabled={busy} onChange={event => {
         const chosen = event.target.files?.[0] ?? null;
         setError(""); setProgress(null); key.current = "";
         try {if (chosen) validateUpload(chosen); setFile(chosen); setPreview(chosen ? URL.createObjectURL(chosen) : "");}
         catch (e) {setFile(null); setPreview(""); setError(e instanceof Error ? e.message : "Choose a JPEG or PNG image.");}
-      }} /></label>
+      }} /><span id="analysis-selected-file" className="selected-file-name" aria-live="polite">{file?.name ?? t("No photograph selected")}</span></span></label>
       {/* Local object URL only; the photograph is never sent to a third party. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {preview && <img src={preview} alt={t("Selected photograph preview")} className="analysis-preview mt-3" />}

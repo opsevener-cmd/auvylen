@@ -1,0 +1,1529 @@
+{
+  "method": "Chromium production build; DPR 1; mocked public status/account fixtures; image/font encoded response bodies only; 6 width/language combinations, 5 routes each",
+  "baseline": [
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-480.webp",
+          "decoded": true,
+          "display": 320
+        },
+        {
+          "file": "onboarding-480.webp",
+          "decoded": true,
+          "display": 320
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-480.webp",
+          "bytes": 17568
+        },
+        {
+          "file": "onboarding-480.webp",
+          "bytes": 18742
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "analysis-480.webp",
+          "decoded": true,
+          "display": 320
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-480.webp",
+          "bytes": 12008
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-480.webp",
+          "decoded": true,
+          "display": 390
+        },
+        {
+          "file": "onboarding-480.webp",
+          "decoded": true,
+          "display": 390
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-480.webp",
+          "bytes": 17568
+        },
+        {
+          "file": "onboarding-480.webp",
+          "bytes": 18742
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.010551149999999999,
+      "images": [
+        {
+          "file": "analysis-480.webp",
+          "decoded": true,
+          "display": 390
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-480.webp",
+          "bytes": 12008
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-1056.webp",
+          "decoded": true,
+          "display": 820
+        },
+        {
+          "file": "onboarding-480.webp",
+          "decoded": true,
+          "display": 820
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-1056.webp",
+          "bytes": 54336
+        },
+        {
+          "file": "onboarding-480.webp",
+          "bytes": 18742
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "analysis-960.webp",
+          "decoded": true,
+          "display": 820
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-960.webp",
+          "bytes": 32926
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-1056.webp",
+          "decoded": true,
+          "display": 900
+        },
+        {
+          "file": "onboarding-480.webp",
+          "decoded": true,
+          "display": 335.640625
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-1056.webp",
+          "bytes": 54336
+        },
+        {
+          "file": "onboarding-480.webp",
+          "bytes": 18742
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.022719953958333334,
+      "images": [
+        {
+          "file": "analysis-960.webp",
+          "decoded": true,
+          "display": 394
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-960.webp",
+          "bytes": 32926
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.006541040277777778,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-1056.webp",
+          "decoded": true,
+          "display": 1024
+        },
+        {
+          "file": "onboarding-480.webp",
+          "decoded": true,
+          "display": 385.25
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-1056.webp",
+          "bytes": 54336
+        },
+        {
+          "file": "onboarding-480.webp",
+          "bytes": 18742
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.005991123318672181,
+      "images": [
+        {
+          "file": "analysis-960.webp",
+          "decoded": true,
+          "display": 451.046875
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-960.webp",
+          "bytes": 32926
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.01563198961317539,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-1440.webp",
+          "decoded": true,
+          "display": 728
+        },
+        {
+          "file": "onboarding-480.webp",
+          "decoded": true,
+          "display": 480
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-1440.webp",
+          "bytes": 63562
+        },
+        {
+          "file": "onboarding-480.webp",
+          "bytes": 18742
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "analysis-960.webp",
+          "decoded": true,
+          "display": 588
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-960.webp",
+          "bytes": 32926
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.011066691080729166,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.p.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "reviewed": [
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-480.webp",
+          "decoded": true,
+          "display": 320
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "decoded": true,
+          "display": 320
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-480.webp",
+          "bytes": 17568
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "bytes": 14289
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "analysis-pair-mobile-480.avif",
+          "decoded": true,
+          "display": 320
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-pair-mobile-480.avif",
+          "bytes": 7731
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 320,
+      "locale": "en",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-480.webp",
+          "decoded": true,
+          "display": 390
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "decoded": true,
+          "display": 390
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-480.webp",
+          "bytes": 17568
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "bytes": 14289
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.010551149999999999,
+      "images": [
+        {
+          "file": "analysis-pair-mobile-480.avif",
+          "decoded": true,
+          "display": 390
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-pair-mobile-480.avif",
+          "bytes": 7731
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "locale": "zh-CN",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-1056.webp",
+          "decoded": true,
+          "display": 820
+        },
+        {
+          "file": "study-still-life-960.avif",
+          "decoded": true,
+          "display": 820
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-1056.webp",
+          "bytes": 54336
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "study-still-life-960.avif",
+          "bytes": 58008
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "analysis-pair-mobile-960.avif",
+          "decoded": true,
+          "display": 820
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-pair-mobile-960.avif",
+          "bytes": 23918
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 820,
+      "locale": "en",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-1056.webp",
+          "decoded": true,
+          "display": 900
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "decoded": true,
+          "display": 335.640625
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-1056.webp",
+          "bytes": 54336
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "bytes": 14289
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.022719953958333334,
+      "images": [
+        {
+          "file": "analysis-pair-480.avif",
+          "decoded": true,
+          "display": 394
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-pair-480.avif",
+          "bytes": 12099
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.006541040277777778,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 900,
+      "locale": "en",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "hero-mobile-1056.webp",
+          "decoded": true,
+          "display": 1024
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "decoded": true,
+          "display": 385.25
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-mobile-1056.webp",
+          "bytes": 54336
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "bytes": 14289
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.005991123318672181,
+      "images": [
+        {
+          "file": "analysis-pair-480.avif",
+          "decoded": true,
+          "display": 451.046875
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-pair-480.avif",
+          "bytes": 12099
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.01563198961317539,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1024,
+      "locale": "zh-CN",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "home",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.011563864474826388,
+      "images": [
+        {
+          "file": "hero-960.webp",
+          "decoded": true,
+          "display": 728
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "decoded": true,
+          "display": 480
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "hero-960.webp",
+          "bytes": 35352
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        },
+        {
+          "file": "study-still-life-480.avif",
+          "bytes": 14289
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "analysis",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [
+        {
+          "file": "analysis-pair-960.avif",
+          "decoded": true,
+          "display": 588
+        }
+      ],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "analysis-pair-960.avif",
+          "bytes": 38632
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "login",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.00018711325563030477,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "account",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0.01125380433635947,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "locale": "en",
+      "page": "research",
+      "overflow": false,
+      "clippedControls": [],
+      "cls": 0,
+      "images": [],
+      "resources": [
+        {
+          "file": "cormorant_garamond_latin_wght-s.p.0jvcp-grhfvvq.woff2",
+          "bytes": 37640
+        },
+        {
+          "file": "cormorant_garamond_latin_italic_500-s.0p-d800d619j9.woff2",
+          "bytes": 23924
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "accessibility": {
+    "keyboardSkipLink": true,
+    "mobileMenuNavigation": true,
+    "inputFocus": {
+      "outline": "solid",
+      "width": "2px"
+    },
+    "reducedMotionHoverTransform": "none",
+    "simulatedNoAvifFallback": {
+      "file": "study-still-life-480.webp",
+      "width": 389
+    },
+    "publicFontLicenseStatus": 200
+  }
+}

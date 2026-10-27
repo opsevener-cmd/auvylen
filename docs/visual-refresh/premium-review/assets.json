@@ -1,0 +1,119 @@
+{
+  "generated_on": "2026-10-27",
+  "analysis_mobile_crop": {
+    "left": 0,
+    "top": 140,
+    "width": 1122,
+    "height": 842
+  },
+  "assets": [
+    {
+      "file": "study-still-life-480.webp",
+      "width": 480,
+      "height": 360,
+      "bytes": 28112,
+      "sha256": "cde1f84304bc5786c0fe79f776438f7d36d9a3f41fa1b7b0cd10b0a020b089ed"
+    },
+    {
+      "file": "study-still-life-480.avif",
+      "width": 480,
+      "height": 360,
+      "bytes": 14289,
+      "sha256": "af13f6b27f114a63514349a6cc4f4ee2c604448bdf4054ee77dfdf71e13936ab"
+    },
+    {
+      "file": "study-still-life-960.webp",
+      "width": 960,
+      "height": 720,
+      "bytes": 108832,
+      "sha256": "27f9bca8404e950f021eedd4c352b597d030789d9debecf10de532731412751e"
+    },
+    {
+      "file": "study-still-life-960.avif",
+      "width": 960,
+      "height": 720,
+      "bytes": 58008,
+      "sha256": "2117694aa0f7b907fd0b8ae74d0d9da0a5ff53702c7d1eae5d37c6c85bdf3a97"
+    },
+    {
+      "file": "analysis-pair-480.webp",
+      "width": 480,
+      "height": 600,
+      "bytes": 17806,
+      "sha256": "76477c96d255933938dd7aa19b2ee2a0b3a121ea28350548a460fe29184be5bb"
+    },
+    {
+      "file": "analysis-pair-480.avif",
+      "width": 480,
+      "height": 600,
+      "bytes": 12099,
+      "sha256": "1d8976d664c4b9e2220d0a6733db780288e3eac489f1caffbd677f4802f0b2cc"
+    },
+    {
+      "file": "analysis-pair-960.webp",
+      "width": 960,
+      "height": 1200,
+      "bytes": 55416,
+      "sha256": "c9b972ca609d689ce5f948f7ca1032bed1270f09e4d076542af20acaa9b0e6c8"
+    },
+    {
+      "file": "analysis-pair-960.avif",
+      "width": 960,
+      "height": 1200,
+      "bytes": 38632,
+      "sha256": "cc7c43d19b8014d29ffa8a48895127e1d4690fd32c42e254edd4c359f613dbc6"
+    },
+    {
+      "file": "analysis-pair-mobile-480.webp",
+      "width": 480,
+      "height": 360,
+      "bytes": 10958,
+      "sha256": "a28055fc9e375aa479fdb687d4a3a78a240edc8757cbc54065412b6a2e861ab7"
+    },
+    {
+      "file": "analysis-pair-mobile-480.avif",
+      "width": 480,
+      "height": 360,
+      "bytes": 7731,
+      "sha256": "7b53ba59ff51c8972872d6974ab9397ea9e2c8ea4d4a29eb7e7e32cc5d8da20a"
+    },
+    {
+      "file": "analysis-pair-mobile-960.webp",
+      "width": 960,
+      "height": 720,
+      "bytes": 34282,
+      "sha256": "f591ea4350ed37d1422862574ffc0b16d0c567d86f9f7b9433d3addea6813b42"
+    },
+    {
+      "file": "analysis-pair-mobile-960.avif",
+      "width": 960,
+      "height": 720,
+      "bytes": 23918,
+      "sha256": "fbc8ba7fc450e14044c58abba77ed51f009c85cd12430659b1a69df5d403b9cd"
+    }
+  ],
+  "encoding": {
+    "webp": {
+      "quality": 74,
+      "effort": 6
+    },
+    "avif": {
+      "quality": 48,
+      "effort": 5
+    },
+    "metadata": "stripped",
+    "runtime_encoding": false
+  },
+  "generated_sources": [
+    {
+      "name": "study-still-life",
+      "sha256": "da85d50f2544518938f8457f4c559232fdec8eddcb1340608ffa9055f411bede",
+      "provenance": "Original image generation for this UI; analysis pair edits only the existing generated PR #6 portrait."
+    },
+    {
+      "name": "analysis-pair",
+      "sha256": "6cc9b8c156d84d7f8e400b830766f1bf41dffb0e12eb140d74d5dfc12ec53239",
+      "provenance": "Original image generation for this UI; analysis pair edits only the existing generated PR #6 portrait."
+    }
+  ]
+}
