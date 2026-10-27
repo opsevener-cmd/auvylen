@@ -102,3 +102,31 @@ export interface OwnerOverview {
   extractors: Record<string, AdminValue>[]; usage: Record<string, AdminValue>[]; quotas: Record<string, number>;
   environment: string; research_enabled: boolean; free_product_access: true;
 }
+
+/** Phase 6 aesthetic model. Percent-encoded JSON in X-Upload-Metadata; attestations, not inference. */
+export interface AestheticUploadMetadata {
+  idempotency_key: string; adult_subject_attested: true; single_subject_attested: true; authorized_consent: true;
+}
+export interface AestheticModelCard {
+  model_version: string; calibration_version: string; implementation: string; extractor: string;
+  dataset_name: string; dataset_license: string; annotator_population: string; synthetic: boolean;
+  test_images: number; test_subjects: number; test_mae: number; mean_baseline_mae: number;
+  test_spearman: number | null; test_distribution_loss: number; mean_distribution_baseline_loss: number;
+  interval_level: number; interval_half_width: number | null; interval_test_coverage: number | null;
+}
+export interface AestheticStatus {
+  enabled: boolean; authorized: boolean; available: boolean; reason: string;
+  model: AestheticModelCard | null; limitations: string[];
+}
+export interface AestheticResult {
+  raw_score: number; display_score: number; engine: string; version: string; calibration_version: string;
+  timestamp: string; synthetic: boolean; score_10: number; expected_rating_5: number;
+  rating_distribution: number[]; rating_spread_10: number; interval_level: number;
+  interval_low: number | null; interval_high: number | null; extractor: string; processing_duration_ms: number;
+  adult_basis: "user_attestation"; single_subject_basis: "user_attestation"; automated_face_detection: "not_implemented";
+}
+export interface AestheticAnalysis {
+  id: string; status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED"; progress: number; phase: string;
+  failure_reason: string | null; model_version: string; image_retained: boolean;
+  result: AestheticResult | null; created_at: string; completed_at: string | null;
+}

@@ -41,7 +41,7 @@ export function ResearchPage() {
   return <section className="max-w-2xl">
     <h1 className="text-3xl font-medium">{t("Research workspace")}</h1>
     <p className="mt-5">{t("Authorized, non-commercial testing. Research jobs do not deduct Credits.")}</p>
-    <p className="mt-6"><Link href="/research/preferences" className="button-primary">{t("Manage personal preference datasets")}</Link></p>
+    <p className="mt-6"><Link href="/research/preferences" className="button-primary">{t("Manage personal preference datasets")}</Link> <Link href="/research/aesthetic" className="button-secondary">{t("Aesthetic analysis")}</Link></p>
     <p className="mt-3">{t("Use personal preference datasets to train numerical rating models and predict from new photographs. Synthetic / Development Analysis remains available separately.")}</p>
     {error && <p role="alert" className="mt-5">{t(error)} <Link href="/login" className="underline">{t("Sign in")}</Link></p>}
     {status && !status.authorized && <p className="mt-5">{t("Research is disabled or operator authorization is required.")}</p>}

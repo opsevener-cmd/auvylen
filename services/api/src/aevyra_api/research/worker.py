@@ -4,9 +4,12 @@ import logging
 import signal
 import time
 
+from aevyra_inference.aesthetic_checkpoint import SLUG as AESTHETIC
 from aevyra_inference.engine import EngineRegistry
 from aevyra_inference.mock import MockScoringEngine
 
+from aevyra_api.aesthetic.execution import AestheticExecution
+from aevyra_api.aesthetic.service import AestheticService
 from aevyra_api.config import Settings
 from aevyra_api.database import DependencyChecks
 from aevyra_api.logging import configure_logging
@@ -31,6 +34,10 @@ def run_one(queue: ResearchQueue) -> bool:
                 if saved:
                     logger.info("custom_job_finished", extra={"analysis_id": str(lease.id)})
                 return True
+            if lease.provider == AESTHETIC and lease.kind == "SCORE":
+                if AestheticExecution(queue, lease, heartbeat).score():
+                    logger.info("aesthetic_job_finished", extra={"analysis_id": str(lease.id)})
+                return True
             if lease.kind != "SCORE" or lease.provider != "mock":
                 raise RuntimeError("Requested model or training implementation unavailable")
             score = EngineRegistry([MockScoringEngine()]).score(
@@ -45,6 +52,8 @@ def run_one(queue: ResearchQueue) -> bool:
         queue.finish(lease, None)
         if lease.provider == "custom":
             CustomExecution(queue, lease, LeaseHeartbeat(queue, lease)).fail()
+        if lease.provider == AESTHETIC:
+            AestheticExecution(queue, lease, LeaseHeartbeat(queue, lease)).fail()
         logger.error("research_job_failed", extra={"error_type": type(exc).__name__})
     return True
 
@@ -73,6 +82,7 @@ def main() -> None:
                 if time.monotonic() - last_cleanup >= 60:
                     ModelService(checks.sessions, settings).purge()
                     PreferenceService(checks.sessions, settings).purge()
+                    AestheticService(checks.sessions, settings).purge()
                     last_cleanup = time.monotonic()
                 checks.redis.set(
                     "auvylen:worker:heartbeat:" + settings.worker_queue, str(time.time()), ex=120

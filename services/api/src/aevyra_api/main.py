@@ -21,6 +21,7 @@ from aevyra_api.logging import configure_logging, request_id_context
 from aevyra_api.payments.mock import MockPaymentProvider
 from aevyra_api.routes import (
     accounts,
+    aesthetic,
     commercial,
     custom_models,
     health,
@@ -179,6 +180,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(research.router)
     application.include_router(preferences.router)
     application.include_router(custom_models.router)
+    application.include_router(aesthetic.router)
     return application
 
 

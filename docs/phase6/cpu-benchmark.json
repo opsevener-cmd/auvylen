@@ -1,0 +1,33 @@
+{
+  "scope": "Generated vectors and a generated 320x400 PNG; CPU timing only, not accuracy.",
+  "python": "3.14.6",
+  "numpy": "2.5.4",
+  "machine": "x86_64",
+  "cpu_count": 4,
+  "blas_threads": "1",
+  "training": [
+    {
+      "images": 600,
+      "dimension": 230,
+      "epochs_run": 92,
+      "seconds": 0.105,
+      "peak_traced_mib": 1.7
+    },
+    {
+      "images": 600,
+      "dimension": 1024,
+      "epochs_run": 34,
+      "seconds": 0.092,
+      "peak_traced_mib": 6.9
+    },
+    {
+      "images": 5000,
+      "dimension": 1024,
+      "epochs_run": 250,
+      "seconds": 5.478,
+      "peak_traced_mib": 55.5
+    }
+  ],
+  "head_inference_ms_per_image_1024": 0.032,
+  "handcrafted_extraction_ms_per_image": 4.86
+}

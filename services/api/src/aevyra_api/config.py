@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import AliasChoices, Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -48,6 +48,18 @@ class Settings(BaseSettings):
     owner_fresh_auth_seconds: int = Field(default=600, ge=60, le=900)
     worker_queue: Literal["cpu", "gpu"] = "cpu"
     job_lease_seconds: int = Field(default=60, ge=30, le=3600)
+    # Phase 6 aesthetic model: off until an authorized, validated checkpoint is pinned.
+    aesthetic_scoring_enabled: bool = False
+    aesthetic_model_version: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9.-]{0,63}$")
+    aesthetic_manifest_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    # Development/test only: lets automated tests exercise the pipeline with a checkpoint
+    # trained on generated data. Results stay labelled synthetic.
+    aesthetic_allow_synthetic_test_checkpoint: bool = False
+
+    @field_validator("aesthetic_model_version", "aesthetic_manifest_sha256", mode="before")
+    @classmethod
+    def blank_is_unset(cls, value: object) -> object:
+        return None if value == "" else value  # Compose passes unset variables as "".
 
     @model_validator(mode="after")
     def production_defaults(self) -> "Settings":
@@ -56,6 +68,15 @@ class Settings(BaseSettings):
             for slug in self.enabled_model_providers
         ):
             raise ValueError("Unknown enabled model provider")
+        if self.aesthetic_scoring_enabled and (
+            not self.aesthetic_model_version or not self.aesthetic_manifest_sha256
+        ):
+            raise ValueError("Aesthetic scoring requires a pinned model version and manifest")
+        if self.aesthetic_allow_synthetic_test_checkpoint and self.api_environment not in {
+            "development",
+            "test",
+        }:
+            raise ValueError("Synthetic aesthetic checkpoints are forbidden in deployments")
         if self.public_pilot:
             if self.api_environment != "staging":
                 raise ValueError("PUBLIC_PILOT requires APP_ENV=staging")

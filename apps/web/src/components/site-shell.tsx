@@ -7,7 +7,7 @@ export function SiteShell({children, pilot}: {children: React.ReactNode; pilot: 
   const {locale, setLocale, t} = useI18n();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const links = [["/", "Home"], ["/research/preferences", "Personal research"], ["/research", "Research workspace"], ["/account", "Account"]];
+  const links = [["/", "Home"], ["/research/aesthetic", "Aesthetic analysis"], ["/research/preferences", "Personal research"], ["/research", "Research workspace"], ["/account", "Account"]];
   return <>
     <a href="#main" className="skip-link">{t("Skip to content")}</a>
     <header className="site-header"><div className="header-inner">

@@ -36,6 +36,12 @@ back to Windows/WSL or local Docker. No cloud environment or paid server is assu
   docs/custom-preference-models.md and docs/pretrained-representation.md. Custom training and inference are non-commercial
   research operations and use the registry research policy gate. Unavailable external
   models must stay unavailable.
+- Phase 6 (authorized by the user on 2026-10-26) adds the first-party aesthetic
+  rating-distribution model; see docs/aesthetic-scoring.md. It stays disabled until an
+  authorized human-rated dataset produces a checkpoint that passes the release gate and the
+  user approves pinning it. Never train on distributions derived from mean scores, never
+  infer adulthood from appearance, and never enable synthetic checkpoints outside
+  development/test.
 - Every future execution must use the registry policy gate; new engines require explicit
   provenance and licensing review. A commercial flag is not a substitute for evidence.
 

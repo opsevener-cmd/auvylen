@@ -22,6 +22,8 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     env:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
       REDEMPTION_CODE_PEPPER: ci-testing-only-secret-not-for-deployment
     services:
       postgres:
@@ -48,6 +50,9 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run alembic -c services/api/alembic.ini upgrade head
+      # Reviewed-weight tests are opt-in: this hosted CPU does not reproduce the
+      # pinned ONNX export. Full local --pretrained verification is documented in
+      # docs/phase6-codex-review.md; never accept a different graph to satisfy CI.
       # The built Next.js proxy test runs in commercial-browser below.
       - run: uv run pytest --integration --ignore=services/api/tests/test_codespaces_login_proxy.py
       - run: uv run alembic -c services/api/alembic.ini check
@@ -101,6 +106,9 @@ jobs:
       - run: uv run pytest --integration services/api/tests/test_codespaces_login_proxy.py
       - run: npm exec --workspace @auvylen/web -- playwright install --with-deps chromium
       - run: npm run test:e2e --workspace @auvylen/web
+      # Phase 6: the aesthetic pipeline with a SYNTHETIC generated-data checkpoint (dev/test only).
+      - run: uv run python scripts/create-test-aesthetic-checkpoint.py --model-root private-data/e2e-models >> "$GITHUB_ENV"
+      - run: npm run test:e2e --workspace @auvylen/web -- aesthetic
   deployment:
     runs-on: ubuntu-latest
     env:

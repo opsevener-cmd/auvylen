@@ -1,0 +1,23 @@
+{
+  "scope": "Generated PNG -> real MobileNet CPU -> aesthetic head; cold includes pinned checkpoint verification and ONNX session creation; excludes HTTP/queue/database latency. Not human aesthetic validation.",
+  "reviewed_weight_sha256": "164c481657afe9d36e08ff58693df24e511b5bf1a07de9b9389dfc468eedd2a6",
+  "images": 96,
+  "feature_shape": [
+    96,
+    1024
+  ],
+  "batch_extraction_seconds": 0.7049195339999415,
+  "timings": {
+    "warm": {
+      "median_ms": 4.998732999979438,
+      "p95_ms": 6.936619500010012
+    },
+    "cold": {
+      "median_ms": 31.503443000019615,
+      "p95_ms": 41.8078245499828
+    }
+  },
+  "checkpoint_round_trip": true,
+  "synthetic": true,
+  "application_scoring_enabled": false
+}
