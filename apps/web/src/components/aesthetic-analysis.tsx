@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import {EditorialPortrait} from "./editorial-portrait";
 import {useEffect, useRef, useState} from "react";
 import {z} from "zod";
 import type {AestheticAnalysis, AestheticResult, AestheticStatus} from "@auvylen/contracts";
@@ -95,11 +96,14 @@ export function AestheticAnalysisPage() {
   }, [currentId, currentStatus]);
   const ready = !!status?.authorized && !!status.available;
   const model = status?.model;
-  return <section className="max-w-3xl">
+  return <section className="aesthetic-workspace">
+    <header className="aesthetic-landing"><div className="aesthetic-landing-copy">
     <p className="eyebrow">{t("Auvylen Analyze · research preview")}</p>
     <h1 className="text-3xl font-medium">{t("Aesthetic analysis")}</h1>
     <p className="mt-5">{t("Auvylen's own model estimates how a group of human annotators would rate a photograph on a five-point scale, then reports the expected rating on a 1–10 scale with the full predicted distribution. It reflects those annotators' statistical preferences, not objective beauty.")}</p>
     <p className="mt-3">{t("This is separate from your personal preference models, which learn only from your own ratings.")} <Link href="/research/preferences" className="underline">{t("Personal research")}</Link></p>
+    </div><EditorialPortrait variant="analysis"/></header>
+    <div className="aesthetic-content">
     {error && <p role="alert" className="mt-5">{t(error)} <Link href="/login" className="underline">{t("Sign in")}</Link></p>}
     {status && !status.authorized && <p role="status" className="mt-5">{t("Research is disabled or operator authorization is required.")}</p>}
     {status && status.authorized && !status.available && <div role="status" className="mt-5">
@@ -179,5 +183,5 @@ export function AestheticAnalysisPage() {
       </li>)}</ul></>}
     {status && <><h2 className="mt-10 text-xl">{t("Limitations")}</h2>
       <ul className="mt-3 list-disc pl-5 space-y-1">{status.limitations.map(text => <li key={text}>{t(text)}</li>)}</ul></>}
-  </section>;
+  </div></section>;
 }

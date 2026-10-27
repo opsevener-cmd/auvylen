@@ -1,0 +1,143 @@
+[
+  {
+    "viewport": "desktop",
+    "page": "home",
+    "horizontalOverflow": false,
+    "errors": [],
+    "images": [
+      {
+        "file": "hero-1440.webp",
+        "decoded": true,
+        "loading": "eager"
+      },
+      {
+        "file": "onboarding-480.webp",
+        "decoded": true,
+        "loading": "lazy"
+      }
+    ],
+    "imageRequests": [
+      {
+        "file": "hero-1440.webp",
+        "bytes": 63562
+      },
+      {
+        "file": "onboarding-480.webp",
+        "bytes": 18742
+      }
+    ]
+  },
+  {
+    "viewport": "desktop",
+    "page": "analysis",
+    "horizontalOverflow": false,
+    "errors": [],
+    "images": [
+      {
+        "file": "analysis-960.webp",
+        "decoded": true,
+        "loading": "eager"
+      }
+    ],
+    "imageRequests": [
+      {
+        "file": "analysis-960.webp",
+        "bytes": 32926
+      }
+    ]
+  },
+  {
+    "viewport": "mobile",
+    "page": "home",
+    "horizontalOverflow": false,
+    "errors": [],
+    "images": [
+      {
+        "file": "hero-mobile-480.webp",
+        "decoded": true,
+        "loading": "eager"
+      },
+      {
+        "file": "onboarding-480.webp",
+        "decoded": true,
+        "loading": "lazy"
+      }
+    ],
+    "imageRequests": [
+      {
+        "file": "hero-mobile-480.webp",
+        "bytes": 17568
+      },
+      {
+        "file": "onboarding-480.webp",
+        "bytes": 18742
+      }
+    ]
+  },
+  {
+    "viewport": "mobile",
+    "page": "analysis",
+    "horizontalOverflow": false,
+    "errors": [],
+    "images": [
+      {
+        "file": "analysis-480.webp",
+        "decoded": true,
+        "loading": "eager"
+      }
+    ],
+    "imageRequests": [
+      {
+        "file": "analysis-480.webp",
+        "bytes": 12008
+      }
+    ]
+  },
+  {
+    "viewport": "tablet",
+    "page": "home",
+    "horizontalOverflow": false,
+    "errors": [],
+    "images": [
+      {
+        "file": "hero-mobile-1056.webp",
+        "decoded": true,
+        "loading": "eager"
+      },
+      {
+        "file": "onboarding-480.webp",
+        "decoded": true,
+        "loading": "lazy"
+      }
+    ],
+    "imageRequests": [
+      {
+        "file": "hero-mobile-1056.webp",
+        "bytes": 54336
+      },
+      {
+        "file": "onboarding-480.webp",
+        "bytes": 18742
+      }
+    ]
+  },
+  {
+    "viewport": "tablet",
+    "page": "analysis",
+    "horizontalOverflow": false,
+    "errors": [],
+    "images": [
+      {
+        "file": "analysis-960.webp",
+        "decoded": true,
+        "loading": "eager"
+      }
+    ],
+    "imageRequests": [
+      {
+        "file": "analysis-960.webp",
+        "bytes": 32926
+      }
+    ]
+  }
+]

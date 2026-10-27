@@ -670,5 +670,8 @@
   "This request conflicts with an earlier analysis. Choose the photograph again.": "此请求与之前的分析冲突。请重新选择照片。",
   "Check the confirmations and use a clear JPEG/PNG photograph of one adult, at least 224 pixels on the shorter side.": "请检查确认事项，并使用一张清晰的、只有一位成年人的 JPEG/PNG 照片，短边至少 224 像素。",
   "Upload capacity or request rate reached. Try again later.": "已达到上传容量或请求频率上限。请稍后再试。",
-  "Aesthetic scoring is unavailable: no validated model is installed.": "审美评分不可用：尚未安装通过验证的模型。"
+  "Aesthetic scoring is unavailable: no validated model is installed.": "审美评分不可用：尚未安装通过验证的模型。",
+  "Four fictional adults in a sunlit stone gallery, generated for Auvylen": "为 Auvylen 生成的四位虚构成年人，身处阳光柔和的石材展厅",
+  "Three fictional adults sharing a quiet moment around a studio table": "三位虚构成年人围坐在工作室桌旁，安静交流",
+  "Two fictional adults in a softly lit studio, generated as decorative artwork": "柔和光线下的两位虚构成年人，仅作装饰的生成图像"
 }

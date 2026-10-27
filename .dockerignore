@@ -68,3 +68,14 @@ logs
 
 # Only this reviewed synthetic decorative image is shipped publicly.
 !apps/web/public/images/auvylen-synthetic-adults.webp
+
+# Original generated editorial UI artwork, reviewed for public decorative use.
+!apps/web/public/images/editorial/hero-960.webp
+!apps/web/public/images/editorial/hero-1440.webp
+!apps/web/public/images/editorial/hero-mobile-480.webp
+!apps/web/public/images/editorial/hero-mobile-768.webp
+!apps/web/public/images/editorial/onboarding-480.webp
+!apps/web/public/images/editorial/onboarding-960.webp
+!apps/web/public/images/editorial/analysis-480.webp
+!apps/web/public/images/editorial/analysis-960.webp
+!apps/web/public/images/editorial/hero-mobile-1056.webp

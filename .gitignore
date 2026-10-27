@@ -83,3 +83,23 @@ logs/
 !/docs/phase5/home-en-desktop.webp
 !/docs/phase5/home-zh-mobile.webp
 !/docs/phase5/research-zh-mobile.webp
+
+# Original generated editorial UI artwork, reviewed for public decorative use.
+!/apps/web/public/images/editorial/hero-960.webp
+!/apps/web/public/images/editorial/hero-1440.webp
+!/apps/web/public/images/editorial/hero-mobile-480.webp
+!/apps/web/public/images/editorial/hero-mobile-768.webp
+!/apps/web/public/images/editorial/onboarding-480.webp
+!/apps/web/public/images/editorial/onboarding-960.webp
+!/apps/web/public/images/editorial/analysis-480.webp
+!/apps/web/public/images/editorial/analysis-960.webp
+!/apps/web/public/images/editorial/hero-mobile-1056.webp
+
+# Reviewed browser screenshots: generated public artwork and fixture-only status.
+!/docs/visual-refresh/home-desktop.webp
+!/docs/visual-refresh/home-mobile.webp
+!/docs/visual-refresh/guide-desktop.webp
+!/docs/visual-refresh/guide-mobile.webp
+!/docs/visual-refresh/analysis-desktop.webp
+!/docs/visual-refresh/analysis-mobile.webp
+!/docs/visual-refresh/hero-desktop.webp
