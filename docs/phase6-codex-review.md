@@ -62,12 +62,14 @@ verify engineering only; they do not validate human aesthetic scoring. The head
 was not enabled in the application. The opt-in automated pretrained regression
 repeats this combined path, and backend CI installs the exact reviewed weights.
 
-GitHub's native Ubuntu exporter produced a different graph checksum even with the
-same Python patch version and reviewed libraries. No alternate graph was accepted.
-The digest-pinned Debian 13 / Python 3.14.8 export container reproduced the original
-hash locally; CI now uses that environment for export only, then verifies the pinned
-graph through the normal installer and host runtime tests. The reviewed graph hash
-and existing personal-model extractor compatibility are unchanged.
+Cross-runner diagnostics found identical graph structure and source tensors but
+floating-point differences in folded convolution tensors. MKL execution branches
+produce different bytes: COMPATIBLE/SSE4_2/AVX2 exports differ from the pin, while
+AVX512 reproduces it locally. CI pins the Debian 13/Python 3.14.8 export container
+and MKL AVX512 branch, with a writable Torch cache for its non-root UID. Every
+export still must match the original full graph SHA before installation. Unsupported
+hardware must fail rather than install different weights. Existing personal-model
+extractor compatibility and the reviewed hash are unchanged.
 
 ## Verification
 

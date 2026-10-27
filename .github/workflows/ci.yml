@@ -59,7 +59,7 @@ jobs:
             --mount "type=bind,src=$PWD/scripts,dst=/scripts,readonly" \
             --mount "type=bind,src=$PWD/private-data/exports,dst=/output" \
             -e OPENBLAS_NUM_THREADS=1 -e OMP_NUM_THREADS=1 -e ATEN_CPU_CAPABILITY=default \
-            -e TORCHINDUCTOR_CACHE_DIR=/tmp/auvylen-export-cache \
+            -e TORCHINDUCTOR_CACHE_DIR=/tmp/auvylen-export-cache -e MKL_CBWR=AVX512 \
             python:3.14.8-slim-trixie@sha256:fbecd461fc72d21b2143c6eaba25143738079154a6d0ea3da3aec724f50eed4a \
             sh -eu -c '
               python -m venv /tmp/export-env

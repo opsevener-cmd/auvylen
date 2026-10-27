@@ -172,6 +172,9 @@ class AestheticService:
         self.ready()
 
     def view(self, session: Session, row: AestheticAnalysis) -> AestheticAnalysisView:
+        # Include idempotent submission retries, not only GET/list responses.
+        if row.expires_at.replace(tzinfo=now().tzinfo) <= now():
+            raise DomainError("Analysis not found", 404)
         job = session.get(ResearchJob, row.job_id)
         if job is None:
             raise DomainError("Analysis not found", 404)
@@ -276,10 +279,7 @@ class AestheticService:
     def get(self, user: UUID, id: UUID) -> AestheticAnalysisView:
         with self.sessions() as session:
             self.access(session, user)
-            row = self.owned(session, user, id)
-            if row.expires_at.replace(tzinfo=now().tzinfo) <= now():
-                raise DomainError("Analysis not found", 404)
-            return self.view(session, row)
+            return self.view(session, self.owned(session, user, id))
 
     def list(self, user: UUID) -> list[AestheticAnalysisView]:
         with self.sessions() as session:

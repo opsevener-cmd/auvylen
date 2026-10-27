@@ -303,13 +303,15 @@ def test_expired_results_are_unreadable_before_worker_cleanup(credits, checkpoin
     from aevyra_api.commercial.models import now
 
     configure(credits, checkpoint_root)
-    queued = submit(credits).json()
+    request_key = uuid4()
+    queued = submit(credits, key=request_key).json()
     execute(credits)
     with credits.sessions.begin() as session:
         row = session.get(AestheticAnalysis, UUID(queued["id"]))
         row.expires_at = now() - timedelta(seconds=1)
     assert credits.client.get(f"{BASE}/analyses/{queued['id']}").status_code == 404
     assert credits.client.get(BASE + "/analyses").json() == []
+    assert submit(credits, key=request_key).status_code == 404
     # Deletion remains available even though retention hides the result.
     assert (
         credits.client.post(
