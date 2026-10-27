@@ -60,16 +60,24 @@ These measure the compute path, excluding HTTP/queue/database latency. They are 
 live Codespaces measurements. Generated pixels and simulated categorical votes
 verify engineering only; they do not validate human aesthetic scoring. The head
 was not enabled in the application. The opt-in automated pretrained regression
-repeats this combined path, and backend CI installs the exact reviewed weights.
+repeats this combined path when explicitly invoked with `--pretrained`.
 
 Cross-runner diagnostics found identical graph structure and source tensors but
-floating-point differences in folded convolution tensors. MKL execution branches
-produce different bytes: COMPATIBLE/SSE4_2/AVX2 exports differ from the pin, while
-AVX512 reproduces it locally. CI pins the Debian 13/Python 3.14.8 export container
-and MKL AVX512 branch, with a writable Torch cache for its non-root UID. Every
-export still must match the original full graph SHA before installation. Unsupported
-hardware must fail rather than install different weights. Existing personal-model
-extractor compatibility and the reviewed hash are unchanged.
+floating-point differences in folded convolution tensors. The hosted export SHA was
+`473260f4979b56cb211588502cdf6847bc2fd65cd3ea66233f4915adc23b8a39`;
+this graph was rejected, never installed. The reviewed graph remains the only accepted
+one. Pinning Python, a Debian container and MKL compatibility modes did not reproduce
+the original bytes on the hosted runner. Locally, MKL COMPATIBLE/SSE4_2/AVX2 branches
+also produced different graphs, while AVX512 reproduced the pin.
+
+**CI limitation:** the five original CI jobs retain their existing optional-weight
+boundary. Backend CI skips five opt-in pretrained tests, including the combined new
+pipeline test. They all passed locally against the exact installed graph as part of
+216 tests with no skips. To repeat the pretrained tests, supply the already verified
+reviewed graph or export on compatible approved hardware, then use `--pretrained
+--pretrained-root private-data/models/pretrained`. Existing personal-model checkpoint
+compatibility and all accepted graph/source hashes are unchanged. Export-only debug
+signatures are opt-in and contain public model tensor checksums, never user data.
 
 ## Verification
 
