@@ -20,9 +20,11 @@ import hashlib
 import json
 import sys
 import time
+from io import BytesIO
 from pathlib import Path
 
 import numpy as np
+from PIL import Image, ImageOps
 from pydantic import ValidationError
 
 from aevyra_inference.aesthetic import RATING_BINS, SEED, fit_scoring_head
@@ -88,7 +90,14 @@ def extract_features(paths: list[Path], extractor_id: str, pretrained_root: Path
             if path.stat().st_size > MAX_IMAGE_BYTES:
                 raise LabelError("Image exceeds 10 MiB")
             payload = path.read_bytes()
-            digest = hashlib.sha256(payload).hexdigest()
+            # File metadata or PNG encoding differences must not conceal identical pixels.
+            with Image.open(BytesIO(payload), formats=["JPEG", "PNG"]) as image:
+                if max(image.size) > 4096 or image.width * image.height > 16_000_000:
+                    raise LabelError("Image dimensions exceed training limits")
+                normalized = ImageOps.exif_transpose(image).convert("RGB")
+                digest = hashlib.sha256(
+                    str(normalized.size).encode() + normalized.tobytes()
+                ).hexdigest()
             if digest in seen:
                 # Identical bytes under two rows would leak across subject splits.
                 raise LabelError(f"Rows {seen[digest] + 2} and {index + 2} are identical images")
@@ -143,8 +152,14 @@ def main(argv: list[str] | None = None) -> int:
             patience=args.patience,
             seed=args.seed,
         )
+    except LabelError as exc:
+        print(f"Training refused: {exc}", file=sys.stderr)
+        return 1
     except (OSError, ValueError) as exc:
-        print(f"Training refused: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(
+            f"Training refused: {type(exc).__name__}; verify labels and image inputs",
+            file=sys.stderr,
+        )
         return 1
     totals = votes.sum(axis=1)
     training = {

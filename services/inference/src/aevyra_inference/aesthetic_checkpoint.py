@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -142,7 +143,13 @@ def release_failures(item: AestheticManifest, *, allow_synthetic: bool = False) 
 
     def number(key: str) -> float | None:
         value = metrics.get(key)
-        return float(value) if isinstance(value, int | float) else None
+        return (
+            float(value)
+            if isinstance(value, int | float)
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+            else None
+        )
 
     test_subjects, test_images = number("test_subjects"), number("test_images")
     if test_subjects is None or test_subjects < GATE_MIN_TEST_SUBJECTS:
@@ -162,7 +169,16 @@ def release_failures(item: AestheticManifest, *, allow_synthetic: bool = False) 
     if correlation is None or correlation < GATE_MIN_SPEARMAN:
         failures.append("insufficient_ranking_correlation")
     calibration = item.calibration
-    if calibration.half_width_display is None or calibration.test_coverage is None:
+    if (
+        calibration.method
+        != (
+            "split-conformal subject-max absolute error on independent "
+            "calibration subjects, display scale"
+        )
+        or calibration.validation_n < 9
+        or calibration.half_width_display is None
+        or calibration.test_coverage is None
+    ):
         failures.append("uncalibrated")
     elif calibration.test_coverage < calibration.level - GATE_COVERAGE_TOLERANCE:
         failures.append("calibration_coverage_failed")

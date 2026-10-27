@@ -22,6 +22,8 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     env:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
       REDEMPTION_CODE_PEPPER: ci-testing-only-secret-not-for-deployment
     services:
       postgres:
@@ -48,8 +50,14 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run alembic -c services/api/alembic.ini upgrade head
+      # Review-pinned CPU toolchain/weights, in an isolated environment, never in Git.
+      - run: uv venv .venv-extractor-export --python 3.14
+      - run: uv pip install --python .venv-extractor-export/bin/python --index-url https://download.pytorch.org/whl/cpu 'torch==2.10.0+cpu' 'torchvision==0.25.0+cpu'
+      - run: uv pip install --python .venv-extractor-export/bin/python 'timm==1.0.30' 'onnx==1.22.0' 'numpy==2.5.4'
+      - run: .venv-extractor-export/bin/python scripts/export-pretrained-extractor.py --download --output private-data/exports/mobilenetv3-small-100-lamb-embedding-v1.onnx
+      - run: uv run python scripts/install-pretrained-extractor.py --source-file private-data/exports/mobilenetv3-small-100-lamb-embedding-v1.onnx --root private-data/models/pretrained
       # The built Next.js proxy test runs in commercial-browser below.
-      - run: uv run pytest --integration --ignore=services/api/tests/test_codespaces_login_proxy.py
+      - run: uv run pytest --integration --pretrained --pretrained-root private-data/models/pretrained --ignore=services/api/tests/test_codespaces_login_proxy.py
       - run: uv run alembic -c services/api/alembic.ini check
   frontend:
     runs-on: ubuntu-latest

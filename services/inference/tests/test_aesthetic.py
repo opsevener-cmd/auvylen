@@ -164,14 +164,14 @@ def test_training_normalization_and_selection_never_see_test_subjects():
 
 
 def test_learnable_signal_beats_simple_baselines_with_ranking_and_calibration():
-    x, votes, ids = synthetic(subjects=200)
+    x, votes, ids = synthetic(subjects=400)
     _, metrics = fit_scoring_head(x, votes, ids)
     assert metrics["test_mae"] < metrics["mean_baseline_mae"]
     assert metrics["test_distribution_loss"] < metrics["mean_distribution_baseline_loss"]
     assert metrics["test_spearman"] > 0.5
     assert metrics["calibration"]["half_width_display"] > 0
     assert 0 <= metrics["calibration"]["test_coverage"] <= 1
-    assert metrics["test_subjects"] == 40 and metrics["training_subjects"] == 120
+    assert metrics["test_subjects"] == 80 and metrics["training_subjects"] == 240
 
 
 def test_training_input_requirements():
@@ -431,3 +431,81 @@ def test_training_command_refuses_mean_scores_and_traversal(tmp_path, capsys):
     assert train_main(args) == 2
     assert not (tmp_path / "m").exists()
     assert os.listdir(images) == ["a.png"]
+
+
+def test_calibration_people_do_not_select_the_head_and_use_subject_residuals():
+    x, votes, ids = synthetic(subjects=200)
+    head, metrics = fit_scoring_head(x, votes, ids, epochs=60)
+    groups = [{ids[i] for i in part} for part in metrics["split"].values()]
+    for index, group in enumerate(groups):
+        assert all(group.isdisjoint(other) for other in groups[index + 1 :])
+    calibration = metrics["split"]["calibration"]
+    assert metrics["calibration"]["validation_n"] == len({ids[i] for i in calibration})
+    changed = votes.copy()
+    changed[calibration] = [25, 0, 0, 0, 0]
+    other, other_metrics = fit_scoring_head(x, changed, ids, epochs=60)
+    np.testing.assert_array_equal(head.weights, other.weights)
+    np.testing.assert_array_equal(head.bias, other.bias)
+    assert (
+        metrics["calibration"]["half_width_display"]
+        != other_metrics["calibration"]["half_width_display"]
+    )
+
+
+def test_gate_rejects_nonfinite_metrics_and_old_reused_validation_calibration(tmp_path):
+    item, _, _ = published(tmp_path)
+    for value in (float("nan"), float("inf"), True):
+        corrupted = item.model_copy(update={"metrics": {**item.metrics, "test_mae": value}})
+        assert "does_not_beat_mean_baseline" in release_failures(corrupted, allow_synthetic=True)
+    old = item.model_copy(
+        update={
+            "calibration": item.calibration.model_copy(
+                update={
+                    "method": "split-conformal absolute error on validation subjects, display scale"
+                }
+            )
+        }
+    )
+    assert "uncalibrated" in release_failures(old, allow_synthetic=True)
+
+
+def test_training_rejects_identical_pixels_with_different_file_metadata(tmp_path):
+    from aevyra_inference.aesthetic_train import LabelError, extract_features
+    from PIL.PngImagePlugin import PngInfo
+
+    image = Image.new("RGB", (224, 224), (10, 20, 30))
+    first, second = tmp_path / "first.png", tmp_path / "second.png"
+    image.save(first)
+    metadata = PngInfo()
+    metadata.add_text("description", "Different encoding, identical pixels")
+    image.save(second, pnginfo=metadata)
+    assert first.read_bytes() != second.read_bytes()
+    with pytest.raises(LabelError, match="identical images"):
+        extract_features([first, second], BASELINE, tmp_path)
+
+
+@pytest.mark.pretrained
+def test_real_mobilenet_aesthetic_training_checkpoint_and_cpu_path(pretrained_root, tmp_path):
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    output = tmp_path / "verification.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(root / "scripts/verify-aesthetic-mobilenet.py"),
+            "--pretrained-root",
+            str(pretrained_root),
+            "--output",
+            str(output),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    result = json.loads(output.read_text())
+    assert result["feature_shape"] == [96, 1024]
+    assert result["checkpoint_round_trip"] is True
+    assert result["synthetic"] is True
+    assert result["application_scoring_enabled"] is False

@@ -276,14 +276,21 @@ class AestheticService:
     def get(self, user: UUID, id: UUID) -> AestheticAnalysisView:
         with self.sessions() as session:
             self.access(session, user)
-            return self.view(session, self.owned(session, user, id))
+            row = self.owned(session, user, id)
+            if row.expires_at.replace(tzinfo=now().tzinfo) <= now():
+                raise DomainError("Analysis not found", 404)
+            return self.view(session, row)
 
     def list(self, user: UUID) -> list[AestheticAnalysisView]:
         with self.sessions() as session:
             self.access(session, user)
             rows = session.scalars(
                 select(AestheticAnalysis)
-                .where(AestheticAnalysis.user_id == user, AestheticAnalysis.deleted_at.is_(None))
+                .where(
+                    AestheticAnalysis.user_id == user,
+                    AestheticAnalysis.deleted_at.is_(None),
+                    AestheticAnalysis.expires_at > now(),
+                )
                 .order_by(AestheticAnalysis.created_at.desc())
                 .limit(50)
             )

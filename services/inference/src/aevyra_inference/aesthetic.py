@@ -207,6 +207,13 @@ def fit_scoring_head(
         raise ValueError("Invalid training configuration.")
 
     train_idx, val_idx, test_idx = split_by_subject(subject_ids, seed)
+    # Reserve half of the validation subjects for calibration, never epoch selection.
+    validation_subjects = sorted({subject_ids[i] for i in val_idx})
+    calibration_subjects = set(validation_subjects[::2])
+    cal_idx = np.asarray([i for i in val_idx if subject_ids[i] in calibration_subjects], dtype=int)
+    val_idx = np.asarray(
+        [i for i in val_idx if subject_ids[i] not in calibration_subjects], dtype=int
+    )
     Y_train, Y_val, Y_test = Y[train_idx], Y[val_idx], Y[test_idx]
     if np.ptp(expected_score(Y_train)) == 0:
         raise ValueError("Training ratings need variation.")
@@ -253,13 +260,24 @@ def fit_scoring_head(
 
     head = ScoringHead(mean=mean, scale=scale, weights=best_W, bias=best_b)
 
-    # Calibration uses validation subjects; test subjects are only evaluated after
-    # model selection and calibration are both fixed.
+    # Each independent person contributes one maximum residual. Repeated photographs
+    # must not be treated as independent calibration observations.
     train_scores = expected_score(Y_train)
-    val_pred = head.predict_distribution(X[val_idx])
-    half_width = conformal_half_width(
-        np.abs(display_score(expected_score(val_pred)) - display_score(expected_score(Y_val)))
+    cal_pred = head.predict_distribution(X[cal_idx])
+    cal_errors = np.abs(
+        display_score(expected_score(cal_pred)) - display_score(expected_score(Y[cal_idx]))
     )
+    subject_errors = np.asarray(
+        [
+            max(
+                error
+                for index, error in zip(cal_idx, cal_errors, strict=True)
+                if subject_ids[index] == subject
+            )
+            for subject in sorted(calibration_subjects)
+        ]
+    )
+    half_width = conformal_half_width(subject_errors)
 
     test_pred = head.predict_distribution(X[test_idx])
     predicted_scores = expected_score(test_pred)
@@ -275,6 +293,8 @@ def fit_scoring_head(
         "labeled_images": len(X),
         "training_images": len(train_idx),
         "validation_images": len(val_idx),
+        "calibration_images": len(cal_idx),
+        "calibration_subjects": len(calibration_subjects),
         "test_images": len(test_idx),
         "training_subjects": len({subject_ids[i] for i in train_idx}),
         "validation_subjects": len({subject_ids[i] for i in val_idx}),
@@ -295,9 +315,12 @@ def fit_scoring_head(
         "test_spread_mae": float(np.mean(np.abs(rating_spread(test_pred) - rating_spread(Y_test)))),
         "mean_target_spread": float(np.mean(rating_spread(Y_test))),
         "calibration": {
-            "method": "split-conformal absolute error on validation subjects, display scale",
+            "method": (
+                "split-conformal subject-max absolute error on independent "
+                "calibration subjects, display scale"
+            ),
             "level": CALIBRATION_LEVEL,
-            "validation_n": len(val_idx),
+            "validation_n": len(subject_errors),
             "half_width_display": half_width,
             "test_coverage": None
             if half_width is None
@@ -307,6 +330,7 @@ def fit_scoring_head(
         "split": {
             "training": train_idx.tolist(),
             "validation": val_idx.tolist(),
+            "calibration": cal_idx.tolist(),
             "test": test_idx.tolist(),
         },
     }

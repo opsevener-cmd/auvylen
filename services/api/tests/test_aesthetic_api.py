@@ -295,3 +295,25 @@ def test_settings_require_a_pinned_checkpoint_and_forbid_synthetic_deployments()
         _env_file=None,
     )
     assert blank.aesthetic_model_version is None and blank.aesthetic_manifest_sha256 is None
+
+
+def test_expired_results_are_unreadable_before_worker_cleanup(credits, checkpoint_root):
+    from datetime import timedelta
+
+    from aevyra_api.commercial.models import now
+
+    configure(credits, checkpoint_root)
+    queued = submit(credits).json()
+    execute(credits)
+    with credits.sessions.begin() as session:
+        row = session.get(AestheticAnalysis, UUID(queued["id"]))
+        row.expires_at = now() - timedelta(seconds=1)
+    assert credits.client.get(f"{BASE}/analyses/{queued['id']}").status_code == 404
+    assert credits.client.get(BASE + "/analyses").json() == []
+    # Deletion remains available even though retention hides the result.
+    assert (
+        credits.client.post(
+            f"{BASE}/analyses/{queued['id']}/delete", json={}, headers=csrf_headers(credits.client)
+        ).status_code
+        == 200
+    )

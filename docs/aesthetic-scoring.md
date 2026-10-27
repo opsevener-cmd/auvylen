@@ -45,14 +45,16 @@ refuses mean-score-only label files. It never constructs a distribution from a m
 ## Training protocol
 
 - Subjects are hashed with the seed and sorted. 20% of subjects form the **test** set,
-  the next 20% the **validation** set, and the rest **training**. All images of one person
+  the next 20% are divided equally into **validation** (epoch selection) and independent
+  **calibration** subjects, and the rest **training**. All images of one person
   stay in one split. At least 15 subjects and 60 labelled images are required, and
   training ratings must vary.
 - Feature means and scales come **only from training subjects**. A test perturbs every
   test row and confirms the fitted head is bit-for-bit identical.
-- Early stopping uses validation loss. Calibration uses validation subjects. The test set
+- Early stopping uses validation loss. Calibration never uses those selection subjects. The test set
   is evaluated once, after model selection and calibration are fixed.
-- Identical image bytes under two label rows are refused, because they would leak across
+- Identical decoded RGB pixels under two label rows are refused, including files with
+  different metadata or lossless encoding, because they would leak across
   splits.
 
 ### Reported metrics (held-out test subjects)
@@ -69,10 +71,14 @@ These are reported separately and must not be confused:
 - **Rating spread** (`rating_spread_10`): the standard deviation of the predicted
   distribution. It shows how much *annotators* are predicted to disagree about the photo.
 - **Calibrated range** (`interval_low/high`): a split-conformal 90% radius on display-scale
-  absolute error, computed from validation subjects with the `(n + 1)` correction. It
-  estimates the *model's own* error. Test-set coverage of this range is reported. The
-  validation set also chose the early-stopping epoch, so coverage is approximate; the
-  release gate therefore requires test coverage within 10 points of the target.
+  absolute error, computed from the maximum residual per independent calibration person
+  with the `(n + 1)` correction. Multiple photos of a person count as one observation.
+  At least nine calibration people are needed for a finite 90% radius. The exchangeability
+  assumption concerns new people from the same population, not arbitrary new datasets.
+  Test-set image coverage is reported, and the release gate requires coverage within
+  10 points of the target. These engineering criteria do not establish broad validity.
+  Earlier checkpoints using the reused validation method still load for inspection but
+  fail the release gate; their bytes are never rewritten. Retraining needs a new version.
 
 ## Checkpoints and integrity
 

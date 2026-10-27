@@ -1,5 +1,9 @@
 # Phase 6 — original aesthetic scoring system (6A–6C)
 
+This is Claude's original implementation report. See the subsequent
+[Codex recovery and independent review](phase6-codex-review.md) for corrected calibration,
+real-weight execution, current verification and CI results.
+
 Prepared on 2026-10-26 in a disposable remote Linux container from `1806972` on
 `codex/phase4b-custom-preferences` (PR #4 merge). No live Codespace, Owner account, private
 photograph, dataset or backup was accessed. Nothing was deployed or merged.
@@ -67,8 +71,9 @@ handcrafted extraction 4.9 ms/image; training 600×1024 in 0.09 s, 5,000×1024 i
 ~56 MiB peak traced allocations. MobileNet extraction cost is unchanged from
 [Phase 4B](phase4b-representation-report.md).
 
-Screenshots show generated test data only. The synthetic-model warnings are visible:
-[English desktop](phase6/aesthetic-en-desktop.webp) · [Chinese mobile](phase6/aesthetic-zh-mobile.webp).
+The recovery artifacts did not include the referenced screenshots. Current bilingual
+interaction evidence comes from the automated browser tests; no absent screenshot is
+claimed as delivered.
 
 ## Not verified here / blockers
 
