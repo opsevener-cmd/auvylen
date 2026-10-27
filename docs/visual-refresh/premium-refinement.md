@@ -1,5 +1,8 @@
 # Premium UI refinement — "quiet gallery" (2026-10-27)
 
+Independent follow-up: [Codex review, final imagery, measurements and screenshots](premium-review/README.md).
+The report below preserves Claude's original implementation notes and proposals.
+
 Builds on Codex's editorial portraits (PR #6, `8466176`). The change is presentation
 only: one stylesheet, a self-hosted display typeface, two small homepage markup
 additions and documentation. No API, data, privacy, scoring or i18n behaviour changes.
