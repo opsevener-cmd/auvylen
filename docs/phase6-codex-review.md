@@ -64,7 +64,15 @@ repeats this combined path, and backend CI installs the exact reviewed weights.
 
 ## Verification
 
-Final command results and PR CI are recorded in the PR description. Checks include
+Local results: **216 backend/integration/pretrained tests passed with no skips**;
+**133 frontend tests passed**, lint/format/type checks and production build passed.
+Browser checks: **7 passed / 1 mutually exclusive checkpoint test skipped** without
+an installed scoring checkpoint, then **1 passed / 1 unavailable-state test skipped**
+with the explicitly synthetic checkpoint. Together these exercise both modes.
+The first overlapping browser/backend run timed out waiting for an account; the
+complete browser run passed with exclusive use of test services.
+
+Final PR CI results are recorded in the PR description. Checks include
 all backend/integration/pretrained regressions, Python lint/format/mypy, frontend
 unit/lint/type/build, unavailable-state bilingual browser behavior and a separate
 explicitly synthetic worker scoring/deletion flow. Migration 0009 was exercised

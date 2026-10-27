@@ -80,7 +80,10 @@ def main() -> None:
         )
         onnx.checker.check_model(onnx.load(staged))
         if hashlib.sha256(staged.read_bytes()).hexdigest() != EXPORT_SHA:
-            raise SystemExit("Export differs from reviewed graph; do not silently change versions")
+            raise SystemExit(
+                "Export differs from reviewed graph; do not silently change versions. "
+                f"Observed SHA-256: {hashlib.sha256(staged.read_bytes()).hexdigest()}"
+            )
         os.chmod(staged, 0o600)
         os.link(staged, args.output)  # Atomic publication; no overwrite.
     print("CPU embedding export verified:", EXPORT_SHA)
