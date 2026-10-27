@@ -61,11 +61,13 @@ export interface PreferenceDataset extends PreferenceProject {
 /** Percent-encoded JSON in X-Upload-Metadata for JPEG/PNG binary uploads. */
 export interface ImageUploadMetadata {
   adult_authorized_consent: true; subject_group: string | null;
+  /** "prediction" photographs are never rated, compared or included in training snapshots. */
+  purpose?: "annotation" | "prediction";
 }
 export interface PreferenceImage {
   id: string; dataset_id: string; width: number; height: number;
   subject_group: string | null; excluded: boolean; created_at: string;
-  score: number | null; rating_recorded: boolean;
+  score: number | null; rating_recorded: boolean; purpose: "annotation" | "prediction";
 }
 export interface PreferencePair {
   id: string; left_id: string; right_id: string;
@@ -129,4 +131,11 @@ export interface AestheticAnalysis {
   id: string; status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED"; progress: number; phase: string;
   failure_reason: string | null; model_version: string; image_retained: boolean;
   result: AestheticResult | null; created_at: string; completed_at: string | null;
+}
+
+export type ReadinessReason = "archived" | "too_few_ratings" | "too_few_groups" | "insufficient_split" | "no_score_variation" | "too_many_ratings";
+/** Server-side training eligibility, computed with the same checks as a training request. */
+export interface TrainingReadiness {
+  eligible: boolean; reasons: ReadinessReason[]; rated: number; required_ratings: number;
+  groups: number; required_groups: number; awaiting: number; skipped: number; excluded: number; prediction_only: number;
 }

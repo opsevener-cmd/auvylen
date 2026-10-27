@@ -49,6 +49,7 @@ class PreferenceImage(Base):
     __table_args__ = (
         UniqueConstraint("dataset_id", "content_hash", name="uq_dataset_image_content"),
         CheckConstraint("byte_size > 0", name="ck_image_bytes"),
+        CheckConstraint("purpose IN ('annotation','prediction')", name="ck_image_purpose"),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     dataset_id: Mapped[UUID] = mapped_column(ForeignKey("preference_datasets.id"), index=True)
@@ -61,6 +62,10 @@ class PreferenceImage(Base):
     height: Mapped[int] = mapped_column(Integer)
     subject_group: Mapped[str | None] = mapped_column(String(120))
     excluded: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Prediction photographs are never rated, compared or included in training snapshots.
+    purpose: Mapped[str] = mapped_column(
+        String(20), default="annotation", server_default="annotation"
+    )
     consent_version: Mapped[str] = mapped_column(String(40))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

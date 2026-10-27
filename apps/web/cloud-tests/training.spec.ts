@@ -66,8 +66,8 @@ test(`real model checkpoints and predictions persist across container recreation
       excludes_queue_wait_and_browser_polling: true,
     }, null, 2) + "\n");
   }
-  await page.goto("/research/preferences");
-  await page.getByRole("button", {name: "Model persistence · 11 images · 10 rated", exact: true}).click();
+  await page.goto(`/research/preferences?dataset=${dataset.id}`);
+  await expect(page.getByRole("heading", {name: "Rate photographs", level: 2})).toBeVisible();
   await expect(page.getByText(`Version 1 · READY · ${extractor}`, {exact: true})).toBeVisible();
   await expect(page.getByRole("heading", {name: "Validation for version 1"})).toBeVisible();
   await post(`${base}/datasets/${dataset.id}/images/${unseen.id}/rating`, {score: 5.5});

@@ -1,7 +1,7 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {uploadImage, validateUpload, type UploadProgress} from "./upload";
 const id = "00000000-0000-4000-8000-000000000001";
-const saved = {id, dataset_id: id, width: 100, height: 80, subject_group: null, excluded: false, score: null, rating_recorded: false, created_at: "2026-10-18"};
+const saved = {id, dataset_id: id, width: 100, height: 80, subject_group: null, excluded: false, score: null, rating_recorded: false, created_at: "2026-10-18", purpose: "annotation"};
 class Transport {
   static latest: Transport;
   headers: Record<string, string> = {};

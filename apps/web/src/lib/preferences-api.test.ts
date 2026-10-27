@@ -4,12 +4,14 @@ import {allowedApiPath} from "./api-proxy-policy";
 import {imageUrl, nextPair} from "./preferences-api";
 
 const ids = ["00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002", "00000000-0000-0000-0000-000000000003"];
-const images: PreferenceImage[] = ids.map(id => ({id, dataset_id: ids[0], width: 100, height: 100, subject_group: null, excluded: false, created_at: "2026-10-12", score: null, rating_recorded: false}));
+const images: PreferenceImage[] = ids.map(id => ({id, dataset_id: ids[0], width: 100, height: 100, subject_group: null, excluded: false, created_at: "2026-10-12", score: null, rating_recorded: false, purpose: "annotation" as const}));
 describe("private preferences", () => {
   it("selects unseen canonical pairs and preserves skipped pairs on resume", () => {
     expect(nextPair(images, [])?.map(i => i.id)).toEqual(ids.slice(0, 2));
     const pairs: PreferencePair[] = [{id: ids[0], left_id: ids[1], right_id: ids[0], choice: "skip", updated_at: "2026-10-12"}];
     expect(nextPair(images, pairs)?.map(i => i.id)).toEqual([ids[0], ids[2]]);
+    const withPrediction = images.map((image, index) => index === 2 ? {...image, purpose: "prediction" as const} : image);
+    expect(nextPair(withPrediction, pairs)).toBeNull(); // Prediction photographs are never compared.
     expect(nextPair(images.slice(0, 2), pairs)).toBeNull();
     expect(nextPair(images.map((image, i) => ({...image, excluded: i !== 0})), [])).toBeNull();
   });

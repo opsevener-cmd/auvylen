@@ -28,7 +28,6 @@ test("private HTTPS preview: consent, annotations, MobileNet versions, predictio
   await page.goto("/research/preferences");
   await page.getByLabel("Project name", {exact: true}).fill("Private preview");
   await page.getByRole("button", {name: "Create project", exact: true}).click();
-  await page.getByText("Create a dataset", {exact: true}).click();
   await page.getByLabel("Dataset name", {exact: true}).fill("Synthetic preview fixture");
   await page.getByLabel("Source", {exact: true}).fill("Generated synthetic colors");
   await page.getByLabel("License and restrictions").fill("Synthetic software fixtures; no real faces");
@@ -38,20 +37,24 @@ test("private HTTPS preview: consent, annotations, MobileNet versions, predictio
   const files = pictures.map((value, i) => ({name: `synthetic-${i}.png`, mimeType: "image/png", buffer: Buffer.from(value, "base64")}));
   await page.getByLabel("Adult photographs", {exact: true}).setInputFiles(files.slice(0, 10));
   await page.getByLabel("I confirm every subject").last().check();
-  await page.getByRole("button", {name: "Upload photographs"}).click();
-  await expect(page.getByText("10 images · 0 rated · 0 comparisons · 10 awaiting rating", {exact: true})).toBeVisible();
+  await page.getByRole("button", {name: "Upload photographs", exact: true}).click();
+  await expect(page.getByText("10 photographs saved · 10 awaiting rating", {exact: false})).toBeVisible();
+  await page.getByRole("button", {name: "Continue to rating", exact: true}).click();
   for (let i = 0; i < 10; i++) {
     await page.getByLabel("Your rating").fill(String(1 + i * 0.8));
-    await page.getByRole("button", {name: "Save and next", exact: true}).click();
+    await page.getByRole("button", {name: i < 9 ? "Save and next" : "Save rating", exact: true}).click();
     if (i < 9) await expect(page.getByText(`Image ${i + 2} of 10`, {exact: true})).toBeVisible();
   }
+  await expect(page.getByRole("heading", {name: "Every photograph has been processed."})).toBeVisible();
   await page.getByRole("combobox", {name: "Visual feature extractor", exact: true}).selectOption("mobilenetv3-small-imagenet-onnx-v1");
   await page.getByRole("button", {name: "Train new version", exact: true}).click();
   await expect(page.getByText("Version 1 · READY · mobilenetv3-small-imagenet-onnx-v1", {exact: true})).toBeVisible({timeout: 30000});
+  await page.getByRole("button", {name: "Previous", exact: true}).click();
   await page.getByLabel("Adult photographs", {exact: true}).setInputFiles(files[10]);
   await page.getByLabel("I confirm every subject").last().check();
-  await page.getByRole("button", {name: "Upload photographs"}).click();
-  await expect(page.getByText("11 images · 10 rated · 0 comparisons · 1 awaiting rating", {exact: true})).toBeVisible();
+  await page.getByRole("button", {name: "Upload photographs", exact: true}).click();
+  await expect(page.getByText("11 photographs saved · 1 awaiting rating", {exact: false})).toBeVisible();
+  await page.getByRole("button", {name: "Continue to rating", exact: true}).click();
   await page.getByLabel("Photograph to predict").selectOption({label: "Image 11 · unrated"});
   await page.getByRole("button", {name: "Predict personal rating", exact: true}).click();
   await expect(page.getByText("Predicted personal rating:", {exact: false})).toBeVisible({timeout: 30000});
@@ -61,7 +64,8 @@ test("private HTTPS preview: consent, annotations, MobileNet versions, predictio
   expect(Number.isFinite(before.raw_score)).toBe(true);
   await page.getByRole("button", {name: "Select image 11", exact: true}).click();
   await page.getByLabel("Your rating").fill("5.5");
-  await page.getByRole("button", {name: "Save and next", exact: true}).click();
+  await page.getByRole("button", {name: "Save rating", exact: true}).click();
+  await expect(page.getByText("Ready to train with 11 valid ratings", {exact: false})).toBeVisible();
   await page.getByRole("button", {name: "Train new version", exact: true}).click();
   await expect(page.getByText("Version 2 · READY · mobilenetv3-small-imagenet-onnx-v1", {exact: true})).toBeVisible({timeout: 30000});
   expect((await api.get("/private-data/codespaces-test/models/pretrained/mobilenetv3-small-100-lamb-embedding-v1.onnx")).status()).toBe(404);
@@ -72,8 +76,7 @@ test("private HTTPS preview: consent, annotations, MobileNet versions, predictio
   // Recreate while running, including recovery of a stale supervisor socket.
   compose("up", "-d", "--no-deps", "--force-recreate", "workspace");
   control("start");
-  await page.reload();
-  await page.getByRole("button", {name: "Synthetic preview fixture · 11 images · 11 rated", exact: true}).click();
+  await page.reload(); // The wizard restores the same dataset and step from the URL.
   await expect(page.getByText("Version 1 · READY · mobilenetv3-small-imagenet-onnx-v1", {exact: true})).toBeVisible();
   await expect(page.getByText("Version 2 · READY · mobilenetv3-small-imagenet-onnx-v1", {exact: true})).toBeVisible();
   await page.getByLabel("Model version").selectOption({index: 2});
