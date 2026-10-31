@@ -1,6 +1,8 @@
+from typing import Annotated
 from uuid import UUID
 
 from aevyra_contracts.commercial import EmptyRequest
+from aevyra_contracts.preferences import TrainingReadiness
 from aevyra_contracts.research import ResearchJobView
 from aevyra_contracts.training import (
     ExtractorView,
@@ -9,7 +11,7 @@ from aevyra_contracts.training import (
     PredictRequest,
     TrainRequest,
 )
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from aevyra_api.preferences.training import ModelService
 from aevyra_api.routes.accounts import CurrentUser, config, csrf, rate, sessions
@@ -24,6 +26,17 @@ def service(request: Request) -> ModelService:
 @router.get("/extractors", response_model=list[ExtractorView])
 def extractors(request: Request, user: CurrentUser) -> list[ExtractorView]:
     return service(request).extractors(user.id)
+
+
+@router.get("/datasets/{dataset_id}/readiness", response_model=TrainingReadiness)
+def readiness(
+    dataset_id: UUID,
+    request: Request,
+    user: CurrentUser,
+    seed: Annotated[int, Query(ge=0, le=2147483647)] = 42,
+    validation_fraction: Annotated[float, Query(ge=0.1, le=0.4, allow_inf_nan=False)] = 0.2,
+) -> TrainingReadiness:
+    return service(request).readiness(user.id, dataset_id, seed, validation_fraction)
 
 
 @router.get("/models", response_model=list[ModelView])

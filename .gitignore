@@ -151,3 +151,17 @@ logs/
 !/docs/visual-refresh/premium-review/comparison-single-desktop.webp
 !/docs/visual-refresh/premium-review/comparison-group-mobile.webp
 !/docs/visual-refresh/premium-review/comparison-single-mobile.webp
+
+# Research wizard UX evidence: generated colour fixtures and synthetic accounts only.
+!/docs/research-wizard/1-project-1440-en.webp
+!/docs/research-wizard/1-project-390-zh-CN.webp
+!/docs/research-wizard/2-dataset-1440-en.webp
+!/docs/research-wizard/3-upload-1440-en.webp
+!/docs/research-wizard/3-upload-390-zh-CN.webp
+!/docs/research-wizard/4-rating-1440-en.webp
+!/docs/research-wizard/4-rating-390-zh-CN.webp
+!/docs/research-wizard/5-complete-1440-en.webp
+!/docs/research-wizard/5-complete-390-zh-CN.webp
+!/docs/research-wizard/6-predict-1440-en.webp
+!/docs/research-wizard/6-predict-390-zh-CN.webp
+!/docs/research-wizard/before-research-desktop-en.webp

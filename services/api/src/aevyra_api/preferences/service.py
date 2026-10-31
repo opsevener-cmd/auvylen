@@ -233,6 +233,7 @@ class PreferenceService:
             created_at=row.created_at,
             score=rating.score if rating else None,
             rating_recorded=rating is not None,
+            purpose="prediction" if row.purpose == "prediction" else "annotation",
         )
 
     def detail(self, user: UUID, id: UUID) -> DatasetDetail:
@@ -280,6 +281,13 @@ class PreferenceService:
                         raise DomainError(
                             "Duplicate image is pending deletion; retry after cleanup", 409
                         )
+                    # A prediction-only photograph never silently becomes training data. An
+                    # existing annotation photograph may be reused for prediction as-is.
+                    if existing.purpose == "prediction" and body.purpose == "annotation":
+                        raise DomainError(
+                            "This photograph is saved for prediction only; delete it to annotate",
+                            409,
+                        )
                     return self.image_view(session, existing)
                 count, used = session.execute(
                     select(func.count(Image.id), func.coalesce(func.sum(Image.byte_size), 0))
@@ -306,6 +314,7 @@ class PreferenceService:
                     width=decoded.width,
                     height=decoded.height,
                     subject_group=body.subject_group,
+                    purpose=body.purpose,
                     consent_version=CONSENT_VERSION,
                 )
                 session.add(row)
@@ -346,7 +355,7 @@ class PreferenceService:
             self.access(session, user, lock=True)
             dataset = self.dataset(session, user, dataset_id, writable=True)
             row = self.image(session, dataset_id, id)
-            if row.excluded:
+            if row.excluded or row.purpose == "prediction":
                 raise DomainError("Image is excluded from annotation", 409)
             if score is not None and not dataset.rating_min <= score <= dataset.rating_max:
                 raise DomainError("Rating outside this dataset's scale", 422)
@@ -365,7 +374,8 @@ class PreferenceService:
             if body.left_id == body.right_id:
                 raise DomainError("Choose two distinct images", 422)
             for id in (body.left_id, body.right_id):
-                if self.image(session, dataset_id, id).excluded:
+                image = self.image(session, dataset_id, id)
+                if image.excluded or image.purpose == "prediction":
                     raise DomainError("Image is excluded from annotation", 409)
             left, right = sorted((body.left_id, body.right_id))
             choice = body.choice

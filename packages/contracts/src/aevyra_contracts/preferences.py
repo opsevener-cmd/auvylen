@@ -57,6 +57,7 @@ class DatasetView(ProjectView):
 class ImageUploadMetadata(Input):
     adult_authorized_consent: Literal[True]
     subject_group: str | None = Field(default=None, min_length=1, max_length=120)
+    purpose: Literal["annotation", "prediction"] = "annotation"
 
 
 class ImageUpload(ImageUploadMetadata):
@@ -83,6 +84,7 @@ class ImageView(BaseModel):
     created_at: datetime
     score: float | None
     rating_recorded: bool
+    purpose: Literal["annotation", "prediction"] = "annotation"
 
 
 class PairInput(Input):
@@ -101,3 +103,27 @@ class DatasetDetail(BaseModel):
     dataset: DatasetView
     images: list[ImageView]
     pairs: list[PairView]
+
+
+class TrainingReadiness(BaseModel):
+    """Same checks as training submission, so the interface never offers an invalid request."""
+
+    eligible: bool
+    reasons: list[
+        Literal[
+            "archived",
+            "too_few_ratings",
+            "too_few_groups",
+            "insufficient_split",
+            "no_score_variation",
+            "too_many_ratings",
+        ]
+    ]
+    rated: int
+    required_ratings: int
+    groups: int
+    required_groups: int
+    awaiting: int
+    skipped: int
+    excluded: int
+    prediction_only: int

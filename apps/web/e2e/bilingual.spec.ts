@@ -7,7 +7,7 @@ const stamp = "2026-10-18T00:00:00Z";
 const dataset = {id: datasetId, project_id: projectId, name: "Bilingual fixture", source: "Generated test fixtures", source_url: "", license: "Test-only", rating_min: 1, rating_max: 10, archived: false, created_at: stamp, expires_at: "2030-01-01T00:00:00Z", image_count: 0, rated_count: 0, compared_count: 0};
 const base = `/api/v1/research/preferences/datasets/${datasetId}`;
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+afoQAAAAASUVORK5CYII=", "base64");
-const syntheticImage = (index: number) => ({id: imageIds[index], dataset_id: datasetId, width: 1, height: 1, subject_group: null, excluded: false, created_at: stamp, score: null as number | null, rating_recorded: false});
+const syntheticImage = (index: number) => ({id: imageIds[index], dataset_id: datasetId, width: 1, height: 1, subject_group: null, excluded: false, created_at: stamp, score: null as number | null, rating_recorded: false, purpose: "annotation" as const});
 
 async function mockResearch(page: Page) {
   const images: ReturnType<typeof syntheticImage>[] = [];
@@ -21,7 +21,10 @@ async function mockResearch(page: Page) {
     if (endpoint.endsWith("/auth/csrf")) body = {csrf_token: "synthetic-csrf"};
     else if (endpoint.endsWith("/projects")) body = [{id: projectId, name: "Demo project", created_at: stamp}];
     else if (endpoint.endsWith("/datasets")) body = [{...dataset, image_count: images.length}];
-    else if (endpoint === base) body = {dataset: {...dataset, image_count: images.length, rated_count: images.filter(i => i.score !== null).length, compared_count: pairs.length}, images, pairs};
+    else if (endpoint === `${base}/readiness`) {
+      const rated = images.filter(i => i.score !== null).length;
+      body = {eligible: false, reasons: ["too_few_ratings", "too_few_groups"], rated, required_ratings: 8, groups: rated, required_groups: 5, awaiting: images.filter(i => !i.rating_recorded).length, skipped: 0, excluded: 0, prediction_only: 0};
+    } else if (endpoint === base) body = {dataset: {...dataset, image_count: images.length, rated_count: images.filter(i => i.score !== null).length, compared_count: pairs.length}, images, pairs};
     else if (endpoint.endsWith("/extractors")) body = [{id: "rgb-grid-texture-v1", available: true, reason: "Built-in handcrafted features", manifest: {}}];
     else if (endpoint.endsWith("/rating")) {
       const image = images.find(item => endpoint.includes(item.id))!;
@@ -81,7 +84,8 @@ test("slow uploads, partial recovery, live language switching, ratings and compa
       state.images.push(syntheticImage(1)); await route.fulfill({json: state.images[1]});}
   });
   await page.goto("/research/preferences");
-  await page.getByRole("button", {name: /Bilingual fixture/}).click();
+  // Saved server data resumes the wizard at the first unfinished step: uploading.
+  await expect(page.getByRole("heading", {name: "Upload photographs", level: 2})).toBeVisible();
   await page.getByLabel("Adult photographs", {exact: true}).setInputFiles(["first", "second"].map(name => ({name: `${name}.png`, mimeType: "image/png", buffer: png})));
   await page.getByLabel("I confirm every subject").last().check();
   await page.getByRole("button", {name: "Upload photographs", exact: true}).click();
@@ -96,6 +100,7 @@ test("slow uploads, partial recovery, live language switching, ratings and compa
   await page.getByRole("button", {name: "重试未保存的照片", exact: true}).click();
   await expect(page.locator(".upload-zone")).toContainText("已确认保存 2／2");
   expect(firstAttempts).toBe(1); expect(secondAttempts).toBe(2);
+  await page.getByRole("button", {name: "继续评分", exact: true}).click();
   await page.getByLabel("你的评分", {exact: false}).fill("8");
   await page.getByRole("button", {name: "English", exact: true}).click();
   await expect(page.getByLabel("Your rating")).toHaveValue("8");
@@ -112,6 +117,6 @@ test("slow uploads, partial recovery, live language switching, ratings and compa
   await expect.poll(() => state.pairs[0].choice).toBe("right");
   await expect(page.getByRole("button", {name: "Train new version", exact: true})).toBeDisabled();
   await page.getByRole("button", {name: "中文", exact: true}).click();
-  await expect(page.getByText("训练至少需要 8 个评分和 5 个独立分组。请补充评分并检查人物标识。", {exact: true})).toBeVisible();
+  await expect(page.getByText("至少需要 8 个有效评分（目前 1 个）。", {exact: true})).toBeVisible();
   await page.screenshot({path: info.outputPath("research-zh-mobile.png"), fullPage: true});
 });

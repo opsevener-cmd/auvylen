@@ -2,9 +2,10 @@
 
 import hashlib
 from datetime import timedelta
-from typing import cast
+from typing import Literal, cast
 from uuid import UUID
 
+from aevyra_contracts.preferences import TrainingReadiness
 from aevyra_contracts.research import ResearchJobView
 from aevyra_contracts.training import ExtractorView, ModelView, PredictRequest, TrainRequest
 from aevyra_inference.extractors import MOBILENET, availability, manifest
@@ -26,6 +27,17 @@ from aevyra_api.preferences.training_models import CustomModel
 from aevyra_api.research.jobs import ResearchQueue
 from aevyra_api.research.models import ResearchJob
 from aevyra_api.research.storage import PrivateArtifactStore
+
+REQUIRED_RATINGS = 8
+REQUIRED_GROUPS = 5
+ReadinessReason = Literal[
+    "archived",
+    "too_few_ratings",
+    "too_few_groups",
+    "insufficient_split",
+    "no_score_variation",
+    "too_many_ratings",
+]
 
 
 class Example(BaseModel):
@@ -123,6 +135,92 @@ class ModelService:
             raise DomainError("Model unavailable, archived or source data deleted/expired", 409)
         return row
 
+    def examples(self, session: Session, dataset: Dataset) -> list[Example]:
+        """Valid numerical labels only: annotation photographs, not excluded, score present."""
+        rows = session.execute(
+            select(Image, Rating)
+            .join(Rating)
+            .where(
+                Image.dataset_id == dataset.id,
+                Image.deleted_at.is_(None),
+                Image.excluded.is_(False),
+                Image.purpose == "annotation",
+                Rating.score.is_not(None),
+            )
+            .order_by(Image.id)
+        ).all()
+        return [
+            Example(
+                image_id=image.id,
+                artifact_id=image.artifact_id,
+                content_hash=image.content_hash,
+                score=cast(float, rating.score),
+                group=hashlib.sha256(
+                    (
+                        "subject:" + image.subject_group
+                        if image.subject_group
+                        else "content:" + image.content_hash
+                    ).encode()
+                ).hexdigest(),
+                subject_known=image.subject_group is not None,
+            )
+            for image, rating in rows
+        ]
+
+    @staticmethod
+    def blockers(examples: list[Example], seed: int, fraction: float) -> list[ReadinessReason]:
+        """Exactly the submission checks, as stable reason codes for the interface."""
+        reasons: list[ReadinessReason] = []
+        if len(examples) > 500:
+            reasons.append("too_many_ratings")
+        if len(examples) < REQUIRED_RATINGS:
+            reasons.append("too_few_ratings")
+        if len({e.group for e in examples}) < REQUIRED_GROUPS:
+            reasons.append("too_few_groups")
+        if reasons:
+            return reasons
+        try:
+            training, _ = split_groups([e.group for e in examples], seed, fraction)
+        except ValueError:
+            return ["insufficient_split"]
+        if len({examples[i].score for i in training}) < 2:
+            return ["no_score_variation"]
+        return []
+
+    def readiness(
+        self, user: UUID, dataset_id: UUID, seed: int, fraction: float
+    ) -> TrainingReadiness:
+        with self.sessions() as session:
+            self.data.access(session, user)
+            dataset = self.data.dataset(session, user, dataset_id)
+            examples = self.examples(session, dataset)
+            reasons = self.blockers(examples, seed, fraction)
+            if dataset.archived:
+                reasons = ["archived", *reasons]
+            images = list(
+                session.execute(
+                    select(Image.excluded, Image.purpose, Rating.image_id, Rating.score)
+                    .outerjoin(Rating, Rating.image_id == Image.id)
+                    .where(Image.dataset_id == dataset.id, Image.deleted_at.is_(None))
+                )
+            )
+            annotation = [row for row in images if row.purpose == "annotation"]
+            return TrainingReadiness(
+                eligible=not reasons,
+                reasons=reasons,
+                rated=len(examples),
+                required_ratings=REQUIRED_RATINGS,
+                groups=len({e.group for e in examples}),
+                required_groups=REQUIRED_GROUPS,
+                awaiting=sum(not r.excluded and r.image_id is None for r in annotation),
+                skipped=sum(
+                    not r.excluded and r.image_id is not None and r.score is None
+                    for r in annotation
+                ),
+                excluded=sum(r.excluded for r in annotation),
+                prediction_only=len(images) - len(annotation),
+            )
+
     def train(self, user: UUID, body: TrainRequest) -> ResearchJobView:
         payload: dict[str, JsonValue] = {
             "operation": "train",
@@ -145,47 +243,16 @@ class ModelService:
             if not available:
                 raise DomainError(reason, 503)
             dataset = self.data.dataset(session, user, body.dataset_id, writable=True)
-            rows = session.execute(
-                select(Image, Rating)
-                .join(Rating)
-                .where(
-                    Image.dataset_id == dataset.id,
-                    Image.deleted_at.is_(None),
-                    Image.excluded.is_(False),
-                    Rating.score.is_not(None),
-                )
-                .order_by(Image.id)
-            ).all()
-            if len(rows) > 500:
+            examples = self.examples(session, dataset)
+            reasons = self.blockers(examples, body.seed, body.validation_fraction)
+            if "too_many_ratings" in reasons:
                 raise DomainError("Training supports at most 500 rated images per version", 422)
-            examples = [
-                Example(
-                    image_id=image.id,
-                    artifact_id=image.artifact_id,
-                    content_hash=image.content_hash,
-                    score=cast(float, rating.score),
-                    group=hashlib.sha256(
-                        (
-                            "subject:" + image.subject_group
-                            if image.subject_group
-                            else "content:" + image.content_hash
-                        ).encode()
-                    ).hexdigest(),
-                    subject_known=image.subject_group is not None,
-                )
-                for image, rating in rows
-            ]
-            try:
-                split_groups([e.group for e in examples], body.seed, body.validation_fraction)
-            except ValueError:
+            if reasons and reasons != ["no_score_variation"]:
                 raise DomainError(
                     "Need 8 rated images, 5 independent groups and 4 training images",
                     422,
-                ) from None
-            training_ids, _ = split_groups(
-                [e.group for e in examples], body.seed, body.validation_fraction
-            )
-            if len({examples[i].score for i in training_ids}) < 2:
+                )
+            if reasons:
                 raise DomainError(
                     "Training split needs at least two distinct numerical scores", 422
                 )

@@ -6,7 +6,9 @@ import {uploadImage, validateUpload, type UploadProgress} from "@/lib/upload";
 import {useI18n} from "./i18n/provider";
 export const consentText = "I confirm every subject is an adult (18+), I have permission and the necessary rights to upload and annotate these photographs, and the recorded license permits this use.";
 type Item = UploadProgress & {file: File; url: string; error?: string};
-export function PhotoUpload({path, onSaved, onComplete, onBusy}: {path: string; onSaved: (image: PreferenceImage) => void; onComplete: () => Promise<void>; onBusy: (busy: boolean) => void}) {
+/** `prediction` uploads one photograph that the server keeps out of ratings, comparisons and training. */
+export function PhotoUpload({path, onSaved, onComplete, onBusy, purpose = "annotation"}: {path: string; onSaved: (image: PreferenceImage) => void; onComplete: () => Promise<void>; onBusy: (busy: boolean) => void; purpose?: "annotation" | "prediction"}) {
+  const single = purpose === "prediction";
   const {t} = useI18n();
   const [items, setItems] = useState<Item[]>([]);
   const [busy, setBusy] = useState(false);
@@ -18,9 +20,9 @@ export function PhotoUpload({path, onSaved, onComplete, onBusy}: {path: string; 
   const saved = items.filter(item => item.stage === "saved").length;
   function update(index: number, value: Partial<Item>) {setItems(current => current.map((item, i) => i === index ? {...item, ...value} : item));}
   return <section className="upload-zone" aria-busy={busy}>
-    <h3 className="text-xl">{t("Add photographs")}</h3>
-    <p className="mt-2 text-sm">{t("JPEG or PNG · 4 MiB per file · 4096px per side · 16 megapixels · Up to 20 files per batch.")}</p>
-    <p className="mt-2 text-sm">{t("Standard accounts allow 500 private images; Owner capacity is shown in the Owner dashboard. Each training version supports up to 500 rated images. Stored copies have metadata removed.")}</p>
+    <h3 className="text-xl">{t(single ? "Upload a new photograph" : "Add photographs")}</h3>
+    <p className="mt-2 text-sm">{t(single ? "One JPEG or PNG up to 4 MiB. It is stored privately in this dataset for prediction only: it is never rated, compared or added to any training snapshot." : "JPEG or PNG · 4 MiB per file · 4096px per side · 16 megapixels · Up to 20 files per batch.")}</p>
+    {!single && <p className="mt-2 text-sm">{t("Standard accounts allow 500 private images; Owner capacity is shown in the Owner dashboard. Each training version supports up to 500 rated images. Stored copies have metadata removed.")}</p>}
     <form className="mt-4" onSubmit={async event => {
       event.preventDefault();
       if (locked.current) return;
@@ -28,7 +30,7 @@ export function PhotoUpload({path, onSaved, onComplete, onBusy}: {path: string; 
       if (!items.length) {setError("Choose at least one photograph."); return;}
       locked.current = true; setBusy(true); onBusy(true); setError("");
       const abort = new AbortController(); controller.current = abort;
-      const metadata = {adult_authorized_consent: true as const, subject_group: String(values.get("group") || "").trim() || null};
+      const metadata = {adult_authorized_consent: true as const, subject_group: String(values.get("group") || "").trim() || null, purpose};
       try {
         const token = await csrfToken();
         for (let index = 0; index < items.length; index++) {
@@ -47,7 +49,7 @@ export function PhotoUpload({path, onSaved, onComplete, onBusy}: {path: string; 
       finally {locked.current = false; setBusy(false); onBusy(false);}
     }}>
       <fieldset disabled={busy}>
-        <label className="button-secondary upload-picker mb-4">{t("Adult photographs")}<input className="sr-only" name="photos" type="file" accept="image/jpeg,image/png" multiple onChange={event => {
+        <label className="button-secondary upload-picker mb-4">{t(single ? "Photograph of an adult to predict" : "Adult photographs")}<input className="sr-only" name="photos" type="file" accept="image/jpeg,image/png" multiple={!single} onChange={event => {
           if (locked.current) return;
           const files = Array.from(event.target.files ?? []);
           if (files.length > 20) {setError("Select at most 20 images per batch."); event.target.value = ""; return;}
@@ -57,10 +59,10 @@ export function PhotoUpload({path, onSaved, onComplete, onBusy}: {path: string; 
             catch (e) {return {file, url: "", stage: "failed", error: e instanceof Error ? e.message : "Upload failed."};}
           })); setError("");
         }}/></label>
-        <label>{t("Person/group identifier (optional; same person must use the same identifier)")}<input name="group" maxLength={120} className="block w-full rounded border p-2 mt-1 mb-3" /></label>
-        <p className="text-sm">{t("For example, use person-01 for every photo of the same adult. A batch shares this identifier; use separate batches for different people or edit each image before training.")}</p>
+        {!single && <><label>{t("Person/group identifier (optional; same person must use the same identifier)")}<input name="group" maxLength={120} className="block w-full rounded border p-2 mt-1 mb-3" /></label>
+        <p className="text-sm">{t("For example, use person-01 for every photo of the same adult. A batch shares this identifier; use separate batches for different people or edit each image before training.")}</p></>}
         <label className="block my-4 text-sm"><input name="consent" type="checkbox" required />{t(consentText)}</label>
-        <button className="button-primary" disabled={!items.length || saved === items.length}>{t(busy ? "Uploading photographs…" : items.some(item => item.stage === "failed") ? "Retry unsaved photographs" : "Upload photographs")}</button>
+        <button className="button-primary" disabled={!items.length || saved === items.length}>{t(busy ? "Uploading photographs…" : items.some(item => item.stage === "failed") ? "Retry unsaved photographs" : single ? "Upload photograph for prediction" : "Upload photographs")}</button>
       </fieldset>
     </form>
     {error && <p role="alert" className="mt-3">{t(error)}</p>}

@@ -193,20 +193,25 @@ def test_incremental_migration_preserves_accounts_ledger_and_private_models(tmp_
             )
             session.add(dataset)
             session.flush()
-            image = PreferenceImage(
-                dataset_id=dataset.id,
-                artifact_id=uuid4(),
-                thumbnail_id=uuid4(),
-                content_hash="a" * 64,
-                original_hash="d" * 64,
-                consent_version="adult-authorized-v1",
-                width=80,
-                height=80,
-                byte_size=100,
+            # Raw SQL: the 0006 schema predates later ORM columns such as image purpose.
+            image_id = uuid4()
+            session.execute(
+                text(
+                    "INSERT INTO preference_images(id,dataset_id,artifact_id,thumbnail_id,"
+                    "original_hash,content_hash,byte_size,width,height,excluded,"
+                    "consent_version,created_at) VALUES (:id,:dataset,:artifact,:thumb,"
+                    ":original,:content,100,80,80,false,'adult-authorized-v1',now())"
+                ),
+                {
+                    "id": image_id,
+                    "dataset": dataset.id,
+                    "artifact": uuid4(),
+                    "thumb": uuid4(),
+                    "original": "d" * 64,
+                    "content": "a" * 64,
+                },
             )
-            session.add(image)
-            session.flush()
-            session.add(PreferenceRating(image_id=image.id, score=7.5))
+            session.add(PreferenceRating(image_id=image_id, score=7.5))
             job = ResearchJob(
                 user_id=user_id,
                 request_key="old-train",
@@ -280,6 +285,9 @@ def test_incremental_migration_preserves_accounts_ledger_and_private_models(tmp_
                 ]
                 if table == "users":
                     assert all(row.pop("role") == "user" for row in current)
+                if table == "preference_images":
+                    # Existing photographs keep their meaning: annotation, never prediction-only.
+                    assert current and all(row.pop("purpose") == "annotation" for row in current)
                 assert current == previous, table
         assert (
             artifact.read_bytes() == b'{"software_fixture":"private historical checkpoint bytes"}'

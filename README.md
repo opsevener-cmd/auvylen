@@ -17,6 +17,10 @@ distribution, an expected 1–10 score, subject-independent validation and calib
 It is **disabled until an authorized human-rated dataset trains a checkpoint that passes the
 release gate**; no simulated score is ever substituted. See the [Phase 6 report](docs/phase6-report.md).
 
+Personal research is a guided four-step wizard with a server-checked training completion screen and
+prediction from newly uploaded, prediction-only photographs. See [research wizard UX](docs/research-wizard-ux.md);
+the optional ComboLoss provider remains unavailable ([assessment](docs/comboloss-assessment.md)).
+
 Phase 5 adds English/Simplified Chinese presentation, a guided home page, responsive research
 workflows, confirmed per-file upload feedback and a backwards-compatible binary upload format.
 See [Phase 5 verification, limitations and safe rollout](docs/phase5-report.md),

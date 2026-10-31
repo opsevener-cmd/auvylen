@@ -37,8 +37,10 @@ test("private images and annotations survive container recreation and worker del
   const detail = await api.get(`/api/v1${base}/datasets/${dataset.id}`).then(r => r.json());
   expect(detail.images[0].score).toBe(7.5);
   expect(detail.images[0].subject_group).toBe("synthetic-person-group");
-  await page.goto("/research/preferences");
-  await page.getByRole("button", {name: "Private noise fixture · 1 images · 1 rated", exact: true}).click();
+  // The wizard restores the saved dataset and step; every photograph is rated, so it completes.
+  await page.goto(`/research/preferences?dataset=${dataset.id}&step=4`);
+  await expect(page.getByRole("heading", {name: "Every photograph has been processed."})).toBeVisible();
+  await page.getByRole("button", {name: "Select image 1", exact: true}).click();
   await expect(page.getByLabel("Your rating")).toHaveValue("7.5");
   const artifacts = JSON.parse(compose("exec", "-T", "api", "python", "-c",
     "import json,sys; from uuid import UUID; from sqlalchemy import select; from aevyra_api.config import Settings; from aevyra_api.database import DependencyChecks; from aevyra_api.preferences.models import PreferenceImage,PreferenceDataset,PreferenceProject; c=DependencyChecks(Settings());\nwith c.sessions() as s:\n i=s.get(PreferenceImage,UUID(sys.argv[1])); owner=s.scalar(select(PreferenceProject.user_id).join(PreferenceDataset).where(PreferenceDataset.id==i.dataset_id)); print(json.dumps([str(owner),str(i.artifact_id),str(i.thumbnail_id)]))\nc.close()", photo.id));
