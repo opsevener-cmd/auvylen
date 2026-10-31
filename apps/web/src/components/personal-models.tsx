@@ -6,7 +6,7 @@ import {useEffect, useState} from "react";
 import {z} from "zod";
 import type {FeatureExtractor, PersonalModel, PreferenceDataset, PreferenceImage, ResearchJob, TrainingReadiness} from "@auvylen/contracts";
 import {accountRequest} from "@/lib/account-api";
-import {extractorSchema, metric, modelSchema, predictionSchema} from "@/lib/model-api";
+import {activeModelVersions, extractorSchema, metric, modelSchema, predictionSchema} from "@/lib/model-api";
 import {preferencePath as base} from "@/lib/preferences-api";
 import {researchJobSchema} from "@/lib/research-api";
 import {annotationImages, predictionImages, readinessMessages} from "@/lib/workflow";
@@ -50,7 +50,7 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, su
   const chosen = images.find(image => image.id === imageId);
   async function refresh() {
     const all = await accountRequest(`${base}/models`, z.array(modelSchema));
-    const versions = all.filter(model => model.dataset_id === datasetId);
+    const versions = activeModelVersions(all, datasetId);
     setModels(versions);
     setSelected(current => versions.some(m => m.id === current && m.state === "READY") ? current : versions.find(m => m.state === "READY")?.id ?? "");
   }
@@ -60,7 +60,7 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, su
       .then(([all, jobs, representations]) => {
         if (!active) return;
         setExtractors(representations);
-        const versions = all.filter(m => m.dataset_id === datasetId);
+        const versions = activeModelVersions(all, datasetId);
         setModels(versions); setSelected(versions.find(m => m.state === "READY")?.id ?? "");
         const saved = jobs.filter(j => j.provider === "custom" && j.payload?.dataset_id === datasetId);
         setJob(saved.find(j => ["QUEUED", "RUNNING"].includes(j.status)) ?? saved[0] ?? null);
@@ -76,7 +76,7 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, su
       if (!["QUEUED", "RUNNING"].includes(updated.status)) {
         const all = await accountRequest(`${base}/models`, z.array(modelSchema));
         if (active) {
-          const versions = all.filter(m => m.dataset_id === datasetId);
+          const versions = activeModelVersions(all, datasetId);
           setModels(versions); setSelected(current => updated.kind === "TRAIN" && typeof updated.result?.model_id === "string" ? updated.result.model_id : current || versions.find(m => m.state === "READY")?.id || "");
         }
         if (active) setJob(updated);
@@ -99,6 +99,7 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, su
     <h2 id="models-title" className="text-2xl">{t("Your preference models")}</h2>
     <p>{t("Models learn from your numerical ratings using handcrafted features or frozen pretrained MobileNetV3-Small features. MobileNet was trained on general ImageNet objects, not facial preferences. Small personal datasets may generalize poorly; these scores express your preference, not objective beauty.")}</p>
     {error && <p role="alert">{t(error)}</p>}
+    {notice && <p role="status">{t(notice)}</p>}
     <fieldset disabled={busy || running || uploading} className="space-y-6">
       <form className={prominent ? "training-card is-prominent" : "training-card"} aria-describedby="training-readiness" onSubmit={event => {event.preventDefault(); const values = new FormData(event.currentTarget); void perform(async () => {
         const queued = await accountRequest(`${base}/train`, researchJobSchema, {dataset_id: datasetId, idempotency_key: crypto.randomUUID(), extractor: String(values.get("extractor")), alpha: Number(values.get("alpha")), seed: Number(values.get("seed")), validation_fraction: Number(values.get("fraction"))}); await refresh(); setJob(queued);
@@ -143,7 +144,6 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, su
           {predictionOnly.length > 0 && <optgroup label={t("Prediction photographs (never used for training)")}>{predictionOnly.map((image, index) => <option key={image.id} value={image.id}>{t("Prediction photograph {number}", {number: index + 1})}</option>)}</optgroup>}
           <optgroup label={t("Dataset photographs")}>{annotation.map((image, index) => <option key={image.id} value={image.id}>{t("Image")} {index + 1}{image.score === null ? t(" · unrated") : t(" · rated")}</option>)}</optgroup>
         </select></label>}
-        {notice && <p role="status">{t(notice)}</p>}
         {chosen && <p className="text-sm">{chosen.purpose === "prediction" ? t("Prediction-only photograph: stored privately in this dataset, never rated or trained on.") : t("Dataset photograph: it may already be part of a model's training snapshot.")}</p>}
         <div className="flex flex-wrap gap-3">
           <button type="button" className="button-primary" disabled={!selected || !imageId} onClick={() => void perform(async () => {
@@ -183,7 +183,7 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, su
     <ul className="space-y-3">{models.map(model => <li key={model.id} className="rounded border p-3">
       <p>{t("Version")} {model.version} · {t(model.state)} · {model.extractor}</p>
       {["READY", "ARCHIVED"].includes(model.state) && <button className={button} disabled={busy} onClick={() => void perform(async () => {await accountRequest(`${base}/models/${model.id}/edit`, modelSchema, {archived: model.state !== "ARCHIVED"}); await refresh();})}>{model.state === "ARCHIVED" ? t("Restore model") : t("Archive model")}</button>}
-      {model.state !== "DELETED" && <button className={`${button} ml-2`} disabled={busy} onClick={() => {if (window.confirm(t("Delete this model version and its checkpoint? Your annotations remain."))) void perform(async () => {await accountRequest(`${base}/models/${model.id}/delete`, z.object({deleted: z.boolean()}), {}); await refresh();});}}>{t("Delete model version")}</button>}
+      {model.state !== "DELETED" && <button className={`${button} ml-2`} disabled={busy} onClick={() => {if (window.confirm(t("Delete this model version and its checkpoint? Your annotations remain."))) void perform(async () => {await accountRequest(`${base}/models/${model.id}/delete`, z.object({deleted: z.boolean()}), {}); await refresh(); setNotice("Model version deleted. Checkpoint cleanup is queued.");});}}>{t("Delete model version")}</button>}
     </li>)}</ul>
     <p>{t("Models expire with their source dataset. Deleting a source image invalidates derived versions; the worker removes their checkpoints. Original annotations stay independent of model archive/delete.")}</p>
   </section>;
