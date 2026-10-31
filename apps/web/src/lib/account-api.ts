@@ -34,7 +34,7 @@ export async function accountRequest<T>(path: string, schema: z.ZodType<T>, body
       headers, body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!response.ok) {
-      throw requestError(path, response.status);
+      throw requestError(path, response.status, await response.text().catch(() => ""));
     }
     return schema.parse(await response.json());
   } catch (error) {
@@ -54,7 +54,15 @@ export async function csrfToken(): Promise<string> {
   }
 }
 
-export function requestError(path: string, status: number): AccountError {
+/** Only map exact known server error codes; never expose arbitrary error bodies. */
+export function requestError(path: string, status: number, responseBody = ""): AccountError {
+    if (status === 403 && (path.startsWith("/research/preferences") || path.startsWith("/research/aesthetic"))) {
+      let detail: unknown;
+      try {detail = (JSON.parse(responseBody) as {detail?: unknown}).detail;} catch { /* Not JSON */ }
+      if (detail === "Research access required") return new AccountError(status, "Research permission is not enabled for this account.");
+      if (detail === "CSRF validation failed") return new AccountError(status, "Request verification expired or failed. Refresh this page and try again.");
+      if (detail === "Request origin rejected") return new AccountError(status, "Request origin rejected. Open the private Codespaces URL directly and retry.");
+    }
     const messages: Record<number, string> = {
       400: "Code is invalid, expired or already used.", 401: "Sign in required or invalid credentials.",
       403: "Request could not be verified. Reload and try again.",
