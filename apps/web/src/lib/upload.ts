@@ -31,7 +31,7 @@ export function sendImage<T>(path: string, file: File, metadata: object, schema:
     request.upload.onprogress = event => progress({stage: "uploading", percent: event.lengthComputable ? Math.floor(event.loaded / event.total * 100) : undefined});
     request.upload.onload = () => progress({stage: "processing"});
     request.onload = () => {
-      if (request.status < 200 || request.status >= 300) {finish(requestError(path, request.status)); return;}
+      if (request.status < 200 || request.status >= 300) {finish(requestError(path, request.status, request.responseText)); return;}
       try {const image = schema.parse(JSON.parse(request.responseText)); progress({stage: "saved"}); finish(undefined, image);}
       catch {finish(new Error("The save response could not be verified. Retry safely; identical images are reused."));}
     };
