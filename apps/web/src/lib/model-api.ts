@@ -15,6 +15,11 @@ export const predictionSchema = z.object({
 });
 export function metric(value: unknown): string {return typeof value === "number" && Number.isFinite(value) ? value.toFixed(3) : "Unavailable";}
 
+/** Keep DELETED versions in the audit API, but not in the user-facing saved versions list. */
+export function activeModelVersions(models: readonly PersonalModel[], datasetId: string): PersonalModel[] {
+  return models.filter(model => model.dataset_id === datasetId && model.state !== "DELETED");
+}
+
 export const extractorSchema: z.ZodType<FeatureExtractor> = z.object({
   id: z.string(), available: z.boolean(), reason: z.string(), manifest: z.record(z.string(), z.unknown()),
 });
