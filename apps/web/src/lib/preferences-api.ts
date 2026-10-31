@@ -5,7 +5,7 @@ export const datasetSchema: z.ZodType<PreferenceDataset> = z.object({
   id: z.uuid(), name: z.string(), created_at: z.string(), project_id: z.uuid(),
   source: z.string(), source_url: z.string(), license: z.string(),
   rating_min: z.number().int(), rating_max: z.number().int(), archived: z.boolean(), expires_at: z.string(),
-  image_count: z.number().int().nonnegative(), rated_count: z.number().int().nonnegative(), compared_count: z.number().int().nonnegative(),
+  image_count: z.number().int().nonnegative(), rated_count: z.number().int().nonnegative(), compared_count: z.number().int().nonnegative(), prediction_count: z.number().int().nonnegative().default(0),
 });
 export const imageSchema: z.ZodType<PreferenceImage> = z.object({
   id: z.uuid(), dataset_id: z.uuid(), width: z.number().int().positive(), height: z.number().int().positive(),

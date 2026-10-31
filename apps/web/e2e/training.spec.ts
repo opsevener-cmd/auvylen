@@ -66,7 +66,7 @@ test(`train ratings, predict unseen upload and retrain a persisted model version
     expect(readiness.prediction_only).toBe(1);
     expect(readiness.rated).toBe(10);
     // Add a new annotation photograph, rate it, and retrain a persisted second version.
-    await page.getByRole("button", {name: "Previous", exact: true}).click();
+    await page.getByRole("button", {name: "Previous step", exact: true}).click();
     await page.getByLabel("Adult photographs", {exact: true}).setInputFiles(files[11]);
     await page.getByLabel("I confirm every subject").last().check();
     await page.getByRole("button", {name: "Upload photographs", exact: true}).click();

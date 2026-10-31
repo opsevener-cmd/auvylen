@@ -49,7 +49,7 @@ test("private HTTPS preview: consent, annotations, MobileNet versions, predictio
   await page.getByRole("combobox", {name: "Visual feature extractor", exact: true}).selectOption("mobilenetv3-small-imagenet-onnx-v1");
   await page.getByRole("button", {name: "Train new version", exact: true}).click();
   await expect(page.getByText("Version 1 · READY · mobilenetv3-small-imagenet-onnx-v1", {exact: true})).toBeVisible({timeout: 30000});
-  await page.getByRole("button", {name: "Previous", exact: true}).click();
+  await page.getByRole("button", {name: "Previous step", exact: true}).click();
   await page.getByLabel("Adult photographs", {exact: true}).setInputFiles(files[10]);
   await page.getByLabel("I confirm every subject").last().check();
   await page.getByRole("button", {name: "Upload photographs", exact: true}).click();

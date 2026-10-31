@@ -19,6 +19,8 @@ from aevyra_inference.extractors import MOBILENET, create_extractor, dimension, 
 EXTRACTOR = "rgb-grid-texture-v1"
 IMPLEMENTATION = "rating-ridge-v1"
 DIMENSION = 230
+MIN_RATED_IMAGES = 8
+MIN_GROUPS = 5
 Finite = Annotated[float, Field(allow_inf_nan=False)]
 Vector = Annotated[list[Finite], Field(min_length=DIMENSION, max_length=DIMENSION)]
 
@@ -92,7 +94,7 @@ def split_groups(groups: list[str], seed: int, fraction: float) -> tuple[list[in
     unique = sorted(
         set(groups), key=lambda value: hashlib.sha256(f"{seed}:{value}".encode()).digest()
     )
-    if len(groups) < 8 or len(unique) < 5:
+    if len(groups) < MIN_RATED_IMAGES or len(unique) < MIN_GROUPS:
         raise ValueError(
             "At least 8 rated images and 5 independent subject/content groups required"
         )

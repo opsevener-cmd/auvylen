@@ -115,14 +115,12 @@ class PreferenceService:
             return ProjectView.model_validate(row)
 
     def view(self, session: Session, row: Dataset) -> DatasetView:
-        count = (
-            session.scalar(
-                select(func.count())
-                .select_from(Image)
-                .where(Image.dataset_id == row.id, Image.deleted_at.is_(None))
-            )
-            or 0
-        )
+        count, predictions = session.execute(
+            select(
+                func.count(Image.id),
+                func.count(Image.id).filter(Image.purpose == "prediction"),
+            ).where(Image.dataset_id == row.id, Image.deleted_at.is_(None))
+        ).one()
         rated = (
             session.scalar(
                 select(func.count())
@@ -160,6 +158,7 @@ class PreferenceService:
             image_count=count,
             rated_count=rated,
             compared_count=compared,
+            prediction_count=predictions,
         )
 
     def datasets(self, user: UUID) -> list[DatasetView]:
