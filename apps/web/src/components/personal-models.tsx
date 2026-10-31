@@ -16,8 +16,8 @@ const button = "rounded border border-black/20 px-3 py-2 disabled:opacity-40";
 const input = "block rounded border border-black/20 p-2 mt-1 mb-3 w-full";
 type Config = {seed: number; fraction: number};
 
-export function PersonalModels({dataset, images, readiness, valid, prominent, config, onConfig, onBusy, onPredictionUpload, onPredictionDeleted}: {
-  dataset: PreferenceDataset; images: PreferenceImage[]; readiness: TrainingReadiness | null; valid: number; prominent: boolean;
+export function PersonalModels({dataset, images, readiness, valid, prominent, summaryShown, config, onConfig, onBusy, onPredictionUpload, onPredictionDeleted}: {
+  dataset: PreferenceDataset; images: PreferenceImage[]; readiness: TrainingReadiness | null; valid: number; prominent: boolean; summaryShown: boolean;
   config: Config; onConfig: (config: Config) => void; onBusy: (busy: boolean) => void; onPredictionUpload: (image: PreferenceImage) => void; onPredictionDeleted: (id: string) => void;
 }) {
   const {t, locale} = useI18n();
@@ -120,6 +120,7 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, co
         <button className={prominent ? "button-primary" : button} disabled={!eligible}>{t("Train new version")}</button>
         <div id="training-readiness" className="mt-3 text-sm">{!readiness ? <p>{t("Checking training eligibility…")}</p> : eligible
           ? <p>{t("Ready to train with {rated} valid ratings from {groups} independent groups.", {rated: readiness.rated, groups: readiness.groups})}</p>
+          : summaryShown ? <p>{t("Training is not available yet. The summary above lists what remains.")}</p>
           : <ul className="list-disc pl-5">{readinessMessages(readiness, valid).map(message => <li key={message.key}>{t(message.key, message.values)}</li>)}</ul>}
           <p className="mt-2">{t("MobileNet training also evaluates the handcrafted and mean-rating baselines on exactly the same held-out groups. Lower error on your holdout alone does not establish facial prediction accuracy.")}</p></div>
       </form>

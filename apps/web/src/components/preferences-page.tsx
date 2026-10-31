@@ -88,7 +88,21 @@ export function PreferencesPage() {
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
   }, []);
-  useEffect(() => {if (moved.current) heading.current?.focus(); moved.current = false;}, [step]);
+  // The wizard owns scrolling: each newly opened step starts at its heading, also after
+  // Back/Forward (browser scroll restoration would otherwise land mid-page).
+  useEffect(() => {
+    if (!("scrollRestoration" in window.history)) return;
+    const previous = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    return () => {window.history.scrollRestoration = previous;};
+  }, []);
+  useEffect(() => {
+    if (moved.current && heading.current) {
+      heading.current.focus({preventScroll: true});
+      heading.current.scrollIntoView({block: "start"});
+    }
+    moved.current = false;
+  }, [step]);
 
   function go(target: Step) {
     if (target > reachable || uploading || target === step) return;
@@ -312,7 +326,7 @@ function RateStep({detail, onDetail, reload, onUpload, onBusy}: {detail: Prefere
       </>}
       <div className="thumbnail-grid">{images.map((image, position) => <button type="button" key={image.id} aria-pressed={!complete && mode === "rating" && index === position} className="rounded border p-1" aria-label={t("Select image {value0}", {value0: position + 1})} onClick={() => review(position)}><PrivatePhoto image={image} thumbnail /><span>{image.excluded ? t("Excluded") : image.score ?? (image.rating_recorded ? t("Skipped") : t("Unrated"))}</span></button>)}</div>
     </fieldset>
-    <PersonalModels dataset={dataset} images={detail.images} readiness={readiness} valid={summary.valid} prominent={complete && !!readiness?.eligible} config={config} onConfig={setConfig} onBusy={onBusy}
+    <PersonalModels dataset={dataset} images={detail.images} readiness={readiness} valid={summary.valid} prominent={complete && !!readiness?.eligible} summaryShown={complete && mode === "rating"} config={config} onConfig={setConfig} onBusy={onBusy}
       onPredictionUpload={image => {if (!detail.images.some(item => item.id === image.id)) onDetail({...detail, images: [...detail.images, image], dataset: {...dataset, image_count: dataset.image_count + 1}});}}
       onPredictionDeleted={id => onDetail({...detail, images: detail.images.filter(item => item.id !== id), dataset: {...dataset, image_count: Math.max(0, dataset.image_count - 1)}})} />
   </>;
@@ -344,5 +358,5 @@ export function PrivatePhoto({image, thumbnail = false}: {image: PreferenceImage
   const {t} = useI18n();
   // Authenticated endpoint only. Next's public image optimizer must not cache private photographs.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={imageUrl(image.dataset_id, image.id, thumbnail)} alt={t("Private photograph for your subjective annotation")} loading="lazy" referrerPolicy="no-referrer" className={thumbnail ? "w-full h-24 object-contain" : "rating-photo"} />;
+  return <img src={imageUrl(image.dataset_id, image.id, thumbnail)} alt={t("Private photograph for your subjective annotation")} loading={thumbnail ? "lazy" : "eager"} referrerPolicy="no-referrer" className={thumbnail ? "w-full h-24 object-contain" : "rating-photo"} />;
 }

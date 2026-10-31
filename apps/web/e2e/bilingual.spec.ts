@@ -117,6 +117,6 @@ test("slow uploads, partial recovery, live language switching, ratings and compa
   await expect.poll(() => state.pairs[0].choice).toBe("right");
   await expect(page.getByRole("button", {name: "Train new version", exact: true})).toBeDisabled();
   await page.getByRole("button", {name: "中文", exact: true}).click();
-  await expect(page.getByText("至少需要 8 个有效评分（目前 1 个）。", {exact: true})).toBeVisible();
+  await expect(page.getByText("再添加 7 个有效评分（目前 1／8）。已跳过和已排除的照片不计入。", {exact: true})).toBeVisible();
   await page.screenshot({path: info.outputPath("research-zh-mobile.png"), fullPage: true});
 });
