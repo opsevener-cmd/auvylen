@@ -171,3 +171,7 @@ logs/
 appendonly.aof
 appendonlydir/
 *.aof
+
+# Public unavailable-model browser evidence; no private photos or predictions.
+!/docs/pretrained/pretrained-en.webp
+!/docs/pretrained/pretrained-zh-CN.webp

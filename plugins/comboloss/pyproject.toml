@@ -1,0 +1,10 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[project]
+name = "auvylen-comboloss"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["auvylen-inference", "torch==2.6.0", "torchvision==0.21.0", "pytorchcv==0.0.73"]
+[project.entry-points."auvylen.model_providers"]
+comboloss = "auvylen_comboloss:Provider"
