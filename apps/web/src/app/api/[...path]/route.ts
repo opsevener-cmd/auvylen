@@ -49,7 +49,7 @@ async function proxy(request: NextRequest, context: {params: Promise<{path: stri
     const response = await fetch(new URL(`/api/${joined}${request.nextUrl.search}`, getApiUrl()), {
       method: request.method, headers, cache: "no-store",
       body,
-      signal: AbortSignal.timeout(15000), redirect: "manual",
+      signal: AbortSignal.timeout(joined.startsWith("v1/research/preferences/datasets/") && joined.endsWith("/images") ? 125000 : 15000), redirect: "manual",
     });
     const outgoing = new Headers({"Content-Type": response.headers.get("content-type") ?? "application/json", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"});
     for (const cookie of response.headers.getSetCookie()) outgoing.append("Set-Cookie", cookie);
