@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def production_defaults(self) -> "Settings":
         if any(
-            slug not in {"custom", "comboloss", "fpem", "faclip", "swingfvqa-ca"}
+            slug not in {"custom", "comboloss", "fpem", "faclip", "swingfvqa-ca", "auvylen-native"}
             for slug in self.enabled_model_providers
         ):
             raise ValueError("Unknown enabled model provider")
