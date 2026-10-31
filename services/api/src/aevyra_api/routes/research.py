@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from datetime import timedelta
 from uuid import UUID
 
 from aevyra_contracts.commercial import EmptyRequest
@@ -7,10 +8,23 @@ from aevyra_inference.providers import ProviderCatalog
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 
+from aevyra_api.commercial.models import now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.research.jobs import ResearchQueue, authorized
 from aevyra_api.research.models import ResearchJob
 from aevyra_api.routes.accounts import CurrentUser, config, csrf, rate, sessions
+
+
+def job_view(job: ResearchJob) -> ResearchJobView:
+    view = ResearchJobView.model_validate(job)
+    if job.provider == "comboloss" and job.created_at.replace(
+        tzinfo=now().tzinfo
+    ) < now() - timedelta(hours=24):
+        return view.model_copy(
+            update={"result": None, "payload": None, "status": "FAILED", "phase": "Expired"}
+        )
+    return view
+
 
 router = APIRouter(prefix="/api/v1/research", tags=["authorized research"])
 
@@ -35,14 +49,14 @@ def submit(body: ResearchRequest, request: Request, user: CurrentUser) -> Resear
     job = ResearchQueue(sessions(request), config(request)).enqueue(
         user.id, body.provider, str(body.idempotency_key)
     )
-    return ResearchJobView.model_validate(job)
+    return job_view(job)
 
 
 @router.get("/jobs", response_model=list[ResearchJobView])
 def history(request: Request, user: CurrentUser) -> list[ResearchJobView]:
     with sessions(request)() as session:
         return [
-            ResearchJobView.model_validate(job)
+            job_view(job)
             for job in session.scalars(
                 select(ResearchJob)
                 .where(ResearchJob.user_id == user.id)
@@ -60,7 +74,7 @@ def result(job_id: UUID, request: Request, user: CurrentUser) -> ResearchJobView
         )
         if job is None:
             raise DomainError("Research job not found", 404)
-        return ResearchJobView.model_validate(job)
+        return job_view(job)
 
 
 @router.post("/jobs/{job_id}/cancel", response_model=ResearchJobView, dependencies=[Depends(csrf)])
@@ -68,4 +82,4 @@ def cancel(
     job_id: UUID, body: EmptyRequest, request: Request, user: CurrentUser
 ) -> ResearchJobView:
     job = ResearchQueue(sessions(request), config(request)).cancel(user.id, job_id)
-    return ResearchJobView.model_validate(job)
+    return job_view(job)

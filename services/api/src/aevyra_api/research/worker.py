@@ -18,6 +18,7 @@ from aevyra_api.preferences.service import PreferenceService
 from aevyra_api.preferences.training import ModelService
 from aevyra_api.research.jobs import ResearchQueue
 from aevyra_api.research.lease import HEARTBEAT, LeaseHeartbeat
+from aevyra_api.routes.pretrained import execute_pretrained, purge_pretrained
 
 logger = logging.getLogger("aevyra.worker")
 
@@ -28,6 +29,9 @@ def run_one(queue: ResearchQueue) -> bool:
         return False
     try:
         with LeaseHeartbeat(queue, lease) as heartbeat:
+            if lease.provider == "comboloss" and lease.kind == "SCORE":
+                execute_pretrained(queue, lease, heartbeat)
+                return True
             if lease.provider == "custom":
                 execution = CustomExecution(queue, lease, heartbeat)
                 saved = execution.train() if lease.kind == "TRAIN" else execution.predict()
@@ -55,6 +59,9 @@ def run_one(queue: ResearchQueue) -> bool:
         if lease.provider == AESTHETIC:
             AestheticExecution(queue, lease, LeaseHeartbeat(queue, lease)).fail()
         logger.error("research_job_failed", extra={"error_type": type(exc).__name__})
+    finally:
+        if lease.provider == "comboloss":
+            purge_pretrained(queue)
     return True
 
 
@@ -80,6 +87,7 @@ def main() -> None:
                 checks.database()
                 checks.cache()
                 if time.monotonic() - last_cleanup >= 60:
+                    purge_pretrained(queue)
                     ModelService(checks.sessions, settings).purge()
                     PreferenceService(checks.sessions, settings).purge()
                     AestheticService(checks.sessions, settings).purge()

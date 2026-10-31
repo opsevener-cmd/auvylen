@@ -27,6 +27,7 @@ from aevyra_api.routes import (
     health,
     owner,
     preferences,
+    pretrained,
     research,
     scoring,
 )
@@ -181,6 +182,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(preferences.router)
     application.include_router(custom_models.router)
     application.include_router(aesthetic.router)
+    application.include_router(pretrained.router)
     return application
 
 

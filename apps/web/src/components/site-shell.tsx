@@ -18,7 +18,7 @@ export function SiteShell({children, pilot}: {children: React.ReactNode; pilot: 
     </div></header>
     <div className="site-content">{pilot && <aside className="pilot-note">{t("Private pilot · Synthetic analysis is available for development testing only.")}</aside>}
       <main id="main" tabIndex={-1}>{children}</main>
-      <footer className="site-footer"><div><Link href="/" className="wordmark">Auvylen.</Link><p>{t("Your perspective. Your private space.")}</p></div><div><Link href="/status">{t("System status")}</Link><Link href="/history">{t("Analysis history")}</Link><Link href="/#guide">{t("Getting started")}</Link></div><p>{t("Personal preferences, never objective beauty.")}</p></footer>
+      <footer className="site-footer"><div><Link href="/" className="wordmark">Auvylen.</Link><p>{t("Your perspective. Your private space.")}</p></div><div><Link href="/research/pretrained">{t("Pretrained Model Analysis")}</Link><Link href="/status">{t("System status")}</Link><Link href="/history">{t("Analysis history")}</Link><Link href="/#guide">{t("Getting started")}</Link></div><p>{t("Personal preferences, never objective beauty.")}</p></footer>
     </div>
   </>;
 }
