@@ -11,6 +11,7 @@ from aevyra_inference.engine import ScoringEngine
 logger = logging.getLogger("aevyra.providers")
 PROVIDERS = {
     "custom": "Custom preference model",
+    "auvylen-native": "Auvylen Native Rating",
     "comboloss": "ComboLoss",
     "fpem": "FPEM",
     "faclip": "FACLIP",
@@ -42,6 +43,10 @@ class ProviderCatalog:
         self.model_root = model_root
 
     def _plugin(self, slug: str) -> ModelProvider | None:
+        if slug == "auvylen-native":
+            from aevyra_inference.native_checkpoint import NativeProvider
+
+            return NativeProvider()
         plugins = list(entry_points(group="auvylen.model_providers", name=slug))
         if len(plugins) != 1:
             return None

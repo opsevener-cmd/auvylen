@@ -763,5 +763,6 @@
   "Next step": "下一步",
   "{count} prediction-only": "{count} 张仅用于预测",
   "Use at least {groups} different person/group identifiers ({current} so far); photographs of one person count once.": "请至少使用 {groups} 个不同的人物/分组标识（目前 {current} 个）；同一人的照片只计为一组。",
-  "Training is not available yet. The summary above lists what remains.": "暂时无法训练。上方总结列出了尚需完成的事项。"
+  "Training is not available yet. The summary above lists what remains.": "暂时无法训练。上方总结列出了尚需完成的事项。",
+  "Auvylen Native Rating": "Auvylen 原生审美评分"
 }

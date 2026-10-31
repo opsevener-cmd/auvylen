@@ -99,3 +99,6 @@ logs
 **/appendonly.aof
 **/appendonlydir
 **/*.aof
+
+# Original learned rating heads are private model artifacts.
+*.f64
