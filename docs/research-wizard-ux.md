@@ -1,5 +1,8 @@
 # Personal research wizard, rating completion and prediction input
 
+Release review, follow-up fixes and the deployment/rollback checklist are in
+[release/research-wizard-release.md](release/research-wizard-release.md).
+
 Implemented on 2026-10-27 from `279afee`. It preserves the existing accounts, datasets,
 ratings, models, Credits and security controls. The aesthetic scoring model is untouched
 and stays disabled.
