@@ -1,7 +1,22 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {accountRequest, accountSchema, redemptionSchema} from "./account-api";
+import {accountRequest, accountSchema, redemptionSchema, requestError} from "./account-api";
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe("safe research authorization feedback", () => {
+  const path = "/research/preferences/datasets/test/images";
+  it.each([
+    ["Research access required", "Research permission is not enabled"],
+    ["CSRF validation failed", "Request verification expired"],
+    ["Request origin rejected", "Request origin rejected"],
+  ])("distinguishes %s without leaking response fields", (detail, expected) => {
+    expect(requestError(path, 403, JSON.stringify({detail, token: "secret"})).message).toContain(expected);
+  });
+  it("keeps unknown errors generic and private", () => {
+    expect(requestError(path, 403, JSON.stringify({detail: "private secret"})).message).toBe("Research access or request verification required.");
+    expect(requestError(path, 403, "not json").message).not.toContain("not json");
+  });
+});
 
 describe("account contracts and mutations", () => {
   it("validates integer balances and transaction history", () => {
