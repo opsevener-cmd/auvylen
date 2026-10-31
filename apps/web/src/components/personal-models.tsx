@@ -9,23 +9,15 @@ import {accountRequest} from "@/lib/account-api";
 import {extractorSchema, metric, modelSchema, predictionSchema} from "@/lib/model-api";
 import {preferencePath as base} from "@/lib/preferences-api";
 import {researchJobSchema} from "@/lib/research-api";
-import {annotationImages, predictionImages} from "@/lib/workflow";
+import {annotationImages, predictionImages, readinessMessages} from "@/lib/workflow";
 import {PhotoUpload} from "@/components/photo-upload";
 
 const button = "rounded border border-black/20 px-3 py-2 disabled:opacity-40";
 const input = "block rounded border border-black/20 p-2 mt-1 mb-3 w-full";
-const blockers: Record<string, string> = {
-  archived: "Restore this archived dataset before training.",
-  too_few_ratings: "Needs at least {required} valid ratings ({rated} so far).",
-  too_few_groups: "Needs at least {groups} different person/group identifiers ({current} so far).",
-  insufficient_split: "The validation split leaves too few training photographs. Add ratings for more people.",
-  no_score_variation: "Training ratings need at least two different scores.",
-  too_many_ratings: "A version supports at most 500 rated photographs. Exclude some photographs.",
-};
 type Config = {seed: number; fraction: number};
 
-export function PersonalModels({dataset, images, readiness, valid, prominent, config, onConfig, onBusy, onPredictionUpload, onPredictionDeleted}: {
-  dataset: PreferenceDataset; images: PreferenceImage[]; readiness: TrainingReadiness | null; valid: number; prominent: boolean;
+export function PersonalModels({dataset, images, readiness, valid, prominent, summaryShown, config, onConfig, onBusy, onPredictionUpload, onPredictionDeleted}: {
+  dataset: PreferenceDataset; images: PreferenceImage[]; readiness: TrainingReadiness | null; valid: number; prominent: boolean; summaryShown: boolean;
   config: Config; onConfig: (config: Config) => void; onBusy: (busy: boolean) => void; onPredictionUpload: (image: PreferenceImage) => void; onPredictionDeleted: (id: string) => void;
 }) {
   const {t, locale} = useI18n();
@@ -39,6 +31,17 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, co
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [seedText, setSeedText] = useState(String(config.seed));
+  const [fractionText, setFractionText] = useState(String(config.fraction));
+  // Keep whatever the user types; ask the server about eligibility only after a pause and
+  // only for values the training request would accept.
+  useEffect(() => {
+    const seed = Number(seedText), fraction = Number(fractionText);
+    if (seedText.trim() === "" || fractionText.trim() === "" || !Number.isInteger(seed) || seed < 0 || seed > 2147483647 || !(fraction >= 0.1 && fraction <= 0.4)) return;
+    if (seed === config.seed && fraction === config.fraction) return;
+    const timer = setTimeout(() => onConfig({seed, fraction}), 400);
+    return () => clearTimeout(timer);
+  }, [seedText, fractionText, config.seed, config.fraction, onConfig]);
   const running = job?.status === "QUEUED" || job?.status === "RUNNING";
   const jobId = job?.id;
   const datasetId = dataset.id;
@@ -98,7 +101,7 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, co
     {error && <p role="alert">{t(error)}</p>}
     <fieldset disabled={busy || running || uploading} className="space-y-6">
       <form className={prominent ? "training-card is-prominent" : "training-card"} aria-describedby="training-readiness" onSubmit={event => {event.preventDefault(); const values = new FormData(event.currentTarget); void perform(async () => {
-        const queued = await accountRequest(`${base}/train`, researchJobSchema, {dataset_id: datasetId, idempotency_key: crypto.randomUUID(), extractor: String(values.get("extractor")), alpha: Number(values.get("alpha")), seed: config.seed, validation_fraction: config.fraction}); await refresh(); setJob(queued);
+        const queued = await accountRequest(`${base}/train`, researchJobSchema, {dataset_id: datasetId, idempotency_key: crypto.randomUUID(), extractor: String(values.get("extractor")), alpha: Number(values.get("alpha")), seed: Number(values.get("seed")), validation_fraction: Number(values.get("fraction"))}); await refresh(); setJob(queued);
       });}}>
         {prominent && <p className="eyebrow">{t("Ready to train")}</p>}
         <h3 className="text-xl">{t("Train your personal model")}</h3>
@@ -110,14 +113,15 @@ export function PersonalModels({dataset, images, readiness, valid, prominent, co
         <details><summary>{t("Training settings explained")}</summary><p className="mt-3">{t("Regularization limits how strongly a small dataset can influence the model. A value of 10 is a sensible starting point.")}</p><p className="mt-2">{t("The random seed makes the group split reproducible. The validation fraction reserves a share of people for evaluation instead of learning.")}</p><p className="mt-2">{t("Handcrafted features describe colors and textures cheaply. MobileNet provides a richer general image representation, requires installed weights and uses more CPU. Neither is a validated facial attractiveness model.")}</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label>{t("Regularization strength")}<input className={input} name="alpha" type="number" defaultValue={10} min={0.001} max={1000} step="0.001" required /></label>
-            <label>{t("Random seed")}<input className={input} name="seed" type="number" value={config.seed} min={0} max={2147483647} required onChange={event => {const seed = Number(event.target.value); if (Number.isInteger(seed) && seed >= 0) onConfig({...config, seed});}} /></label>
-            <label>{t("Validation group fraction")}<input className={input} name="fraction" type="number" value={config.fraction} min={0.1} max={0.4} step="0.05" required onChange={event => {const fraction = Number(event.target.value); if (fraction >= 0.1 && fraction <= 0.4) onConfig({...config, fraction});}} /></label>
+            <label>{t("Random seed")}<input className={input} name="seed" type="number" value={seedText} min={0} max={2147483647} step={1} required onChange={event => setSeedText(event.target.value)} /></label>
+            <label>{t("Validation group fraction")}<input className={input} name="fraction" type="number" value={fractionText} min={0.1} max={0.4} step="0.05" required onChange={event => setFractionText(event.target.value)} /></label>
           </div>
         </details>
         <button className={prominent ? "button-primary" : button} disabled={!eligible}>{t("Train new version")}</button>
         <div id="training-readiness" className="mt-3 text-sm">{!readiness ? <p>{t("Checking training eligibility…")}</p> : eligible
           ? <p>{t("Ready to train with {rated} valid ratings from {groups} independent groups.", {rated: readiness.rated, groups: readiness.groups})}</p>
-          : <ul className="list-disc pl-5">{readiness.reasons.map(reason => <li key={reason}>{t(blockers[reason], {required: readiness.required_ratings, rated: valid, groups: readiness.required_groups, current: readiness.groups})}</li>)}</ul>}
+          : summaryShown ? <p>{t("Training is not available yet. The summary above lists what remains.")}</p>
+          : <ul className="list-disc pl-5">{readinessMessages(readiness, valid).map(message => <li key={message.key}>{t(message.key, message.values)}</li>)}</ul>}
           <p className="mt-2">{t("MobileNet training also evaluates the handcrafted and mean-rating baselines on exactly the same held-out groups. Lower error on your holdout alone does not establish facial prediction accuracy.")}</p></div>
       </form>
 

@@ -165,3 +165,9 @@ logs/
 !/docs/research-wizard/6-predict-1440-en.webp
 !/docs/research-wizard/6-predict-390-zh-CN.webp
 !/docs/research-wizard/before-research-desktop-en.webp
+
+# Local datastore snapshots (Redis RDB/AOF, PostgreSQL dumps) never belong in Git.
+*.rdb
+appendonly.aof
+appendonlydir/
+*.aof

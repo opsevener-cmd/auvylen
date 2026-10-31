@@ -52,6 +52,8 @@ class DatasetView(ProjectView):
     image_count: int
     rated_count: int
     compared_count: int
+    # Included in image_count (and storage quota); never rated, compared or trained on.
+    prediction_count: int = 0
 
 
 class ImageUploadMetadata(Input):
@@ -105,20 +107,21 @@ class DatasetDetail(BaseModel):
     pairs: list[PairView]
 
 
+ReadinessReason = Literal[
+    "archived",
+    "too_few_ratings",
+    "too_few_groups",
+    "insufficient_split",
+    "no_score_variation",
+    "too_many_ratings",
+]
+
+
 class TrainingReadiness(BaseModel):
     """Same checks as training submission, so the interface never offers an invalid request."""
 
     eligible: bool
-    reasons: list[
-        Literal[
-            "archived",
-            "too_few_ratings",
-            "too_few_groups",
-            "insufficient_split",
-            "no_score_variation",
-            "too_many_ratings",
-        ]
-    ]
+    reasons: list[ReadinessReason]
     rated: int
     required_ratings: int
     groups: int

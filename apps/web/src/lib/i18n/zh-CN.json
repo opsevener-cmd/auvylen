@@ -754,5 +754,10 @@
   "One JPEG or PNG up to 4 MiB. It is stored privately in this dataset for prediction only: it is never rated, compared or added to any training snapshot.": "一张不超过 4 MiB 的 JPEG 或 PNG。它会私密保存在此数据集中，仅用于预测：从不评分、比较或加入任何训练快照。",
   "Photograph of an adult to predict": "要预测的成年人照片",
   "Upload photograph for prediction": "上传用于预测的照片",
-  "Select a photograph": "选择一张照片"
+  "Select a photograph": "选择一张照片",
+  "Previous step": "上一步",
+  "Next step": "下一步",
+  "{count} prediction-only": "{count} 张仅用于预测",
+  "Use at least {groups} different person/group identifiers ({current} so far); photographs of one person count once.": "请至少使用 {groups} 个不同的人物/分组标识（目前 {current} 个）；同一人的照片只计为一组。",
+  "Training is not available yet. The summary above lists what remains.": "暂时无法训练。上方总结列出了尚需完成的事项。"
 }

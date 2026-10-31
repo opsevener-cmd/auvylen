@@ -33,6 +33,8 @@ def test_prediction_photographs_never_enter_annotation_or_training(credits):
     assert pair.status_code == 409
     state = readiness(credits, dataset)
     assert (state["prediction_only"], state["rated"], state["awaiting"]) == (1, 10, 0)
+    listed = next(d for d in credits.client.get(f"{BASE}/datasets").json() if d["id"] == dataset)
+    assert (listed["image_count"], listed["prediction_count"], listed["rated_count"]) == (11, 1, 10)
     train_job(credits, dataset)
     execute(credits)
     model = models(credits)[0]
@@ -122,3 +124,19 @@ def test_readiness_is_private_to_the_dataset_owner(credits):
     assert credits.client.get(f"{BASE}/datasets/{dataset}/readiness").status_code == 401
     register(credits.client, "other@example.test")
     assert credits.client.get(f"{BASE}/datasets/{dataset}/readiness").status_code in {403, 404}
+
+
+def test_readiness_follows_score_edits_without_count_changes(credits):
+    dataset = setup_dataset(credits)
+    ids = [
+        upload(credits, dataset, (15 + i * 20, 60, 70), subject_group=f"q{i}").json()["id"]
+        for i in range(10)
+    ]
+    for image in ids:
+        post(credits, f"/datasets/{dataset}/images/{image}/rating", {"score": 5})
+    flat = readiness(credits, dataset)
+    assert flat["reasons"] == ["no_score_variation"] and flat["rated"] == 10
+    for index, image in enumerate(ids):
+        post(credits, f"/datasets/{dataset}/images/{image}/rating", {"score": 1 + index % 4})
+    varied = readiness(credits, dataset)
+    assert varied["eligible"] is True and varied["rated"] == 10

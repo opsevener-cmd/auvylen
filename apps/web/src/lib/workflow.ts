@@ -1,4 +1,4 @@
-import type {PreferenceDataset, PreferenceImage, PreferenceProject} from "@auvylen/contracts";
+import type {PreferenceDataset, PreferenceImage, PreferenceProject, ReadinessReason, TrainingReadiness} from "@auvylen/contracts";
 
 /** The four research steps. Progress is always derived from saved server data. */
 export type Step = 1 | 2 | 3 | 4;
@@ -43,7 +43,7 @@ export function readSelection(search: string): Selection {
   const params = new URLSearchParams(search);
   const step = Number(params.get("step"));
   const id = (name: string) => uuid.test(params.get(name) ?? "") ? params.get(name)! : "";
-  return {project: id("project"), dataset: id("dataset"), step: step >= 1 && step <= 4 ? step as Step : null};
+  return {project: id("project"), dataset: id("dataset"), step: Number.isInteger(step) && step >= 1 && step <= 4 ? step as Step : null};
 }
 export function selectionQuery({project, dataset, step}: Selection): string {
   const params = new URLSearchParams();
@@ -74,4 +74,26 @@ export function reachableStep(project: string, dataset: PreferenceDataset | unde
 export function resumeStep(project: string, dataset: PreferenceDataset | undefined, images: PreferenceImage[] | null, requested: Step | null): Step {
   const reachable = reachableStep(project, dataset, images);
   return requested && requested <= reachable ? requested : reachable;
+}
+
+/** Changes whenever any valid score changes, so eligibility (e.g. score variation) is re-checked. */
+export function ratingSignature(images: PreferenceImage[]): string {
+  return annotationImages(images).filter(image => !image.excluded && image.score !== null).map(image => `${image.id}:${image.score}`).sort().join("|");
+}
+
+/** One wording per server reason, shared by the completion screen and the training form. */
+export const readinessText: Record<ReadinessReason, string> = {
+  archived: "Restore this archived dataset before training.",
+  too_few_ratings: "Add {count} more valid ratings ({rated} of {required}). Skipped and excluded photographs do not count.",
+  too_few_groups: "Use at least {groups} different person/group identifiers ({current} so far); photographs of one person count once.",
+  insufficient_split: "The validation split leaves too few training photographs. Add ratings for more people.",
+  no_score_variation: "Training ratings need at least two different scores.",
+  too_many_ratings: "A version supports at most 500 rated photographs. Exclude some photographs.",
+};
+/** `valid` is the locally saved count, which is never older than the last server answer. */
+export function readinessMessages(readiness: TrainingReadiness, valid: number): {key: string; values: Record<string, number>}[] {
+  return readiness.reasons.map(reason => ({key: readinessText[reason], values: {
+    count: Math.max(0, readiness.required_ratings - valid), rated: valid, required: readiness.required_ratings,
+    groups: readiness.required_groups, current: readiness.groups,
+  }}));
 }

@@ -2,14 +2,20 @@
 
 import hashlib
 from datetime import timedelta
-from typing import Literal, cast
+from typing import cast
 from uuid import UUID
 
-from aevyra_contracts.preferences import TrainingReadiness
+from aevyra_contracts.preferences import ReadinessReason, TrainingReadiness
 from aevyra_contracts.research import ResearchJobView
 from aevyra_contracts.training import ExtractorView, ModelView, PredictRequest, TrainRequest
 from aevyra_inference.extractors import MOBILENET, availability, manifest
-from aevyra_inference.preference import EXTRACTOR, IMPLEMENTATION, split_groups
+from aevyra_inference.preference import (
+    EXTRACTOR,
+    IMPLEMENTATION,
+    MIN_GROUPS,
+    MIN_RATED_IMAGES,
+    split_groups,
+)
 from pydantic import BaseModel, ConfigDict, JsonValue
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -28,16 +34,8 @@ from aevyra_api.research.jobs import ResearchQueue
 from aevyra_api.research.models import ResearchJob
 from aevyra_api.research.storage import PrivateArtifactStore
 
-REQUIRED_RATINGS = 8
-REQUIRED_GROUPS = 5
-ReadinessReason = Literal[
-    "archived",
-    "too_few_ratings",
-    "too_few_groups",
-    "insufficient_split",
-    "no_score_variation",
-    "too_many_ratings",
-]
+REQUIRED_RATINGS = MIN_RATED_IMAGES
+REQUIRED_GROUPS = MIN_GROUPS
 
 
 class Example(BaseModel):

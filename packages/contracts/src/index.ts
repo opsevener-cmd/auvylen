@@ -57,6 +57,8 @@ export interface PreferenceDataset extends PreferenceProject {
   project_id: string; source: string; source_url: string; license: string;
   rating_min: number; rating_max: number; archived: boolean; expires_at: string;
   image_count: number; rated_count: number; compared_count: number;
+  /** Included in image_count and the storage quota; never rated, compared or trained on. */
+  prediction_count: number;
 }
 /** Percent-encoded JSON in X-Upload-Metadata for JPEG/PNG binary uploads. */
 export interface ImageUploadMetadata {

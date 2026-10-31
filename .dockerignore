@@ -93,3 +93,9 @@ logs
 !apps/web/public/images/editorial/analysis-pair-mobile-480.webp
 !apps/web/public/images/editorial/analysis-pair-mobile-960.avif
 !apps/web/public/images/editorial/analysis-pair-mobile-960.webp
+
+# Local datastore snapshots never enter build contexts.
+**/*.rdb
+**/appendonly.aof
+**/appendonlydir
+**/*.aof

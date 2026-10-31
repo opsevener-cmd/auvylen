@@ -9,7 +9,7 @@ import {z} from "zod";
 import type {PreferenceDataset, PreferenceDetail, PreferenceImage, PreferencePair, PreferenceProject, TrainingReadiness} from "@auvylen/contracts";
 import {accountRequest} from "@/lib/account-api";
 import {datasetSchema, detailSchema, imageSchema, imageUrl, nextPair, pairSchema, preferencePath as base, projectSchema, readinessSchema} from "@/lib/preferences-api";
-import {annotationImages, firstPending, nextPending, ratingSummary, reachableStep, readSelection, resolveSelection, resumeStep, selectionQuery, steps, type Step} from "@/lib/workflow";
+import {annotationImages, firstPending, nextPending, ratingSignature, ratingSummary, reachableStep, readinessMessages, readSelection, resolveSelection, resumeStep, selectionQuery, steps, type Step} from "@/lib/workflow";
 
 const button = "rounded border border-black/20 px-3 py-2 disabled:opacity-40";
 const field = "block w-full rounded border border-black/20 p-2 mt-1 mb-3";
@@ -61,17 +61,52 @@ export function PreferencesPage() {
     return () => {active = false;};
   }, [refresh]);
 
-  // Remember choices in the URL so refresh and back/forward restore the same place.
+  // Remember choices in the URL: step moves add history entries so Back/Forward work;
+  // other selection changes replace the current entry. Refresh restores the same place.
+  const push = useRef(false);
   useEffect(() => {
     if (!loaded) return;
     const query = selectionQuery({project, dataset: datasetId, step});
-    if (window.location.search !== query) window.history.replaceState(null, "", `${window.location.pathname}${query}`);
+    if (window.location.search === query) return;
+    const url = `${window.location.pathname}${query}`;
+    if (push.current) window.history.pushState(null, "", url); else window.history.replaceState(null, "", url);
+    push.current = false;
   }, [loaded, project, datasetId, step]);
-  useEffect(() => {if (moved.current) heading.current?.focus(); moved.current = false;}, [step]);
+  const latest = useRef({projects, datasets});
+  useEffect(() => {latest.current = {projects, datasets};}, [projects, datasets]);
+  useEffect(() => {
+    function restore() {
+      const saved = readSelection(window.location.search);
+      const chosen = resolveSelection(saved, latest.current.projects, latest.current.datasets);
+      (async () => {
+        const loadedDetail = chosen.dataset ? await accountRequest(`${base}/datasets/${chosen.dataset}`, detailSchema) : null;
+        setProject(chosen.project); setDatasetId(chosen.dataset); setDetail(loadedDetail);
+        moved.current = true;
+        setStep(resumeStep(chosen.project, latest.current.datasets.find(item => item.id === chosen.dataset), loadedDetail?.images ?? null, saved.step));
+      })().catch(e => setError(e instanceof Error ? e.message : "Research unavailable."));
+    }
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  // The wizard owns scrolling: each newly opened step starts at its heading, also after
+  // Back/Forward (browser scroll restoration would otherwise land mid-page).
+  useEffect(() => {
+    if (!("scrollRestoration" in window.history)) return;
+    const previous = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    return () => {window.history.scrollRestoration = previous;};
+  }, []);
+  useEffect(() => {
+    if (moved.current && heading.current) {
+      heading.current.focus({preventScroll: true});
+      heading.current.scrollIntoView({block: "start"});
+    }
+    moved.current = false;
+  }, [step]);
 
   function go(target: Step) {
-    if (target > reachable || uploading) return;
-    moved.current = true; setError(""); setStep(target);
+    if (target > reachable || uploading || target === step) return;
+    moved.current = true; push.current = true; setError(""); setStep(target);
   }
   const perform: Perform = async action => {
     setBusy(true); setError("");
@@ -87,12 +122,13 @@ export function PreferencesPage() {
   async function chooseDataset(id: string) {setDatasetId(id); setDetail(null); await loadDetail(id);}
 
   const title = steps[step - 1].label;
+  const progress = images ? ratingSummary(images) : null;
   const nextAllowed = step < 4 && step + 1 <= reachable;
   return <section className="research-wizard max-w-4xl">
     <Link className="underline" href="/research">{t("Research workspace")}</Link>
     <header className="research-heading mt-4"><p className="eyebrow">{t("Your private research studio")}</p><h1>{t("Personal preference datasets")}</h1><p>{t("Create a project, collect authorized photographs and explore patterns in your own ratings.")}</p></header>
     <nav aria-label={t("Research steps")} className="wizard-steps"><ol>{steps.map(item => {
-      const done = item.step < reachable || (item.step === 4 && !!images && ratingSummary(images).awaiting === 0 && ratingSummary(images).total > 0);
+      const done = item.step < reachable || (item.step === 4 && !!progress && progress.awaiting === 0 && progress.total > 0);
       const status = item.step === step ? t("current step") : done ? t("completed") : item.step <= reachable ? t("available") : t("locked");
       return <li key={item.step} className={item.step === step ? "is-current" : done ? "is-done" : ""}>
         <button type="button" disabled={item.step > reachable || uploading} aria-current={item.step === step ? "step" : undefined} onClick={() => go(item.step)} aria-label={t("Step {number}: {label} ({status})", {number: item.step, label: t(item.label), status})}>
@@ -104,18 +140,18 @@ export function PreferencesPage() {
       <p className="wizard-kicker">{t("Step {number} of 4", {number: step})}</p>
       <h2 ref={heading} tabIndex={-1} className="wizard-title">{t(title)}</h2>
       <fieldset disabled={busy} className="mt-6 space-y-6">
-        {step === 1 && <ProjectStep projects={projects} datasets={datasets} project={project} perform={perform} onChoose={id => perform(() => chooseProject(id))} onCreated={async created => {await refresh(); setProject(created.id); setDatasetId(""); setDetail(null); moved.current = true; setStep(2);}} />}
+        {step === 1 && <ProjectStep projects={projects} datasets={datasets} project={project} perform={perform} onChoose={id => perform(() => chooseProject(id))} onCreated={async created => {await refresh(); setProject(created.id); setDatasetId(""); setDetail(null); moved.current = true; push.current = true; setStep(2);}} />}
         {step === 2 && <DatasetStep project={projects.find(item => item.id === project)} datasets={datasets.filter(item => item.project_id === project)} selected={dataset} perform={perform}
           onChoose={id => perform(() => chooseDataset(id))}
-          onCreated={async created => {await refresh(); setDatasetId(created.id); await loadDetail(created.id); moved.current = true; setStep(3);}}
+          onCreated={async created => {await refresh(); setDatasetId(created.id); await loadDetail(created.id); moved.current = true; push.current = true; setStep(3);}}
           onChanged={async () => {await refresh(); if (datasetId) await loadDetail(datasetId);}}
           onDeleted={async () => {setDatasetId(""); setDetail(null); await refresh();}} />}
         {step === 3 && dataset && <UploadStep dataset={dataset} images={images ?? []} onBusy={active => {setUploading(active);}} onSaved={image => setDetail(current => current && !current.images.some(item => item.id === image.id) ? {...current, images: [...current.images, image], dataset: {...current.dataset, image_count: current.dataset.image_count + 1}} : current)} onComplete={async () => {await loadDetail(dataset.id);}} onContinue={() => go(4)} onManage={() => go(2)} />}
         {step === 4 && detail && dataset && <RateStep key={dataset.id} detail={detail} onDetail={updated => {setDetail(updated); setDatasets(current => current.map(item => item.id === updated.dataset.id ? updated.dataset : item));}} reload={() => loadDetail(dataset.id).then(() => undefined)} onUpload={() => go(3)} onBusy={setUploading} />}
       </fieldset>
       <div className="wizard-footer">
-        <button type="button" className="button-secondary" disabled={step === 1 || uploading} onClick={() => go((step - 1) as Step)}>{t("Previous")}</button>
-        {step < 4 && <button type="button" className="button-primary" disabled={!nextAllowed || uploading} aria-describedby="wizard-next-hint" onClick={() => go((step + 1) as Step)}>{t("Next")}</button>}
+        <button type="button" className="button-secondary" disabled={step === 1 || uploading} onClick={() => go((step - 1) as Step)}>{t("Previous step")}</button>
+        {step < 4 && <button type="button" className="button-primary" disabled={!nextAllowed || uploading} aria-describedby="wizard-next-hint" onClick={() => go((step + 1) as Step)}>{t("Next step")}</button>}
         {step < 4 && !nextAllowed && <p id="wizard-next-hint" className="wizard-hint">{t(step === 1 ? "Choose or create a project to continue." : step === 2 ? "Choose or create a dataset to continue." : "Upload at least one photograph to continue.")}</p>}
       </div>
     </div>}
@@ -146,7 +182,7 @@ function DatasetStep({project, datasets, selected, perform, onChoose, onCreated,
   return <>
     <p>{t("Project:")} <strong>{project?.name}</strong>. {t("A dataset groups photographs with a common source and rating scale. Set a retention period you can justify; expiry blocks access and schedules file removal.")}</p>
     {datasets.length > 0 && <fieldset className="choice-list"><legend>{t("Datasets in this project")}</legend>
-      {datasets.map(item => <label key={item.id} className="choice"><input type="radio" name="dataset" checked={item.id === selected?.id} onChange={() => onChoose(item.id)} /><span><strong>{item.name}{item.archived ? t(" (archived)") : ""}</strong><small>{item.image_count} {t("images ·")} {item.rated_count} {t("rated")}</small></span></label>)}
+      {datasets.map(item => <label key={item.id} className="choice"><input type="radio" name="dataset" checked={item.id === selected?.id} onChange={() => onChoose(item.id)} /><span><strong>{item.name}{item.archived ? t(" (archived)") : ""}</strong><small>{item.image_count - item.prediction_count} {t("images ·")} {item.rated_count} {t("rated")}{item.prediction_count ? ` · ${t("{count} prediction-only", {count: item.prediction_count})}` : ""}</small></span></label>)}
     </fieldset>}
     {selected && <details className="workspace-panel"><summary>{t("Manage “{name}”", {name: selected.name})}</summary>
       <p className="mt-3 text-sm">{t("Expires:")} {new Date(selected.expires_at).toLocaleDateString(locale)} {t("· Source:")} {selected.source} {t("· License:")} {selected.license}</p>
@@ -218,7 +254,8 @@ function RateStep({detail, onDetail, reload, onUpload, onBusy}: {detail: Prefere
   const [revision, setRevision] = useState(0);
   // Ask the server only when eligibility can have changed: below eight valid ratings it cannot
   // become eligible, so ordinary saves stay at two requests (CSRF + save).
-  const phase = complete ? `complete:${summary.valid}` : summary.valid >= 8 ? `valid:${summary.valid}` : "collecting";
+  const signature = useMemo(() => ratingSignature(detail.images), [detail.images]);
+  const phase = complete || summary.valid >= 8 ? `${complete ? "complete" : "valid"}:${signature}` : "collecting";
   useEffect(() => {
     let active = true;
     accountRequest(`${path}/readiness?seed=${config.seed}&validation_fraction=${config.fraction}`, readinessSchema)
@@ -289,22 +326,14 @@ function RateStep({detail, onDetail, reload, onUpload, onBusy}: {detail: Prefere
       </>}
       <div className="thumbnail-grid">{images.map((image, position) => <button type="button" key={image.id} aria-pressed={!complete && mode === "rating" && index === position} className="rounded border p-1" aria-label={t("Select image {value0}", {value0: position + 1})} onClick={() => review(position)}><PrivatePhoto image={image} thumbnail /><span>{image.excluded ? t("Excluded") : image.score ?? (image.rating_recorded ? t("Skipped") : t("Unrated"))}</span></button>)}</div>
     </fieldset>
-    <PersonalModels dataset={dataset} images={detail.images} readiness={readiness} valid={summary.valid} prominent={complete && !!readiness?.eligible} config={config} onConfig={setConfig} onBusy={onBusy}
+    <PersonalModels dataset={dataset} images={detail.images} readiness={readiness} valid={summary.valid} prominent={complete && !!readiness?.eligible} summaryShown={complete && mode === "rating"} config={config} onConfig={setConfig} onBusy={onBusy}
       onPredictionUpload={image => {if (!detail.images.some(item => item.id === image.id)) onDetail({...detail, images: [...detail.images, image], dataset: {...dataset, image_count: dataset.image_count + 1}});}}
       onPredictionDeleted={id => onDetail({...detail, images: detail.images.filter(item => item.id !== id), dataset: {...dataset, image_count: Math.max(0, dataset.image_count - 1)}})} />
   </>;
 }
 
-const reasonText: Record<string, string> = {
-  archived: "Restore this archived dataset before training.",
-  too_few_groups: "Use at least {groups} different person/group identifiers; photographs of one person count once.",
-  insufficient_split: "The validation split leaves too few training photographs. Add ratings for more people.",
-  no_score_variation: "Training ratings need at least two different scores.",
-  too_many_ratings: "A version supports at most 500 rated photographs. Exclude some photographs.",
-};
 function Completion({summary, readiness, onReviewSkipped, onUpload}: {summary: ReturnType<typeof ratingSummary>; readiness: TrainingReadiness | null; onReviewSkipped: () => void; onUpload: () => void}) {
   const {t} = useI18n();
-  const needed = readiness ? Math.max(0, readiness.required_ratings - readiness.rated) : 0;
   return <section className="completion" aria-labelledby="completion-title">
     <p className="eyebrow">{t("Rating complete")}</p>
     <h3 id="completion-title">{t("Every photograph has been processed.")}</h3>
@@ -316,8 +345,7 @@ function Completion({summary, readiness, onReviewSkipped, onUpload}: {summary: R
     {!readiness ? <p role="status">{t("Checking training eligibility…")}</p> : readiness.eligible
       ? <p>{t("Your ratings meet every training requirement. Train a personal model below.")}</p>
       : <div><p>{t("Processing every photograph is not the same as having enough valid ratings. Before training:")}</p><ul className="list-disc pl-5 mt-2 space-y-1">
-        {needed > 0 && <li>{t("Add {count} more valid ratings ({rated} of {required}). Skipped and excluded photographs do not count.", {count: needed, rated: readiness.rated, required: readiness.required_ratings})}</li>}
-        {readiness.reasons.filter(reason => reason !== "too_few_ratings").map(reason => <li key={reason}>{t(reasonText[reason], {groups: readiness.required_groups})}</li>)}
+        {readinessMessages(readiness, summary.valid).map(message => <li key={message.key}>{t(message.key, message.values)}</li>)}
       </ul></div>}
     <div className="mt-5 flex flex-wrap gap-3">
       {(!readiness?.eligible) && <button type="button" className="button-primary" onClick={onUpload}>{t("Upload more photographs")}</button>}
@@ -330,5 +358,5 @@ export function PrivatePhoto({image, thumbnail = false}: {image: PreferenceImage
   const {t} = useI18n();
   // Authenticated endpoint only. Next's public image optimizer must not cache private photographs.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={imageUrl(image.dataset_id, image.id, thumbnail)} alt={t("Private photograph for your subjective annotation")} loading="lazy" referrerPolicy="no-referrer" className={thumbnail ? "w-full h-24 object-contain" : "rating-photo"} />;
+  return <img src={imageUrl(image.dataset_id, image.id, thumbnail)} alt={t("Private photograph for your subjective annotation")} loading={thumbnail ? "lazy" : "eager"} referrerPolicy="no-referrer" className={thumbnail ? "w-full h-24 object-contain" : "rating-photo"} />;
 }
