@@ -127,3 +127,23 @@ def test_human_annotation_aggregation_refuses_repeated_raters(tmp_path):
     with pytest.raises(ValueError, match="repeated"):
         aggregate_annotations(source, tmp_path / "other.csv")
     assert hashlib.sha256(target.read_bytes()).hexdigest()
+
+
+def test_preview_prediction_loads_and_hashes_checkpoint_once(tmp_path, monkeypatch):
+    import aevyra_inference.native_preview as preview
+
+    labels, images = fixture(tmp_path)
+    human = plan().model_copy(update={"synthetic": False, "rating_max": 7})
+    head, item = run(labels, images, human, tmp_path, encoders=(BASELINE,))
+    root = tmp_path / "checkpoint"
+    pin = write(root, head, item)
+    calls = []
+
+    def counted(*args, **kwargs):
+        calls.append(args)
+        return load(*args, **kwargs)
+
+    monkeypatch.setattr(preview, "load", counted)
+    result = preview.predict(root, pin, tmp_path, (images / "0.png").read_bytes())
+    assert len(calls) == 1
+    assert 1 <= result["predicted_rating"] <= 7 and result["consumer_enabled"] is False

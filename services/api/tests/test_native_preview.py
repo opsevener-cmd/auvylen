@@ -329,3 +329,27 @@ def test_review_change_before_completion_cannot_publish(credits, tmp_path):
             assert run_one(service.queue)
         record = credits.client.get(BASE + "/jobs/" + job_id).json()
         assert record["status"] == "FAILED" and record["result"] is None
+
+
+def test_poll_expires_only_requested_job_and_status_does_not_lock(credits, tmp_path):
+    service = setup(credits, tmp_path)
+    with patch.object(NativePreview, "ready", return_value=None):
+        polled, other = submit(credits).json()["id"], submit(credits).json()["id"]
+        with credits.sessions.begin() as session:
+            for job_id in (polled, other):
+                session.get(ResearchJob, UUID(job_id)).created_at = now() - timedelta(hours=2)
+        with patch.object(NativePreview, "purge", side_effect=AssertionError("global sweep")):
+            assert credits.client.get(BASE + "/jobs/" + polled).status_code == 404
+        with credits.sessions() as session:
+            assert session.get(ResearchJob, UUID(polled)).payload == {
+                "operation": "native_research_preview",
+                "deleted": True,
+            }
+            # The unpolled job waits for the worker's periodic sweep.
+            assert session.get(ResearchJob, UUID(other)).status == "QUEUED"
+        assert len(list(service.store.root.rglob("*/*"))) == 1
+        service.purge()
+        assert not list(service.store.root.rglob("*/*"))
+    with patch.object(NativePreview, "access", autospec=True) as access:
+        credits.client.get(BASE + "/status")
+    assert access.call_args.kwargs == {"lock": False}
