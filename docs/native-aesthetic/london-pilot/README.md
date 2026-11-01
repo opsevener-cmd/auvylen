@@ -1,5 +1,7 @@
 # London Set: genuine human-rated feasibility result
 
+Continuation: [independent cohort acquisition and private preview verification](../independent-cohort/README.md). The original experiment below is unchanged; subsequent engineering does not retune its test set.
+
 2026-11-01. Continues draft PR #12. **GO: private research feasibility. NO-GO: service release.**
 An actual first-party model was trained and evaluated. No public model, UI, deployment,
 participant recruitment or private account-data reuse was enabled.

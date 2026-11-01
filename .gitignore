@@ -174,3 +174,7 @@ appendonlydir/
 
 # Original learned rating heads are private model artifacts.
 *.f64
+
+# Native preview: disabled UI only, no portraits or predictions.
+!/docs/native-aesthetic/independent-cohort/native-preview-disabled-en-desktop.webp
+!/docs/native-aesthetic/independent-cohort/native-preview-disabled-zh-mobile.webp

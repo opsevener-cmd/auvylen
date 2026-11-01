@@ -1,0 +1,15 @@
+{
+  "manifest_sha256": "362ed74e378989ee2b64f6478a12577410e257b5e633f695af9464f24fe5366e",
+  "duration_ms": 109.66864300007728,
+  "peak_rss_kib": 216592,
+  "native_scale": [
+    1,
+    7
+  ],
+  "worker_and_read_ms": 347.57275400033905,
+  "upload_acceptance_ms": 375.25668900025266,
+  "upload_to_verified_read_ms": 722.832918000222,
+  "saved_pixel_prediction_difference": 0.0,
+  "genuine_inference": true,
+  "consumer_enabled": false
+}

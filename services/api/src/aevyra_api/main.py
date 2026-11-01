@@ -25,6 +25,7 @@ from aevyra_api.routes import (
     commercial,
     custom_models,
     health,
+    native_preview,
     owner,
     preferences,
     research,
@@ -181,6 +182,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(preferences.router)
     application.include_router(custom_models.router)
     application.include_router(aesthetic.router)
+    application.include_router(native_preview.router)
     return application
 
 

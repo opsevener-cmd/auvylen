@@ -10,6 +10,7 @@ from aevyra_inference.extractors import BASELINE
 from aevyra_inference.native import fit_head, select_model
 from aevyra_inference.native_checkpoint import NativeProvider, load, release_failures, write
 from aevyra_inference.native_data import Collection, aggregate_annotations, load_rows
+from aevyra_inference.native_preview import reviewed
 from aevyra_inference.native_train import run
 from PIL import Image
 
@@ -81,6 +82,8 @@ def test_full_fixture_training_roundtrip_and_no_release(tmp_path, monkeypatch):
     assert "real_pose_review_missing" in release_failures(item)
     root = tmp_path / "checkpoint"
     pin = write(root, head, item)
+    with pytest.raises(ValueError, match="human-trained native"):
+        reviewed(root, pin)
     restored, _ = load(root, pin, require_release=False)
     assert np.array_equal(restored.weights, head.weights)
     monkeypatch.setenv("AUVYLEN_NATIVE_MANIFEST_SHA256", pin)

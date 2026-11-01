@@ -1,0 +1,22 @@
+{
+  "version": "auvylen-independent-cohort-v1",
+  "date": "2026-11-01",
+  "state": "prospective_no_data_acquired_no_holdout_sealed",
+  "rating_scale": [1, 7],
+  "development_subject_target": 400,
+  "train_subject_target": 320,
+  "validation_subject_target": 80,
+  "external_subject_target": 200,
+  "real_captures_per_subject": 4,
+  "independent_ratings_per_image_target": 30,
+  "development_logistics_tranche_subjects": 60,
+  "external_site_and_rater_panel_separate": true,
+  "external_custodian_required": true,
+  "consumer_release_enabled": false,
+  "development_candidates": ["train_mean", "train_median", "handcrafted_v1_ridge", "mobilenet_v3_small_v1_ridge"],
+  "ridge_alphas": [0.01, 1.0, 100.0],
+  "model_selection": "validation_MAE_only",
+  "subject_bootstrap_repetitions": 2000,
+  "external_holdout_accesses_before_model_lock": 0,
+  "existing_london_test_permitted_for_development": false
+}
