@@ -40,9 +40,12 @@ def run(
     seed: int = 42,
     encoders: tuple[str, ...] = (BASELINE, MOBILENET),
     pose_review: str = "",
+    selection: str = "validation",
 ) -> tuple[NativeHead, Manifest]:
     payloads, subjects, y, cohorts, digest = load_rows(labels, images, plan)
-    train, _, test = split_by_subject(subjects, seed)
+    train, val, test = split_by_subject(subjects, seed)
+    # Augmented views are only ever made for images the protocol may fit on.
+    fit_rows = train if selection == "validation" else np.sort(np.concatenate([train, val]))
     matrices, views = {}, {}
     extractors = {name: create_extractor(name, encoder_root) for name in encoders}
     for encoder in encoders:
@@ -51,12 +54,19 @@ def run(
         # Each augmented view belongs to a train subject, never validation/test.
         views[encoder] = np.stack(
             [
-                features((perturb(payloads[i], kind) for i in train), extractor)
+                features((perturb(payloads[i], kind) for i in fit_rows), extractor)
                 for kind in ("lighting", "crop")
             ]
         )
     encoder, head, report = select_model(
-        matrices, y, subjects, seed=seed, train_views=views, rating_max=plan.rating_max
+        matrices,
+        y,
+        subjects,
+        seed=seed,
+        rating_max=plan.rating_max,
+        selection="grouped-cv" if selection == "grouped-cv" else "validation",
+        train_views=views if selection == "validation" else None,
+        development_views=views if selection == "grouped-cv" else None,
     )
     report["cohorts"] = {}
     for cohort in sorted({cohorts[i] for i in test}):
@@ -77,7 +87,13 @@ def run(
     report["pose_review_reference"] = pose_review
     sources = [
         Path(__file__).with_name(name)
-        for name in ("native.py", "native_data.py", "native_train.py", "native_checkpoint.py")
+        for name in (
+            "native.py",
+            "native_data.py",
+            "native_train.py",
+            "native_checkpoint.py",
+            "native_selection.py",
+        )
     ]
     report["implementation_sha256"] = hashlib.sha256(
         b"".join(p.read_bytes() for p in sources)
@@ -87,7 +103,11 @@ def run(
         f"sum squared errors + alpha * squared weight norm; bounded output 1–{plan.rating_max}"
     )
     report["augmentation"] = "train only: clean + brightness 0.85 + central 90% crop"
-    report["test_policy"] = "winner fixed by validation MAE; no test-based selection"
+    report["test_policy"] = (
+        "winner fixed by validation MAE; no test-based selection"
+        if selection == "validation"
+        else "winner fixed by grouped development CV; no test-based selection"
+    )
     return head, new_manifest(encoder, plan, digest, head, report)
 
 
@@ -97,6 +117,12 @@ def main() -> int:
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--pose-review", default="")
+    parser.add_argument(
+        "--selection",
+        choices=["validation", "grouped-cv"],
+        default="validation",
+        help="validation reproduces the original pilot rule; grouped-cv is opt-in",
+    )
     args = parser.parse_args()
     try:
         plan = Collection.model_validate_json(args.plan.read_bytes())
@@ -107,6 +133,7 @@ def main() -> int:
             args.encoder_root,
             seed=args.seed,
             pose_review=args.pose_review,
+            selection=args.selection,
         )
         pin = write(args.output, head, item)
         print(

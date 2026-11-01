@@ -22,6 +22,10 @@ def evaluate(root: Path, checkpoint: Path, pin: str, encoder_root: Path) -> dict
     saved, item = load(checkpoint, pin, require_release=False)
     if item.collection.synthetic:
         raise ValueError("Human pilot evaluation refuses synthetic checkpoints")
+    # This replay re-fits the original train-only, validation-selected heads. A
+    # grouped-CV checkpoint refits on train+validation and must not be replayed here.
+    if item.report.get("selection_protocol", "validation-3") != "validation-3":
+        raise ValueError("Replay supports the original validation-selected protocol only")
     payloads, subjects, y, _, digest = load_rows(
         root / "means.csv", root / "images", item.collection
     )

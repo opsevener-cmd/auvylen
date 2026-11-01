@@ -1,0 +1,74 @@
+{
+  "policy": "sealed seed-42 test subjects removed before ratings were parsed; nested grouped CV over development subjects only; no test metric computed or read",
+  "development_images": 80,
+  "sealed_test_subjects_excluded": 20,
+  "development_subjects": 80,
+  "outer": "repeated subject-grouped 5-fold x 5",
+  "protocol_a": "single inner subject-hash validation split (~25%), alpha in {.01,1,100}",
+  "protocol_b": "inner grouped 5-fold x 3 CV, 15-point log alpha grid",
+  "augmentation": "train folds only: brightness 0.85 + central 90% crop (original)",
+  "encoders": {
+    "rgb-grid-texture-v1": {
+      "outer_cv": {
+        "a": {
+          "mae": 0.6414137082721867,
+          "rmse": 0.8034624906778394,
+          "spearman": 0.37750862274964975,
+          "mae_sd_across_repeats": 0.04579328995656726
+        },
+        "b": {
+          "mae": 0.6241624848021119,
+          "rmse": 0.7651843678898196,
+          "spearman": 0.3262587904360056,
+          "mae_sd_across_repeats": 0.04206565722834895
+        },
+        "mean": {
+          "mae": 0.6579164425559381,
+          "rmse": 0.8162186032530847,
+          "spearman": null,
+          "mae_sd_across_repeats": 0.005756774093405
+        }
+      },
+      "selected_alpha_counts": {
+        "a": {
+          "0.01": 2,
+          "1.0": 3,
+          "100.0": 20
+        },
+        "b": {
+          "10.0": 1,
+          "31.622776601683793": 7,
+          "100.0": 8,
+          "316.2277660168379": 2,
+          "1000.0": 5,
+          "3162.2776601683795": 2
+        }
+      },
+      "paired_b_minus_a_mae": {
+        "mean": -0.017251223470074902,
+        "low": -0.054108798742456436,
+        "high": 0.015437836522549372,
+        "share_of_draws_favouring_b": 0.8405
+      },
+      "paired_b_minus_mean_baseline_mae": {
+        "mean": -0.033753957753826155,
+        "low": -0.1022149523427096,
+        "high": 0.03607234981547817,
+        "share_of_draws_favouring_b": 0.834
+      },
+      "paired_a_minus_mean_baseline_mae": {
+        "mean": -0.016502734283751246,
+        "low": -0.10145503523561349,
+        "high": 0.06678912275706232,
+        "share_of_draws_favouring_b": 0.6495
+      },
+      "repeat_averaged_spearman_b": 0.35768870135958747,
+      "seconds": {
+        "feature_extraction": 52.73464855199998,
+        "protocol_a_fitting": 0.08575489000014613,
+        "protocol_b_fitting": 1.8574685540001497
+      }
+    }
+  },
+  "generated": "2026-11-01, Claude independent review branch; development subjects only"
+}
