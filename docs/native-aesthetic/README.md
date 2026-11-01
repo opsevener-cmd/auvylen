@@ -5,6 +5,10 @@
 uncertainty, CPU portrait inference and NO-GO recommendation](london-pilot/README.md).
 The native 1–7 scale is preserved by compatible checkpoint v2. No service was enabled.
 
+**Independent audit (same day):** opt-in grouped-CV selection with a development-only
+study (inconclusive; default unchanged), native preview runtime/API fixes and a rebuilt
+Owner preview page. See [improvement-audit-2026-11-01.md](improvement-audit-2026-11-01.md).
+
 The remainder below preserves the initial 2026-10-31 draft record; its no-data status
 is superseded by the linked experiment, while its original 1–5 default remains supported.
 
