@@ -13,23 +13,28 @@ from pathlib import Path
 import numpy as np
 
 from aevyra_inference.extractors import create_extractor
+from aevyra_inference.native import NativeHead
 from aevyra_inference.native_checkpoint import Manifest, load, release_failures
 
 
-def reviewed(root: Path, pin: str) -> Manifest:
-    _, item = load(root, pin, require_release=False)
+def reviewed_checkpoint(root: Path, pin: str) -> tuple[NativeHead, Manifest]:
+    """Load and hash-verify the pinned checkpoint once, then apply the preview review."""
+    head, item = load(root, pin, require_release=False)
     if item.collection.synthetic or item.native_scale != (1, 7):
         raise ValueError("Preview requires a human-trained native 1–7 checkpoint")
     # Rights are independently pinned as part of the manifest, never inferred from a URL.
     if not all(r.research_allowed and r.adult_confirmed for r in item.collection.rights.values()):
         raise ValueError("Research rights review missing")
-    return item
+    return head, item
+
+
+def reviewed(root: Path, pin: str) -> Manifest:
+    return reviewed_checkpoint(root, pin)[1]
 
 
 def predict(root: Path, pin: str, encoder_root: Path, image: bytes) -> dict[str, object]:
     started = time.perf_counter()
-    item = reviewed(root, pin)
-    head, _ = load(root, pin, require_release=False)
+    head, item = reviewed_checkpoint(root, pin)
     extractor = create_extractor(item.encoder, encoder_root)
     value = float(head.predict(np.asarray(extractor.extract_batch([image])))[0])
     if not np.isfinite(value) or not 1 <= value <= 7:

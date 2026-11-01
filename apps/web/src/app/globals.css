@@ -283,6 +283,16 @@ details[open] > summary {margin-bottom: 8px;}
 .model-facts dd {margin: 0; overflow-wrap: anywhere;}
 .analysis-preview {max-height: 320px; max-width: 100%; border-radius: 1px; object-fit: contain; background: var(--stone);}
 
+/* ── Native research preview (Owner laboratory) ─────────────────────────── */
+.research-notice {display: grid; gap: 6px; padding: 18px 22px; background: var(--surface); border: 1px solid var(--line); border-left: 2px solid var(--brass); color: var(--ink-soft); font-size: 15px;}
+#main .native-section-title {margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 26px;}
+.native-gate summary {list-style-position: inside; cursor: pointer; font-size: 14px; color: var(--ink-soft);}
+.native-gate summary:focus-visible {outline: 2px solid var(--brass); outline-offset: 4px;}
+#main .native-result h2 {font-size: 26px;}
+.native-scale {position: relative; height: 2px; background: var(--line-strong); margin: 4px 0 8px; max-width: 520px;}
+.native-scale-marker {position: absolute; top: -7px; width: 2px; height: 16px; background: var(--ink); transform: translateX(-1px);}
+.native-scale-labels {display: flex; justify-content: space-between; max-width: 520px; color: var(--muted); font-variant-numeric: lining-nums tabular-nums;}
+
 /* ── Motion: restrained, and disabled for reduced-motion users ───────────── */
 @keyframes rise {from {transform: translateY(12px);} to {transform: none;}}
 @keyframes unveil {from {clip-path: inset(0 0 0 8%);} to {clip-path: inset(0);}}

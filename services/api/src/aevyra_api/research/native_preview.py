@@ -45,7 +45,7 @@ def is_preview(job: ResearchJob) -> bool:
 def canonical(payload: bytes) -> bytes:
     decode_image_bytes(payload)  # Existing decompression, dimensions and format bounds.
     # Preserve oriented RGB pixels for inference parity; no JPEG re-encoding or metadata.
-    with Image.open(BytesIO(payload)) as image:
+    with Image.open(BytesIO(payload), formats=["JPEG", "PNG"]) as image:
         rgb = ImageOps.exif_transpose(image).convert("RGB")
         if min(rgb.size) < 224:
             raise DomainError("Use a photograph at least 224 pixels on its shorter side", 422)
@@ -63,8 +63,12 @@ class NativePreview:
             settings.private_upload_root / "native-preview", 50 * 1024**2
         )
 
-    def access(self, session: Session, user: UUID, *, token: str | None = None) -> None:
-        require_owner(session.scalar(select(User).where(User.id == user).with_for_update()))
+    def access(
+        self, session: Session, user: UUID, *, token: str | None = None, lock: bool = True
+    ) -> None:
+        # Mutations lock the Owner row; the read-only status check must not serialize on it.
+        query = select(User).where(User.id == user)
+        require_owner(session.scalar(query.with_for_update() if lock else query))
         if token is not None:
             auth = session.scalar(
                 select(AccountSession).where(
@@ -106,7 +110,7 @@ class NativePreview:
 
     def status(self, user: UUID) -> dict[str, JsonValue]:
         with self.sessions() as session:
-            self.access(session, user)
+            self.access(session, user, lock=False)
         try:
             item = self.ready()
         except DomainError:
@@ -180,9 +184,16 @@ class NativePreview:
         return job
 
     def get(self, user: UUID, job_id: UUID) -> ResearchJobView:
-        self.purge()
-        with self.sessions() as session:
-            return ResearchJobView.model_validate(self.owned(session, user, job_id))
+        # Polling expires only the requested job. The worker's periodic purge() owns the
+        # global sweep and orphan cleanup, so a poll never scans every Owner's jobs.
+        with self.sessions.begin() as session:
+            job = self.owned(session, user, job_id)
+            self.expire(job)
+            view = ResearchJobView.model_validate(job)
+            expired = bool((job.payload or {}).get("deleted"))
+        if expired:
+            raise DomainError("Research job not found", 404)
+        return view
 
     def erase(self, job: ResearchJob, *, expired: bool = False) -> None:
         payload = dict(job.payload or {})
@@ -196,6 +207,16 @@ class NativePreview:
             job.lease_token = job.lease_until = None
             payload = {"operation": OPERATION, "deleted": True}
         job.payload = payload
+
+    def expire(self, job: ResearchJob) -> None:
+        """Apply image and result retention to one locked job; idempotent."""
+        if not is_preview(job) or (job.payload or {}).get("deleted"):
+            return
+        age = now() - aware(job.created_at)
+        if age >= RESULT_TTL or (job.status in {"QUEUED", "RUNNING"} and age >= IMAGE_TTL):
+            self.erase(job, expired=True)
+        elif job.status in {"COMPLETED", "FAILED"} and (job.payload or {}).get("artifact"):
+            self.erase(job)
 
     def delete(self, user: UUID, job_id: UUID) -> None:
         with self.sessions.begin() as session:
@@ -216,13 +237,7 @@ class NativePreview:
                 )
                 .with_for_update()
             ):
-                if not is_preview(job) or (job.payload or {}).get("deleted"):
-                    continue
-                age = now() - aware(job.created_at)
-                if age >= RESULT_TTL or (job.status in {"QUEUED", "RUNNING"} and age >= IMAGE_TTL):
-                    self.erase(job, expired=True)
-                elif job.status in {"COMPLETED", "FAILED"}:
-                    self.erase(job)
+                self.expire(job)
         # A crash/failed commit after put() must not leave an eternal orphan.
         if self.store.root.exists():
             for owner in self.store.root.iterdir():

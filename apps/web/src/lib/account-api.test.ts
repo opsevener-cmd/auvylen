@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {accountRequest, accountSchema, redemptionSchema, requestError} from "./account-api";
+import {accountRequest, accountSchema, freshOwnerSignIn, redemptionSchema, requestError} from "./account-api";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -15,6 +15,21 @@ describe("safe research authorization feedback", () => {
   it("keeps unknown errors generic and private", () => {
     expect(requestError(path, 403, JSON.stringify({detail: "private secret"})).message).toBe("Research access or request verification required.");
     expect(requestError(path, 403, "not json").message).not.toContain("not json");
+  });
+});
+
+describe("native research preview feedback", () => {
+  const path = "/research/native-preview/jobs";
+  it("separates fresh sign-in, Owner-only and verification failures", () => {
+    expect(requestError(path, 403, JSON.stringify({detail: "Fresh Owner sign-in required for this operation"})).message).toBe(freshOwnerSignIn);
+    expect(requestError(path, 403, JSON.stringify({detail: "Owner authorization required"})).message).toContain("Only the Owner");
+    expect(requestError(path, 403, JSON.stringify({detail: "private secret"})).message).toBe("Request could not be verified. Reload and try again.");
+  });
+  it("explains disabled, expired and rate-limited states without a fallback score", () => {
+    expect(requestError(path, 503).message).toContain("No score was generated");
+    expect(requestError(path + "/x", 404).message).toContain("expired or was deleted");
+    expect(requestError(path, 429).message).toContain("same photograph");
+    expect(requestError(path, 500).status).toBe(500);
   });
 });
 
