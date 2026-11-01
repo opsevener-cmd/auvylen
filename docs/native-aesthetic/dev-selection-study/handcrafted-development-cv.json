@@ -70,5 +70,8 @@
       }
     }
   },
-  "generated": "2026-11-01, Claude independent review branch; development subjects only"
+  "generated": "2026-11-01, Claude independent review branch; development subjects only",
+  "interval_scope": "descriptive resampling of fixed OOF errors; no model refitting, split, selection or rater uncertainty",
+  "protocol_a_refit": "single-split selector followed by full outer-training refit; not the original frozen pilot",
+  "reported_code_head": "6c9f5965a9d8e358382f01171b537e7e1c315d59"
 }

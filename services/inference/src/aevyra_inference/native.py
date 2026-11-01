@@ -58,14 +58,14 @@ def fit_head(x: Array, y: Array, alpha: float, rating_max: float = 5.0) -> Nativ
 
 
 def effective_dof(x: Array, alpha: float) -> float:
-    """Ridge effective degrees of freedom on training-standardized features.
+    """Unclipped linear-design ridge degrees of freedom, including the intercept.
 
-    Values close to the number of distinct training images indicate a nearly
-    interpolating fit (e.g. alpha=.01 with 1024 features and ~60 portraits).
+    This treats design-row responses as independent. With repeated augmentation
+    targets it is a design diagnostic, not independent-image/subject degrees of freedom.
     """
     z = (x - x.mean(0)) / np.maximum(x.std(0), 0.05)
     singular = np.linalg.svd(z, compute_uv=False)
-    return float(np.sum(singular**2 / (singular**2 + alpha)))
+    return 1.0 + float(np.sum(singular**2 / (singular**2 + alpha)))
 
 
 def metrics(predicted: Array, target: Array) -> dict[str, Any]:
@@ -139,6 +139,8 @@ def select_model(
     report: dict[str, Any] = {
         "selection_protocol": "validation-3",
         "effective_degrees_of_freedom": effective_dof(fitted, alpha),
+        "fitted_design_rows": len(fitted),
+        "effective_dof_basis": "unclipped augmented design + intercept; not subject df",
         "distinct_training_images": len(train),
         "seed": seed,
         "selected_encoder": winner,
@@ -224,6 +226,8 @@ def _select_grouped_cv(
         "selected_encoder": winner,
         "selected_alpha": alpha,
         "effective_degrees_of_freedom": effective_dof(fitted_rows[winner], alpha),
+        "fitted_design_rows": len(fitted_rows[winner]),
+        "effective_dof_basis": "unclipped augmented design + intercept; not subject df",
         "distinct_training_images": len(development),
         "seed": seed,
         "validation": {"n": len(development), "mae": cv_mae, "rmse": None, "spearman": None},

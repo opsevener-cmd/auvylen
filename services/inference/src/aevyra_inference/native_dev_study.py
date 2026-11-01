@@ -33,10 +33,16 @@ from aevyra_inference.native_selection import ALPHA_GRID, cv_curve, grouped_fold
 from aevyra_inference.native_train import features
 
 COLUMNS = ["image", "subject_id", "rating", "rating_count", "rights_id", "cohort"]
+HOLDOUT_SEED = 42
+# SHA-256 of newline-joined, sorted IDs from the pinned adult London metadata.
+# Subsetting/replacing the input universe must not redefine the sealed 20 people.
+LONDON_SUBJECTS_SHA256 = "c2d37370bbcdeab00048dbaa686caff075609506d641a444221f24f480d377ff"
 
 
 def development_table(labels: Path, seed: int, destination: Path) -> dict[str, int]:
     """Copy only development rows. Test rows are dropped by subject id, ratings unparsed."""
+    if seed != HOLDOUT_SEED:
+        raise ValueError("The sealed London holdout uses seed 42 and cannot be changed")
     with labels.open(newline="", encoding="utf-8") as file:
         reader = csv.reader(file)
         header = next(reader)
@@ -44,6 +50,11 @@ def development_table(labels: Path, seed: int, destination: Path) -> dict[str, i
             raise ValueError("Unexpected native label columns")
         rows = list(reader)
     subjects = [row[1].strip() for row in rows]
+    if (
+        hashlib.sha256("\n".join(sorted(set(subjects))).encode()).hexdigest()
+        != LONDON_SUBJECTS_SHA256
+    ):
+        raise ValueError("The fixed adult London subject registry changed")
     train, val, test = split_by_subject(subjects, seed)
     sealed = {subjects[i] for i in test}
     with destination.open("x", newline="", encoding="utf-8") as file:
@@ -93,7 +104,11 @@ def protocol_b(x: Array, views: Array, y: Array, subjects: list[str], seed: int,
 def paired_bootstrap(
     first: Array, second: Array, subjects: list[str], draws: int, seed: int
 ) -> dict[str, float]:
-    """Subject-cluster percentile bootstrap of mean(|err_B| - |err_A|); negative favours B."""
+    """Descriptive cluster resampling of fixed OOF errors, not full training uncertainty.
+
+    Overlapping outer training folds make these errors dependent. The interval does not
+    account for model refitting, split or selection variability, or rater uncertainty.
+    """
     unique = sorted(set(subjects))
     groups = [np.flatnonzero(np.asarray(subjects) == s) for s in unique]
     difference = second - first
@@ -121,10 +136,12 @@ def study(
     outer_repeats: int = 5,
     draws: int = 2000,
 ) -> dict[str, Any]:
+    if outer_repeats < 1 or draws < 1:
+        raise ValueError("Positive repeat and bootstrap counts required")
     with tempfile.TemporaryDirectory(prefix="native-dev-") as temporary:
         dev_labels = Path(temporary) / "development.csv"
-        sizes = development_table(labels, seed, dev_labels)
-        payloads, subjects, y, _, _ = load_rows(dev_labels, images, plan)
+        sizes = development_table(labels, HOLDOUT_SEED, dev_labels)
+        payloads, subjects, y, _, development_digest = load_rows(dev_labels, images, plan)
     top = float(plan.rating_max)
     report: dict[str, Any] = {
         "policy": (
@@ -132,6 +149,11 @@ def study(
             "CV over development subjects only; no test metric computed or read"
         ),
         **sizes,
+        "holdout_seed": HOLDOUT_SEED,
+        "experiment_seed": seed,
+        "development_collection_sha256": development_digest,
+        "interval_scope": "descriptive subject resampling of fixed OOF errors; no refitting",
+        "protocol_a_refit": "both selectors refit all outer-training subjects before scoring",
         "development_subjects": len(set(subjects)),
         "outer": f"repeated subject-grouped 5-fold x {outer_repeats}",
         "protocol_a": "single inner subject-hash validation split (~25%), alpha in {.01,1,100}",

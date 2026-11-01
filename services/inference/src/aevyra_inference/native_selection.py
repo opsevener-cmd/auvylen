@@ -86,6 +86,20 @@ def cv_curve(
     views: Array | None = None,
 ) -> dict[float, float]:
     """Mean held-fold MAE per penalty. Augmented views are used only for training folds."""
+    if (
+        x.ndim != 2
+        or y.shape != (len(x),)
+        or len(subjects) != len(x)
+        or any(not s.strip() for s in subjects)
+        or not np.isfinite(x).all()
+        or not np.isfinite(y).all()
+        or rating_max not in (5, 7)
+        or not alphas
+        or any(not np.isfinite(a) or a <= 0 for a in alphas)
+    ):
+        raise ValueError(
+            "Aligned finite features, labels and subjects with a valid ridge grid required"
+        )
     if views is not None and (views.ndim != 3 or views.shape[1:] != x.shape):
         raise ValueError("Augmented views must align with development images")
     errors: dict[float, list[float]] = {alpha: [] for alpha in alphas}
@@ -102,5 +116,5 @@ def cv_curve(
 
 
 def select_alpha(curve: dict[float, float]) -> float:
-    """Lowest grouped-CV MAE; exact ties resolve to the stronger (larger) penalty."""
+    """Lowest MAE rounded to 12 decimals; ties prefer the stronger (larger) penalty."""
     return min(curve, key=lambda alpha: (round(curve[alpha], 12), -alpha))

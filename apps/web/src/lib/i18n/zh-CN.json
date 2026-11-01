@@ -813,5 +813,6 @@
   "Use a JPEG or PNG of one adult, at least 224 pixels on the shorter side, and confirm the statement.": "请使用一名成人的 JPEG 或 PNG 照片，短边至少 224 像素，并勾选确认声明。",
   "Too many preview requests or the research queue is full. Wait a moment, then retry with the same photograph.": "预览请求过多或研究队列已满。请稍候，再用同一张照片重试。",
   "The research preview is disabled or its reviewed checkpoint is no longer valid. No score was generated.": "研究预览已停用，或已审核的模型检查点不再有效。未生成任何分数。",
-  "Private preview request": "私密预览请求"
+  "Private preview request": "私密预览请求",
+  "Prediction checkpoint SHA-256": "本次预测模型清单 SHA-256"
 }

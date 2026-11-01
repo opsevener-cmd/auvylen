@@ -122,3 +122,63 @@ test("a stale Owner sign-in gets a specific message and keeps the chosen photogr
   // Viewport capture: what the Owner sees immediately after the failed submit.
   await page.screenshot({path: info.outputPath("native-preview-fresh-signin-en-mobile.png")});
 });
+
+// Regression cases found during the independent review. All API bodies are fixtures.
+test("an expired poll clears the pending job and unlocks a new request", async ({page}) => {
+  let reads = 0;
+  await page.route("**/api/v1/**", async route => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
+    if (endpoint === `${base}/jobs/${job.id}` && reads++ === 0) {await route.fulfill({json: job}); return;}
+    await route.fulfill({status: 404, json: {detail: "Research job not found"}});
+  });
+  await page.goto(`/research/native-preview?job=${job.id}`);
+  await expect(page.getByLabel("Authorized adult portrait")).toBeDisabled();
+  await expect(page.getByText("That preview request has expired or was deleted. Nothing was kept.")).toBeVisible({timeout: 10000});
+  await expect(page.getByLabel("Authorized adult portrait")).toBeEnabled();
+  expect(new URL(page.url()).searchParams.has("job")).toBe(false);
+  await expect(page.getByText("Research prediction · native scale 1–7")).toHaveCount(0);
+});
+
+test("a slow restoration cannot overwrite a new portrait request", async ({page}) => {
+  let release!: () => void;
+  const delayed = new Promise<void>(resolve => {release = resolve;});
+  await page.route("**/api/v1/**", async route => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
+    await delayed;
+    await route.fulfill({json: {...job, status: "COMPLETED", result: fixtureResult}});
+  });
+  await page.goto(`/research/native-preview?job=${job.id}`);
+  await expect(page.getByText("Pinned checkpoint", {exact: true})).toBeVisible();
+  await expect(page.getByLabel("Authorized adult portrait")).toBeDisabled();
+  release();
+  await expect(page.getByRole("heading", {name: "Research prediction · native scale 1–7"})).toBeVisible();
+  await expect(page.getByLabel("Authorized adult portrait")).toBeEnabled();
+  await page.getByLabel("Authorized adult portrait").setInputFiles({name: "different-portrait.png", mimeType: "image/png", buffer: png});
+  await expect(page.getByRole("heading", {name: "Research prediction · native scale 1–7"})).toHaveCount(0);
+  expect(new URL(page.url()).searchParams.has("job")).toBe(false);
+});
+
+test("restored results show their own checkpoint when the active pin changed", async ({page}) => {
+  await page.route("**/api/v1/**", async route => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === base + "/status") {await route.fulfill({json: {...available, manifest_sha256: "b".repeat(64)}}); return;}
+    await route.fulfill({json: {...job, status: "COMPLETED", result: fixtureResult}});
+  });
+  await page.goto(`/research/native-preview?job=${job.id}`);
+  await expect(page.locator(".native-result dd")).toHaveText("a".repeat(64));
+  await page.getByRole("button", {name: "中文", exact: true}).click();
+  await expect(page.getByText("本次预测模型清单 SHA-256")).toBeVisible();
+});
+
+for (const state of ["QUEUED", "FAILED"]) test(`a ${state} response cannot display a score`, async ({page}) => {
+  await page.route("**/api/v1/**", async route => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
+    await route.fulfill({json: {...job, status: state, result: fixtureResult}});
+  });
+  await page.goto(`/research/native-preview?job=${job.id}`);
+  await expect(page.getByRole("heading", {name: "Private preview request"})).toBeVisible();
+  await expect(page.getByRole("heading", {name: "Research prediction · native scale 1–7"})).toHaveCount(0);
+});

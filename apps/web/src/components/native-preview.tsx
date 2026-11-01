@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import {useEffect, useRef, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {z} from "zod";
 import {useI18n} from "./i18n/provider";
 import {AccountError, accountRequest, csrfToken, freshOwnerSignIn} from "@/lib/account-api";
@@ -53,6 +53,7 @@ export function NativePreviewPage() {
   const [job, setJob] = useState<ResearchJob | null>(null);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<Failure | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -61,23 +62,29 @@ export function NativePreviewPage() {
   const abort = useRef<AbortController | null>(null);
   const picker = useRef<HTMLInputElement | null>(null);
   const alertRef = useRef<HTMLParagraphElement | null>(null);
+  const clearRequest = useCallback(() => {
+    setJob(null); setFile(null); setPreview(null); key.current = ""; setProgress(null); setConsent(false); setJobParam(null);
+    if (picker.current) picker.current.value = "";
+  }, []);
   const currentId = job?.id;
   const currentStatus = job?.status;
   useEffect(() => {
     let active = true;
-    accountRequest(`${path}/status`, statusSchema).then(value => {if (active) setStatus(value);}).catch(e => {if (active) setError(failure(e));});
+    const checking = accountRequest(`${path}/status`, statusSchema).then(value => {if (active) setStatus(value);}).catch(e => {if (active) setError(failure(e));});
     // Restore a request after reload; the server re-checks Owner access and ownership.
     const saved = new URLSearchParams(window.location.search).get("job");
+    let restored: Promise<unknown> = Promise.resolve();
     if (saved && uuid.test(saved)) {
-      accountRequest(`${path}/jobs/${saved}`, researchJobSchema).then(value => {if (active) setJob(value);}).catch(e => {
+      restored = accountRequest(`${path}/jobs/${saved}`, researchJobSchema).then(value => {if (active) setJob(value);}).catch(e => {
         if (!active) return;
         const value = failure(e);
-        if (value.status === 404) {setJobParam(null); setNotice("That preview request has expired or was deleted. Nothing was kept.");}
+        if (value.status === 404) {clearRequest(); setNotice("That preview request has expired or was deleted. Nothing was kept.");}
         else setError(value);
       });
     } else if (saved) setJobParam(null);
+    void Promise.all([checking, restored]).then(() => {if (active) setRestoring(false);});
     return () => {active = false; abort.current?.abort();};
-  }, []);
+  }, [clearRequest]);
   // Errors render above the form; move focus there so they are not missed off-screen.
   useEffect(() => {if (error) alertRef.current?.focus();}, [error]);
   useEffect(() => () => {if (preview) URL.revokeObjectURL(preview);}, [preview]);
@@ -88,15 +95,21 @@ export function NativePreviewPage() {
       const value = await accountRequest(`${path}/jobs/${currentId}`, researchJobSchema);
       if (active) setJob(value);
       return pending(value);
-    }, e => {if (active) setError(failure(e));});
+    }, e => {
+      if (!active) return;
+      const value = failure(e);
+      if (value.status === 404) {clearRequest(); setError(null); setNotice("That preview request has expired or was deleted. Nothing was kept.");}
+      else setError(value);
+    });
     return () => {active = false; stop();};
-  }, [currentId, currentStatus]);
+  }, [currentId, currentStatus, clearRequest]);
   function choose(next: File | null) {
+    setJob(null); setJobParam(null);
     setFile(next); setPreview(next ? URL.createObjectURL(next) : null); key.current = ""; setProgress(null); setError(null); setNotice(null);
   }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!file || !consent || busyRef.current || pending(job)) return;
+    if (!file || !consent || busyRef.current || restoring || pending(job)) return;
     busyRef.current = true; setBusy(true); setError(null); setNotice(null); setProgress({stage: "preparing"});
     try {
       validateUpload(file);
@@ -113,22 +126,21 @@ export function NativePreviewPage() {
     busyRef.current = true; setBusy(true); setError(null);
     try {
       await accountRequest(`${path}/jobs/${job.id}/delete`, z.object({deleted: z.literal(true)}), {});
-      setJob(null); setFile(null); setPreview(null); key.current = ""; setProgress(null); setConsent(false); setJobParam(null);
+      clearRequest();
       setNotice("Preview deleted. Its image and result were removed.");
-      if (picker.current) picker.current.value = "";
     } catch (e) {
       const value = failure(e);
       // Already expired or removed on the server: nothing remains to delete.
-      if (value.status === 404) {setJob(null); setJobParam(null); setNotice("That preview request has expired or was deleted. Nothing was kept.");}
+      if (value.status === 404) {clearRequest(); setNotice("That preview request has expired or was deleted. Nothing was kept.");}
       else setError(value);
     }
     finally {busyRef.current = false; setBusy(false);}
   }
-  const parsed = job?.result ? nativeResultSchema.safeParse(job.result) : null;
+  const parsed = job?.status === "COMPLETED" && job.result ? nativeResultSchema.safeParse(job.result) : null;
   const result = parsed?.success ? parsed.data : null;
   const expires = job ? new Date(new Date(job.created_at).getTime() + RESULT_HOURS * 3600_000) : null;
   const signIn = error && (error.status === 401 || error.message === freshOwnerSignIn);
-  const locked = busy || pending(job);
+  const locked = busy || restoring || pending(job);
   const failures = status?.release_failures ?? [];
   return <section aria-labelledby="native-preview-title" className="aesthetic-workspace native-preview">
     <header className="research-heading">
@@ -176,6 +188,7 @@ export function NativePreviewPage() {
           <div className="native-scale" aria-hidden="true"><span className="native-scale-marker" style={{left: `${(result.predicted_rating - 1) / 6 * 100}%`}} /></div>
           <p className="native-scale-labels text-xs" aria-hidden="true"><span>1</span><span>4</span><span>7</span></p>
           <p className="mt-5">{t("For research inspection only. This result does not unlock consumer scoring or establish model validity for this photograph.")}</p>
+          <dl className="model-facts mt-4 text-sm"><dt>{t("Prediction checkpoint SHA-256")}</dt><dd className="font-mono text-xs">{result.manifest_sha256}</dd></dl>
           <p className="mt-3 text-sm wizard-note">{t("Two decimals are shown for inspection; they do not indicate precision.")}</p>
         </>}
         {expires && <p className="mt-4 text-sm wizard-note">{t("This request and any result are removed by {time}.", {time: expires.toLocaleString(locale)})}</p>}

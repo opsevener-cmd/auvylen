@@ -42,6 +42,8 @@ def run(
     pose_review: str = "",
     selection: str = "validation",
 ) -> tuple[NativeHead, Manifest]:
+    if selection not in {"validation", "grouped-cv"}:
+        raise ValueError("Unknown selection protocol")
     payloads, subjects, y, cohorts, digest = load_rows(labels, images, plan)
     train, val, test = split_by_subject(subjects, seed)
     # Augmented views are only ever made for images the protocol may fit on.

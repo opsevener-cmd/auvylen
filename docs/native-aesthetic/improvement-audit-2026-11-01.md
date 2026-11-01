@@ -33,7 +33,7 @@ imported. The sealed 20-subject London test was **not** used for any choice here
 - **`native.select_model(selection="grouped-cv")`, `native_train --selection grouped-cv`.**
   Opt-in. Encoder and α are chosen by repeated grouped CV over train∪validation subjects,
   then refit on that development set. The test set is evaluated once and never selects.
-  The default `validation` protocol is byte-for-byte unchanged and now also reports
+  The default `validation` protocol preserves learned head bytes and predictions and now reports
   `selection_protocol`, `effective_degrees_of_freedom` and `distinct_training_images`.
   `native_london_evaluate` refuses to replay a checkpoint that used a different protocol.
 - **`native_dev_study.py` (new).** A development-only comparison. Sealed test subjects
@@ -52,17 +52,30 @@ output: [`dev-selection-study/handcrafted-development-cv.json`](dev-selection-st
 
 | Protocol | MAE | RMSE | Spearman |
 | --- | --- | --- | --- |
-| A: original (one split, 3 penalties) | 0.641 | 0.803 | 0.378 |
+| A: single-split selector + outer-training refit (3 penalties) | 0.641 | 0.803 | 0.378 |
 | B: grouped CV, 15-point grid | 0.624 | 0.765 | 0.326 |
 | Train-mean baseline | 0.658 | 0.816 | n/a |
 
-Paired subject-cluster bootstrap (2,000 draws; negative favours the first protocol named):
+Protocol A reuses the original *selection rule* but refits on all outer-training
+subjects after selecting alpha. It does **not** evaluate the frozen 60-image pilot
+head or reproduce the original no-refit training procedure. Both A and B refit on
+the same outer-training subjects, isolating selector comparisons at that sample size.
 
-| Comparison | Mean | 95% interval |
+Descriptive subject-cluster resampling of **fixed OOF errors** (2,000 draws;
+negative favours the first protocol named):
+
+| Comparison | Mean | 2.5–97.5% resampling quantiles |
 | --- | --- | --- |
 | B − A | −0.017 | −0.054 to 0.015 |
 | B − mean | −0.034 | −0.102 to 0.036 |
 | A − mean | −0.017 | −0.101 to 0.067 |
+
+These quantiles condition on fitted models and the chosen folds. Overlapping
+outer-training sets induce dependence; no model is refitted inside this bootstrap.
+They omit training/selection variability, split uncertainty and rater uncertainty,
+and are not confidence intervals with established repeated-sampling coverage.
+`share_of_draws_favouring_b` denotes the second argument of the bootstrap helper,
+including when that argument is protocol A; it is not a probability of superiority.
 
 - **Selected penalties.** A chose α=100 in 20 of 25 folds and α=.01 in 2. B chose
   between 10 and 3,162.
@@ -112,6 +125,13 @@ All screenshots use UI contract fixtures; they contain no photographs and no mod
 - [Stale Owner sign-in, mobile](preview-ui/native-preview-fresh-signin-en-mobile.webp)
 - Disabled state: [desktop](preview-ui/native-preview-disabled-en-desktop.webp) ·
   [Chinese mobile](preview-ui/native-preview-disabled-zh-mobile.webp)
+
+## Independent Codex review
+
+See [the independent review and focused regression fixes](pr13-independent-review.md).
+The original aggregate results above are retained, not replaced by a new test-set
+experiment. The study's optional seed now varies development CV only; the seed-42
+holdout and original adult subject registry remain fixed.
 
 ## 6. Remaining blockers and recommendations
 
