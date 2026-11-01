@@ -60,3 +60,65 @@ test("private upload: language switching, binary body, queued state and cancella
   await page.getByRole("button", {name: "运行原生模型私密预览"}).click();
   await expect.poll(() => submits).toBe(2);
 });
+
+const available = {available: true, consumer_enabled: false, native_scale: [1, 7], collection: "UI contract fixture, not inference evidence", encoder: "contract-fixture", manifest_sha256: "a".repeat(64), release_failures: ["insufficient_test_subjects", "real_pose_review_missing", "unreviewed_fixture_code"]};
+const fixtureResult = {predicted_rating: 4.25, native_scale: [1, 7], manifest_sha256: "a".repeat(64), encoder: "contract-fixture", collection: "UI contract fixture, not inference evidence", research_only: true, synthetic: false, consumer_enabled: false, release_failures: ["insufficient_test_subjects"], duration_ms: 1, peak_rss_kib: 1};
+
+test("reload restores a completed request with release-gate reasons; screenshots", async ({page}, info) => {
+  const errors: string[] = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.route("**/api/v1/**", async route => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
+    if (endpoint === `${base}/jobs/${job.id}`) {await route.fulfill({json: {...job, status: "COMPLETED", progress: 100, result: fixtureResult, completed_at: "2026-11-01T00:00:05Z"}}); return;}
+    await route.fulfill({status: 404, json: {detail: "Not found"}});
+  });
+  await page.setViewportSize({width: 1440, height: 1000});
+  await page.goto(`/research/native-preview?job=${job.id}`);
+  await expect(page.getByText("4.25")).toBeVisible();
+  await expect(page.getByRole("button", {name: "Delete this preview now"})).toBeVisible();
+  await page.getByText("Why release is blocked (3 open checks)").click();
+  await expect(page.getByText("Too few independent people in the held-out test")).toBeVisible();
+  await expect(page.getByText("unreviewed_fixture_code")).toBeVisible();
+  await page.screenshot({path: info.outputPath("native-preview-result-en-desktop.png"), fullPage: true});
+  await page.getByRole("button", {name: "中文", exact: true}).click();
+  await expect(page.getByText("留出测试中的独立人物过少")).toBeVisible();
+  await page.setViewportSize({width: 390, height: 844});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({path: info.outputPath("native-preview-result-zh-mobile.png"), fullPage: true});
+  expect(errors).toEqual([]);
+});
+
+test("an expired restored request is dropped from the URL; no score shown", async ({page}) => {
+  await page.route("**/api/v1/**", async route => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
+    await route.fulfill({status: 404, json: {detail: "Research job not found"}});
+  });
+  await page.goto(`/research/native-preview?job=${job.id}`);
+  await expect(page.getByText("That preview request has expired or was deleted. Nothing was kept.")).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.has("job")).toBe(false);
+  await expect(page.getByText("Research prediction · native scale 1–7")).toHaveCount(0);
+});
+
+test("a stale Owner sign-in gets a specific message and keeps the chosen photograph", async ({page}, info) => {
+  await page.route("**/api/v1/**", async route => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
+    if (endpoint.endsWith("/auth/csrf")) {await route.fulfill({json: {csrf_token: "test-only-token"}}); return;}
+    if (endpoint === base + "/jobs") {await route.fulfill({status: 403, json: {detail: "Fresh Owner sign-in required for this operation"}}); return;}
+    await route.fulfill({status: 404, json: {detail: "Not found"}});
+  });
+  await page.goto("/research/native-preview");
+  await page.getByLabel("Authorized adult portrait").setInputFiles({name: "contract-fixture.png", mimeType: "image/png", buffer: png});
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", {name: "Run private native preview"}).click();
+  await expect(page.getByRole("alert").filter({hasText: "Owner"})).toContainText("For safety, previews need a recent Owner sign-in.");
+  await expect(page.getByRole("link", {name: "Sign in again"})).toHaveAttribute("href", "/login");
+  await expect(page.getByText("contract-fixture.png")).toBeVisible();
+  await expect(page.getByRole("button", {name: "Run private native preview"})).toBeEnabled();
+  await expect(page.getByRole("alert").filter({hasText: "Owner"})).toBeFocused();
+  await expect(page.getByRole("alert").filter({hasText: "Owner"})).toBeInViewport();
+  // Viewport capture: what the Owner sees immediately after the failed submit.
+  await page.screenshot({path: info.outputPath("native-preview-fresh-signin-en-mobile.png")});
+});

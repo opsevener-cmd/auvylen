@@ -54,8 +54,35 @@ export async function csrfToken(): Promise<string> {
   }
 }
 
+export const freshOwnerSignIn = "For safety, previews need a recent Owner sign-in. Sign in again, then retry.";
+
+function serverDetail(responseBody: string): unknown {
+  try {return (JSON.parse(responseBody) as {detail?: unknown}).detail;} catch {return undefined;}
+}
+
 /** Only map exact known server error codes; never expose arbitrary error bodies. */
 export function requestError(path: string, status: number, responseBody = ""): AccountError {
+    if (path.startsWith("/research/native-preview")) {
+      const detail = status === 403 ? serverDetail(responseBody) : undefined;
+      const forbidden: Record<string, string> = {
+        "Fresh Owner sign-in required for this operation": freshOwnerSignIn,
+        "Owner authorization required": "Only the Owner can use the native research preview.",
+        "CSRF validation failed": "Request verification expired or failed. Refresh this page and try again.",
+        "Request origin rejected": "Request origin rejected. Open the private Codespaces URL directly and retry.",
+      };
+      const native: Record<number, string> = {
+        401: "Sign in as the Owner to use the native research preview.",
+        403: typeof detail === "string" && forbidden[detail] ? forbidden[detail] : "Request could not be verified. Reload and try again.",
+        404: "That preview request has expired or was deleted. Nothing was kept.",
+        409: "This request conflicts with an earlier preview. Choose the photograph again.",
+        413: "Image upload exceeds the size limit.",
+        415: "Choose a JPEG or PNG image.",
+        422: "Use a JPEG or PNG of one adult, at least 224 pixels on the shorter side, and confirm the statement.",
+        429: "Too many preview requests or the research queue is full. Wait a moment, then retry with the same photograph.",
+        503: "The research preview is disabled or its reviewed checkpoint is no longer valid. No score was generated.",
+      };
+      return new AccountError(status, native[status] ?? "Service temporarily unavailable.");
+    }
     if (status === 403 && (path.startsWith("/research/preferences") || path.startsWith("/research/aesthetic"))) {
       let detail: unknown;
       try {detail = (JSON.parse(responseBody) as {detail?: unknown}).detail;} catch { /* Not JSON */ }
