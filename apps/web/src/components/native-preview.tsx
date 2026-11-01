@@ -25,6 +25,7 @@ export function NativePreviewPage() {
   const key = useRef("");
   const busyRef = useRef(false);
   const abort = useRef<AbortController | null>(null);
+  const picker = useRef<HTMLInputElement | null>(null);
   const currentId = job?.id;
   const currentStatus = job?.status;
   useEffect(() => {
@@ -62,6 +63,7 @@ export function NativePreviewPage() {
     try {
       await accountRequest(`${path}/jobs/${job.id}/delete`, z.object({deleted: z.literal(true)}), {});
       setJob(null); setFile(null); key.current = ""; setProgress(null); setConsent(false);
+      if (picker.current) picker.current.value = "";
     } catch {setError(true);}
     finally {busyRef.current = false; setBusy(false);}
   }
@@ -78,7 +80,7 @@ export function NativePreviewPage() {
     {!status && !error ? <p className="mt-6" role="status">{t("Checking private research access…")}</p> : !status?.available ? <p className="mt-6" role="status">{t("This research preview is disabled or its reviewed checkpoint is unavailable.")}</p> : <>
       <dl className="mt-6 break-words text-sm"><dt>{t("Training collection")}</dt><dd>{status.collection}</dd><dt>{t("Visual features")}</dt><dd>{status.encoder}</dd><dt>{t("Pinned manifest SHA-256")}</dt><dd className="font-mono text-xs">{status.manifest_sha256}</dd></dl>
       <form onSubmit={submit} className="mt-8 space-y-5 rounded border border-black/15 p-6">
-        <label className="block">{t("Authorized adult portrait")}<input className="mt-2 block max-w-full" type="file" accept="image/jpeg,image/png" disabled={busy || pending(job)} onChange={e => {setFile(e.target.files?.[0] ?? null); key.current = ""; setJob(null); setProgress(null);}} /></label>
+        <label className="block">{t("Authorized adult portrait")}<input ref={picker} className="mt-2 block max-w-full" type="file" accept="image/jpeg,image/png" disabled={busy || pending(job)} onChange={e => {setFile(e.target.files?.[0] ?? null); key.current = ""; setJob(null); setProgress(null);}} /></label>
         <label className="flex items-start gap-3"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} disabled={busy || pending(job)} /><span>{t("I confirm one adult subject and permission for private research inference. This upload is not consent to training or public display.")}</span></label>
         <button className="btn-primary disabled:opacity-40" disabled={!file || !consent || !status.available || busy || pending(job)}>{t("Run private native preview")}</button>
         {progress && <p role="status">{progress.stage === "uploading" ? (progress.percent === undefined ? t("Uploading image…") : t("Uploading {percent}%", {percent: progress.percent})) : progress.stage === "preparing" ? t("Preparing image") : progress.stage === "processing" ? t("Processing image") : progress.stage === "saved" ? t("Request saved; waiting for the research worker.") : t("Upload failed")}</p>}

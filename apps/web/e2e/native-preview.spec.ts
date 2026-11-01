@@ -54,4 +54,9 @@ test("private upload: language switching, binary body, queued state and cancella
   await page.getByRole("button", {name: "删除预览并取消待处理任务"}).click();
   await expect(page.getByText("原生模型推理已排队或正在运行，只有工作进程完成并验证后才会显示结果。")).toHaveCount(0);
   expect(deleted).toBe(true);
+  expect(await page.getByLabel("已获授权的成人肖像").evaluate((e: HTMLInputElement) => e.files?.length)).toBe(0);
+  await page.getByLabel("已获授权的成人肖像").setInputFiles({name: "contract-fixture.png", mimeType: "image/png", buffer: png});
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", {name: "运行原生模型私密预览"}).click();
+  await expect.poll(() => submits).toBe(2);
 });
