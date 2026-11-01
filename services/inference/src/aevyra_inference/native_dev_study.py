@@ -196,8 +196,9 @@ def study(
                 "mae": float(np.mean([s["mae"] for s in scores])),
                 "rmse": float(np.mean([s["rmse"] for s in scores])),
                 "spearman": None
-                if name == "mean"
+                if name == "mean" or any(s["spearman"] is None for s in scores)
                 else float(np.mean([s["spearman"] for s in scores])),
+                "undefined_spearman_repeats": sum(s["spearman"] is None for s in scores),
                 "mae_sd_across_repeats": float(np.std([s["mae"] for s in scores])),
             }
         report["encoders"][encoder] = {

@@ -62,6 +62,11 @@ deployment, participant contact, collection, payment or live-data modification.
    and a hat-matrix reference test; report augmented design-row counts explicitly.
    This is **unclipped design DF**, not independent-person DF when labels are tiled
    across augmentations. Neither this diagnostic nor its correction changes weights.
+   A related reporting bug at
+   [`native_dev_study.py:178`](https://github.com/opsevener-cmd/auvylen/blob/6c9f5965a9d8e358382f01171b537e7e1c315d59/services/inference/src/aevyra_inference/native_dev_study.py#L178)
+   attempted to average undefined Spearman values when OOF predictions were constant.
+   Fixed: preserve null and report the undefined-repeat count, with a constant-
+   prediction regression test; do not substitute zero or drop undefined repeats.
 
 ## Verified concerns that are not bugs / remaining statistical limits
 

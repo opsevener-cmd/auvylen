@@ -227,3 +227,32 @@ def test_grouped_checkpoint_cannot_enter_original_london_replay(tmp_path, monkey
     monkeypatch.setattr(replay, "load_rows", forbidden)
     with pytest.raises(ValueError, match="original validation-selected"):
         replay.evaluate(tmp_path, tmp_path, "a" * 64, tmp_path)
+
+
+def test_study_preserves_undefined_rank_instead_of_crashing(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from aevyra_inference import native_dev_study as module
+    from test_native import plan
+
+    x, y, subjects = data(n=80, d=4)
+    monkeypatch.setattr(
+        module,
+        "development_table",
+        lambda *a: {
+            "development_images": 80,
+            "sealed_test_subjects_excluded": 20,
+        },
+    )
+    monkeypatch.setattr(module, "load_rows", lambda *a: ([], subjects, y, [], "unit-fixture"))
+    monkeypatch.setattr(module, "create_extractor", lambda *a: None)
+    monkeypatch.setattr(module, "features", lambda *a: x)
+    constant = SimpleNamespace(predict=lambda rows: np.full(len(rows), 4.0))
+    monkeypatch.setattr(module, "protocol_a", lambda *a: (constant, 1.0))
+    monkeypatch.setattr(module, "protocol_b", lambda *a: (constant, 1.0))
+    report = module.study(
+        tmp_path, tmp_path, plan(), tmp_path, ["fixture"], outer_repeats=1, draws=10
+    )
+    summary = report["encoders"]["fixture"]["outer_cv"]
+    assert summary["a"]["spearman"] is None and summary["b"]["spearman"] is None
+    assert summary["a"]["undefined_spearman_repeats"] == 1
