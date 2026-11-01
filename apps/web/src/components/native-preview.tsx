@@ -81,7 +81,7 @@ export function NativePreviewPage() {
         <label className="block">{t("Authorized adult portrait")}<input className="mt-2 block max-w-full" type="file" accept="image/jpeg,image/png" disabled={busy || pending(job)} onChange={e => {setFile(e.target.files?.[0] ?? null); key.current = ""; setJob(null); setProgress(null);}} /></label>
         <label className="flex items-start gap-3"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} disabled={busy || pending(job)} /><span>{t("I confirm one adult subject and permission for private research inference. This upload is not consent to training or public display.")}</span></label>
         <button className="btn-primary disabled:opacity-40" disabled={!file || !consent || !status.available || busy || pending(job)}>{t("Run private native preview")}</button>
-        {progress && <p role="status">{progress.stage === "uploading" ? t("Uploading {percent}%", {percent: progress.percent ?? 0}) : progress.stage === "preparing" ? t("Preparing image") : progress.stage === "processing" ? t("Processing image") : progress.stage === "saved" ? t("Request saved; waiting for the research worker.") : t("Upload failed")}</p>}
+        {progress && <p role="status">{progress.stage === "uploading" ? (progress.percent === undefined ? t("Uploading image…") : t("Uploading {percent}%", {percent: progress.percent})) : progress.stage === "preparing" ? t("Preparing image") : progress.stage === "processing" ? t("Processing image") : progress.stage === "saved" ? t("Request saved; waiting for the research worker.") : t("Upload failed")}</p>}
       </form>
     </>}
     {job && <section className="mt-6 rounded border border-black/15 p-6" aria-live="polite">

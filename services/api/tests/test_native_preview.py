@@ -31,9 +31,9 @@ BASE = "/api/v1/research/native-preview"
 PIN = "a" * 64
 
 
-def image():
+def image(size=(224, 224)):
     output = BytesIO()
-    Image.new("RGB", (224, 224), (90, 100, 120)).save(output, "PNG")
+    Image.new("RGB", size, (90, 100, 120)).save(output, "PNG")
     return output.getvalue()
 
 
@@ -188,8 +188,9 @@ def test_failure_no_fallback_and_queued_expiry(credits, tmp_path):
         assert not list(service.store.root.rglob("*/*"))
 
 
-def test_lossless_preparation_strips_metadata():
-    payload = image()
+@pytest.mark.parametrize("size", [(224, 224), (224, 4096)])
+def test_lossless_preparation_strips_metadata(size):
+    payload = image(size)
     with Image.open(BytesIO(payload)) as original, Image.open(BytesIO(canonical(payload))) as clean:
         assert original.convert("RGB").tobytes() == clean.tobytes()
         assert not clean.getexif()

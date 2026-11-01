@@ -43,12 +43,12 @@ def is_preview(job: ResearchJob) -> bool:
 
 
 def canonical(payload: bytes) -> bytes:
-    decoded = decode_image_bytes(payload)  # Existing decompression, dimensions and format bounds.
-    if min(decoded.width, decoded.height) < 224:
-        raise DomainError("Use a photograph at least 224 pixels on its shorter side", 422)
+    decode_image_bytes(payload)  # Existing decompression, dimensions and format bounds.
     # Preserve oriented RGB pixels for inference parity; no JPEG re-encoding or metadata.
     with Image.open(BytesIO(payload)) as image:
         rgb = ImageOps.exif_transpose(image).convert("RGB")
+        if min(rgb.size) < 224:
+            raise DomainError("Use a photograph at least 224 pixels on its shorter side", 422)
         rgb.info.clear()
         output = BytesIO()
         rgb.save(output, format="PNG")

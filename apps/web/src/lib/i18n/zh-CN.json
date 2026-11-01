@@ -787,5 +787,6 @@
   "Research prediction · native scale 1–7": "研究预测 · 原生量表 1–7",
   "For research inspection only. This result does not unlock consumer scoring or establish model validity for this photograph.": "仅供研究检查。本结果不会开放面向用户的评分服务，也不能证明模型适用于这张照片。",
   "Delete preview and cancel pending work": "删除预览并取消待处理任务",
-  "Processing image": "正在处理照片"
+  "Processing image": "正在处理照片",
+  "Uploading image…": "正在上传图片…"
 }
