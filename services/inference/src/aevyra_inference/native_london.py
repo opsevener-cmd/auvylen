@@ -143,6 +143,30 @@ def prepare(root: Path) -> dict[str, Any]:
     return summary
 
 
+def validated_metadata(root: Path) -> dict[str, dict[str, str]]:
+    """Rebuild declared cohort metadata from the pinned author CSV before reporting."""
+    if (
+        hashlib.sha256((root / "source-info.csv").read_bytes()).hexdigest()
+        != SOURCE_HASHES["source-info.csv"]
+    ):
+        raise ValueError("Author metadata integrity failure")
+    with (root / "source-info.csv").open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    expected = {
+        f"{int(r['face_id'].removeprefix('X')):03}": {
+            "sex": r["face_sex"],
+            "ethnicity": r["face_eth"],
+            "age_band": "18–29" if number(r["face_age"]) < 30 else "30+",
+        }
+        for r in rows
+        if 18 <= number(r["face_age"]) <= 120
+    }
+    actual: dict[str, dict[str, str]] = json.loads((root / "subject-metadata.json").read_text())
+    if actual != expected:
+        raise ValueError("Derived subgroup metadata differs from author records")
+    return actual
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)

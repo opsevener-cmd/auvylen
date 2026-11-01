@@ -87,7 +87,11 @@ scored multiple faces. Intervals are performance intervals, **not calibrated ind
 ranges**. No p-value or universal aesthetic-validity claim is made.
 
 Held-out, self-reported groups (no demographic inference): female 11 / male 9;
-white 14 / black 4 / west_asian 2; age 18–29: 14 / age 30+: 6. Group metrics/intervals
+white 14 / black 4 / west_asian 2; age 18–29: 14 / age 30+: 6. There are **zero**
+held-out east_asian subjects and zero subjects in the source mixed category. All
+train/validation/test counts (including zeroes) are recorded in `subgroup_partition_counts`
+in evaluation.json. Original source category spellings are retained. No split seed was
+redrawn to repair coverage after seeing outcomes. Group metrics/intervals
 are in [evaluation.json](evaluation.json); performance is suppressed for n<5. The counts
 are too small for reliable subgroup comparisons or fairness claims. Lighting/crop/rotation
 sensitivity probes are in [provenance.json](provenance.json). Their labels are original
@@ -177,7 +181,7 @@ No removal request or live-data deletion was performed during this work.
 ## Regression verification
 
 Local backend regression: 203 passed, 29 integration/opt-in skips; targeted native,
-compatibility and provider controls: 11 passed. Native v1 files without the new scale
+compatibility and provider controls: 12 passed. Native v1 files without the new scale
 field retain 1–5 behavior; seven-point heads retain values above five and cannot be
 written against a five-point manifest. Source pins reject relabelled inputs; bootstrap
 controls check determinism, grouping and non-finite rejection. Frontend 145 tests,

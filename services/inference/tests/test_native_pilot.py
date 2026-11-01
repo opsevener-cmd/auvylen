@@ -88,3 +88,16 @@ def test_seven_point_raw_annotations_are_not_rescaled(tmp_path):
     assert float(row["rating"]) == 6
     with pytest.raises(ValueError):
         aggregate_annotations(source, tmp_path / "invalid.csv", rating_max=5)
+
+
+def test_absent_test_cohorts_are_reported_with_zero_counts():
+    from aevyra_inference.native_london_evaluate import subgroup_counts
+
+    metadata = {
+        "a": {"sex": "f", "ethnicity": "x", "age_band": "young"},
+        "b": {"sex": "m", "ethnicity": "y", "age_band": "older"},
+    }
+    counts = subgroup_counts(metadata, ["a", "b"], {"train": [0], "validation": [], "test": [1]})
+    assert counts["ethnicity"]["x"]["test"] == 0
+    assert counts["ethnicity"]["y"]["train"] == 0
+    assert counts["sex"]["f"]["train"] == 1

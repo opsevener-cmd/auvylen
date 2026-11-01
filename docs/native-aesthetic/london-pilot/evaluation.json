@@ -224,6 +224,16 @@
                 }
               }
             }
+          },
+          "east_asian": {
+            "n": 0,
+            "metrics": null,
+            "uncertainty": null
+          },
+          "eats_asian/white": {
+            "n": 0,
+            "metrics": null,
+            "uncertainty": null
           }
         },
         "age_band": {
@@ -470,6 +480,16 @@
                 }
               }
             }
+          },
+          "east_asian": {
+            "n": 0,
+            "metrics": null,
+            "uncertainty": null
+          },
+          "eats_asian/white": {
+            "n": 0,
+            "metrics": null,
+            "uncertainty": null
           }
         },
         "age_band": {
@@ -562,5 +582,58 @@
     1,
     7
   ],
-  "first_holdout_image_selection": "first test row in fixed subject-hash split; no outcome-based selection"
+  "first_holdout_image_selection": "first test row in fixed subject-hash split; no outcome-based selection",
+  "subgroup_partition_counts": {
+    "sex": {
+      "female": {
+        "train": 31,
+        "validation": 6,
+        "test": 11
+      },
+      "male": {
+        "train": 29,
+        "validation": 14,
+        "test": 9
+      }
+    },
+    "ethnicity": {
+      "black": {
+        "train": 8,
+        "validation": 1,
+        "test": 4
+      },
+      "east_asian": {
+        "train": 6,
+        "validation": 3,
+        "test": 0
+      },
+      "eats_asian/white": {
+        "train": 1,
+        "validation": 0,
+        "test": 0
+      },
+      "west_asian": {
+        "train": 6,
+        "validation": 1,
+        "test": 2
+      },
+      "white": {
+        "train": 39,
+        "validation": 15,
+        "test": 14
+      }
+    },
+    "age_band": {
+      "18\u201329": {
+        "train": 41,
+        "validation": 14,
+        "test": 14
+      },
+      "30+": {
+        "train": 19,
+        "validation": 6,
+        "test": 6
+      }
+    }
+  }
 }

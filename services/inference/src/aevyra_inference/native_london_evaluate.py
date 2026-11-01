@@ -13,6 +13,7 @@ from aevyra_inference.extractors import create_extractor
 from aevyra_inference.native import fit_head, metrics
 from aevyra_inference.native_checkpoint import load, pack
 from aevyra_inference.native_data import load_rows, perturb
+from aevyra_inference.native_london import validated_metadata
 from aevyra_inference.native_train import features
 from aevyra_inference.native_uncertainty import uncertainty
 
@@ -27,7 +28,7 @@ def evaluate(root: Path, checkpoint: Path, pin: str, encoder_root: Path) -> dict
     if digest != item.collection_sha256:
         raise ValueError("Evaluation collection changed")
     train, val, test = split_by_subject(subjects, item.report["seed"])
-    metadata = json.loads((root / "subject-metadata.json").read_text())
+    metadata = validated_metadata(root)
     baseline = np.full(len(test), y[train].mean())
     median = np.full(len(test), np.median(y[train]))
     result: dict[str, Any] = {
@@ -70,7 +71,7 @@ def evaluate(root: Path, checkpoint: Path, pin: str, encoder_root: Path) -> dict
         subgroups: dict[str, dict[str, Any]] = {}
         for trait in ("sex", "ethnicity", "age_band"):
             subgroups[trait] = {}
-            for group in sorted({metadata[subjects[i]][trait] for i in test}):
+            for group in sorted({m[trait] for m in metadata.values()}):
                 indices = np.asarray(
                     [j for j, i in enumerate(test) if metadata[subjects[i]][trait] == group],
                     dtype=int,
@@ -100,7 +101,27 @@ def evaluate(root: Path, checkpoint: Path, pin: str, encoder_root: Path) -> dict
     with (root / "inspection-input.json").open("x") as f:
         (root / "inspection-input.json").chmod(0o600)
         json.dump({"image": str(root / "images" / f"{subjects[test[0]]}_03.jpg")}, f)
+    result["subgroup_partition_counts"] = subgroup_counts(
+        metadata,
+        subjects,
+        {"train": train.tolist(), "validation": val.tolist(), "test": test.tolist()},
+    )
     return result
+
+
+def subgroup_counts(
+    metadata: dict[str, dict[str, str]], subjects: list[str], partitions: dict[str, list[int]]
+) -> dict[str, dict[str, dict[str, int]]]:
+    return {
+        trait: {
+            group: {
+                name: sum(metadata[subjects[i]][trait] == group for i in indices)
+                for name, indices in partitions.items()
+            }
+            for group in sorted({m[trait] for m in metadata.values()})
+        }
+        for trait in ("sex", "ethnicity", "age_band")
+    }
 
 
 if __name__ == "__main__":
