@@ -1,0 +1,23 @@
+{
+  "source_subjects": 102,
+  "eligible_subjects": 100,
+  "excluded_missing_subject_age": 2,
+  "source_rater_records": 2513,
+  "eligible_adult_rater_records": 2324,
+  "human_ratings_used": 232400,
+  "native_scale": [
+    1,
+    7
+  ],
+  "ratings_per_photo_min": 2324,
+  "ratings_per_photo_max": 2324,
+  "label_mean_se_median": 0.02902023895484794,
+  "sources": {
+    "images_commit": "fa8b78fda2d659bb74ce62fcd99c4407551d2a77",
+    "ratings_commit": "1b5d2a179edd873162a54dec11faff2163afe6c0",
+    "doi": "https://doi.org/10.6084/m9.figshare.5047666.v5"
+  },
+  "source_info_sha256": "c5cadd839e18c9c480dceffcadf31afaa374ab58cb60f7a7b5ff4612e9a22903",
+  "source_ratings_sha256": "eadc7a6710b752fb9ca537f84feb420636a1603d1a02dee3d178898f80d35195",
+  "selected_image_inventory_sha256": "fe0a985e5c4f1209e43ee90dba74fae931a94e3da34fc4d668389ef4e609df8d"
+}

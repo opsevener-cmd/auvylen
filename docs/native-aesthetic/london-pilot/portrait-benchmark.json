@@ -1,0 +1,23 @@
+{
+  "scope": "real human-trained checkpoint and authorized held-out portrait; offline research only",
+  "encoder": "mobilenetv3-small-imagenet-onnx-v1",
+  "native_scale": [
+    1,
+    7
+  ],
+  "cold_model_load_ms": 47.185946000013246,
+  "first_portrait_decode_encoder_head_ms": 47.63564699999279,
+  "warm_portrait_decode_encoder_head_median_ms": 28.491654499987362,
+  "warm_p95_ms": 32.662406700063684,
+  "repetitions": 30,
+  "peak_process_rss_kib_linux": 120564,
+  "head_bytes": 24584,
+  "max_prediction_drift": 0.0,
+  "saved_head_reload_difference": 0.0,
+  "manifest_sha256": "362ed74e378989ee2b64f6478a12577410e257b5e633f695af9464f24fe5366e",
+  "release_failures": [
+    "insufficient_test_subjects",
+    "real_pose_review_missing",
+    "cohort_review_underpowered"
+  ]
+}

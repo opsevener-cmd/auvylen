@@ -29,6 +29,7 @@ class Collection(BaseModel):
     name: str = Field(min_length=1)
     rights: dict[str, Rights] = Field(min_length=1)
     synthetic: bool = False
+    rating_max: Literal[5, 7] = 5
     encoder_rights_review: str = Field(min_length=1)
     annotator_population: str = Field(min_length=1)
     rating_protocol_reference: str = Field(min_length=1)
@@ -63,10 +64,8 @@ def load_rows(
             if not subject or len(subject) > 200:
                 raise ValueError("Stable pseudonymous subject required")
             rating, count = float(row["rating"]), int(row["rating_count"])
-            if not np.isfinite(rating) or not 1 <= rating <= 5 or count < 3:
-                raise ValueError(
-                    "Native mean rating 1–5 and >=3 independent human ratings required"
-                )
+            if not np.isfinite(rating) or not 1 <= rating <= plan.rating_max or count < 3:
+                raise ValueError("Native-scale mean and >=3 independent human ratings required")
             if source.stat().st_size > 10 * 1024 * 1024:
                 raise ValueError("Training image exceeds byte limit")
             if sum(map(len, payloads)) + source.stat().st_size > 256 * 1024 * 1024:
@@ -113,8 +112,10 @@ def perturb(payload: bytes, kind: str) -> bytes:
         return out.getvalue()
 
 
-def aggregate_annotations(source: Path, target: Path) -> None:
+def aggregate_annotations(source: Path, target: Path, *, rating_max: int = 5) -> None:
     """Human mean/count only. Refuse duplicate rater/image votes and inconsistent grouping."""
+    if rating_max not in (5, 7):
+        raise ValueError("Unsupported native scale")
     groups: dict[str, tuple[tuple[str, str, str], dict[str, float]]] = {}
     with source.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -140,8 +141,8 @@ def aggregate_annotations(source: Path, target: Path) -> None:
             if stored != metadata or rater in ratings:
                 raise ValueError("Conflicting subject/rights or repeated rater")
             value = float(row["rating"])
-            if not np.isfinite(value) or not 1 <= value <= 5:
-                raise ValueError("Human ratings must use native scale 1–5")
+            if not np.isfinite(value) or not 1 <= value <= rating_max:
+                raise ValueError("Human rating is outside the declared native scale")
             ratings[rater] = value
     if not groups or any(len(ratings) < 3 for _, ratings in groups.values()):
         raise ValueError("Every portrait requires >=3 independent human ratings")
@@ -173,5 +174,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("source", type=Path)
     parser.add_argument("target", type=Path)
+    parser.add_argument("--rating-max", type=int, choices=[5, 7], default=5)
     args = parser.parse_args()
-    aggregate_annotations(args.source, args.target)
+    aggregate_annotations(args.source, args.target, rating_max=args.rating_max)

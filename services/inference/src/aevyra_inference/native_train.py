@@ -55,7 +55,9 @@ def run(
                 for kind in ("lighting", "crop")
             ]
         )
-    encoder, head, report = select_model(matrices, y, subjects, seed=seed, train_views=views)
+    encoder, head, report = select_model(
+        matrices, y, subjects, seed=seed, train_views=views, rating_max=plan.rating_max
+    )
     report["cohorts"] = {}
     for cohort in sorted({cohorts[i] for i in test}):
         indices = np.asarray([i for i in test if cohorts[i] == cohort], dtype=int)
@@ -81,7 +83,9 @@ def run(
         b"".join(p.read_bytes() for p in sources)
     ).hexdigest()
     report["labels_sha256"] = hashlib.sha256(labels.read_bytes()).hexdigest()
-    report["objective"] = "sum squared errors + alpha * squared weight norm; bounded output 1–5"
+    report["objective"] = (
+        f"sum squared errors + alpha * squared weight norm; bounded output 1–{plan.rating_max}"
+    )
     report["augmentation"] = "train only: clean + brightness 0.85 + central 90% crop"
     report["test_policy"] = "winner fixed by validation MAE; no test-based selection"
     return head, new_manifest(encoder, plan, digest, head, report)

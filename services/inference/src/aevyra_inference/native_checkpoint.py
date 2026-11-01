@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 import numpy as np
 from aevyra_contracts import EngineMetadata
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from aevyra_inference.engine import ScoringEngine
 from aevyra_inference.extractors import create_extractor, dimension, manifest
@@ -22,7 +22,9 @@ SLUG = "auvylen-native"
 
 class Manifest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    format: Literal["auvylen-native-ridge-v1"] = "auvylen-native-ridge-v1"
+    format: Literal["auvylen-native-ridge-v1", "auvylen-native-ridge-v2"] = (
+        "auvylen-native-ridge-v2"
+    )
     created_at: str
     encoder: str
     representation: dict[str, Any]
@@ -30,7 +32,15 @@ class Manifest(BaseModel):
     collection_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     weights_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     report: dict[str, Any]
-    native_scale: tuple[Literal[1], Literal[5]] = (1, 5)
+    native_scale: tuple[Literal[1], Literal[5, 7]] = (1, 5)
+
+    @model_validator(mode="after")
+    def scale_compatibility(self) -> "Manifest":
+        if self.collection.rating_max != self.native_scale[1] or (
+            self.format.endswith("v1") and self.native_scale != (1, 5)
+        ):
+            raise ValueError("Native scale/checkpoint version mismatch")
+        return self
 
 
 def release_failures(item: Manifest) -> list[str]:
@@ -79,6 +89,8 @@ def pack(head: NativeHead) -> bytes:
 
 
 def write(root: Path, head: NativeHead, item: Manifest) -> str:
+    if head.rating_max != item.native_scale[1]:
+        raise ValueError("Head/manifest native scale mismatch")
     if root.exists():
         raise ValueError("Checkpoint directory must be new and immutable")
     raw = pack(head)
@@ -122,7 +134,9 @@ def load(root: Path, pin: str, *, require_release: bool = True) -> tuple[NativeH
     v = np.frombuffer(raw, dtype="<f8").copy()
     if not np.isfinite(v).all() or np.any(v[d : 2 * d] <= 0):
         raise ValueError("Invalid head values")
-    return NativeHead(v[:d], v[d : 2 * d], v[2 * d : 3 * d], float(v[-1])), item
+    return NativeHead(
+        v[:d], v[d : 2 * d], v[2 * d : 3 * d], float(v[-1]), item.native_scale[1]
+    ), item
 
 
 class NativeEngine(ScoringEngine):
@@ -139,7 +153,7 @@ class NativeEngine(ScoringEngine):
         return float(self.head.predict(features)[0])
 
     def normalize(self, raw_score: float) -> float:
-        return raw_score  # Native 1–5, no 1–10 conversion or interval claim.
+        return raw_score  # Declared native scale, no 1–10 conversion or interval claim.
 
     def metadata(self) -> EngineMetadata:
         return EngineMetadata(
@@ -158,7 +172,15 @@ class NativeEngine(ScoringEngine):
 class NativeProvider:
     def availability(self, model_root: Path) -> ProviderStatus:
         try:
-            _, item = load(model_root, os.environ.get("AUVYLEN_NATIVE_MANIFEST_SHA256", ""))
+            _, item = load(
+                model_root,
+                os.environ.get("AUVYLEN_NATIVE_MANIFEST_SHA256", ""),
+                require_release=False,
+            )
+            if release_failures(item):
+                return ProviderStatus(
+                    SLUG, "Auvylen Native Rating", False, "validation_gate_failed"
+                )
             from aevyra_inference.extractors import availability
 
             ready, _ = availability(item.encoder, model_root.parent / "pretrained")
@@ -178,6 +200,7 @@ def new_manifest(
     return Manifest(
         created_at=datetime.now(UTC).isoformat(),
         encoder=encoder,
+        native_scale=(1, collection.rating_max),
         representation=manifest(encoder),
         collection=collection,
         collection_sha256=digest,

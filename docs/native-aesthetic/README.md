@@ -1,5 +1,13 @@
 # Auvylen Native Rating v1 — original population-model research
 
+**2026-11-01 update:** A genuine London Set feasibility model has now been trained on
+100 adult portraits and 232,400 human judgments. See [data rights, measured results,
+uncertainty, CPU portrait inference and NO-GO recommendation](london-pilot/README.md).
+The native 1–7 scale is preserved by compatible checkpoint v2. No service was enabled.
+
+The remainder below preserves the initial 2026-10-31 draft record; its no-data status
+is superseded by the linked experiment, while its original 1–5 default remains supported.
+
 2026-10-31. Separate draft implementation from `d2223bf`, independent of PR #11 and
 its ComboLoss adapter. **No authorized human aesthetic training collection was available.**
 No production rating model was trained, installed or enabled. The deliverable is a

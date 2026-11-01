@@ -22,19 +22,24 @@ class NativeHead:
     scale: Array
     weights: Array
     intercept: float
+    rating_max: float = 5.0
 
     def predict(self, features: NDArray[Any]) -> Array:
         x = np.asarray(features, dtype=np.float64)
         if x.ndim != 2 or x.shape[1] != self.weights.size or not np.isfinite(x).all():
             raise ValueError("Invalid native-model features")
-        # Bounded native 1–5 estimator, applied identically in selection/evaluation/runtime.
+        # Declared-native-scale bounds are identical during selection, evaluation and runtime.
         return np.asarray(
-            np.clip((x - self.mean) / self.scale @ self.weights + self.intercept, 1.0, 5.0),
+            np.clip(
+                (x - self.mean) / self.scale @ self.weights + self.intercept, 1.0, self.rating_max
+            ),
             dtype=np.float64,
         )
 
 
-def fit_head(x: Array, y: Array, alpha: float) -> NativeHead:
+def fit_head(x: Array, y: Array, alpha: float, rating_max: float = 5.0) -> NativeHead:
+    if rating_max not in (5, 7):
+        raise ValueError("Unsupported native scale")
     if not np.isfinite(alpha) or alpha <= 0:
         raise ValueError("Positive ridge penalty required")
     if x.ndim != 2 or y.shape != (len(x),) or len(x) < 2:
@@ -49,7 +54,7 @@ def fit_head(x: Array, y: Array, alpha: float) -> NativeHead:
         weights = np.linalg.solve(z.T @ z + alpha * np.eye(z.shape[1]), z.T @ target)
     else:
         weights = z.T @ np.linalg.solve(z @ z.T + alpha * np.eye(len(z)), target)
-    return NativeHead(mean, scale, np.asarray(weights, dtype=np.float64), intercept)
+    return NativeHead(mean, scale, np.asarray(weights, dtype=np.float64), intercept, rating_max)
 
 
 def metrics(predicted: Array, target: Array) -> dict[str, Any]:
@@ -68,10 +73,17 @@ def select_model(
     subjects: list[str],
     *,
     seed: int = 42,
+    rating_max: int = 5,
     train_views: dict[str, Array] | None = None,
 ) -> tuple[str, NativeHead, dict[str, Any]]:
-    if len(labels) < 60 or not np.isfinite(labels).all() or np.any((labels < 1) | (labels > 5)):
+    if (
+        len(labels) < 60
+        or not np.isfinite(labels).all()
+        or np.any((labels < 1) | (labels > rating_max))
+    ):
         raise ValueError("At least 60 finite native-scale ratings required")
+    if rating_max not in (5, 7):
+        raise ValueError("Unsupported native rating scale")
     if len(subjects) != len(labels) or not features:
         raise ValueError("Dataset dimensions mismatch")
     train, val, test = split_by_subject(subjects, seed)
@@ -89,7 +101,7 @@ def select_model(
             tx = np.concatenate([tx, *views])
             ty = np.tile(ty, len(views) + 1)
         for alpha in ALPHAS:
-            head = fit_head(tx, ty, alpha)
+            head = fit_head(tx, ty, alpha, rating_max)
             score = metrics(head.predict(x[val]), labels[val])
             candidates.append((score["mae"], name, alpha, head, score))
     # Test labels are not read until a single encoder/penalty winner is fixed.

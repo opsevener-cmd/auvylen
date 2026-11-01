@@ -1,0 +1,8 @@
+{
+  "correctly_pinned_provider_available": false,
+  "reason": "validation_gate_failed",
+  "strict_product_loader_refused": true,
+  "private_individual_prediction_mode": "0o600",
+  "application_configuration_modified": false,
+  "comboloss_configuration_touched": false
+}

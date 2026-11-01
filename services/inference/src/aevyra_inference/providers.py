@@ -69,7 +69,13 @@ class ProviderCatalog:
             reason = (
                 status.reason
                 if status.reason
-                in {"ready", "missing_weights", "missing_dependencies", "unreviewed_license"}
+                in {
+                    "ready",
+                    "missing_weights",
+                    "missing_dependencies",
+                    "unreviewed_license",
+                    "validation_gate_failed",
+                }
                 else "dependency_or_configuration_error"
             )
             return ProviderStatus(slug, PROVIDERS[slug], status.available, reason)
