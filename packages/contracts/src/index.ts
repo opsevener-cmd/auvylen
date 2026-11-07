@@ -141,3 +141,11 @@ export interface TrainingReadiness {
   eligible: boolean; reasons: ReadinessReason[]; rated: number; required_ratings: number;
   groups: number; required_groups: number; awaiting: number; skipped: number; excluded: number; prediction_only: number;
 }
+
+/** Phase 7A consented collection: no consumer model output and no holdout exports. */
+export interface StudyConsent {id: string; version: number; sha256: string; text_en: string; text_zh: string; contact_en: string; contact_zh: string; rights_reference: string; created_at: string}
+export interface StudyMember {id: string; role: string; approved: boolean; active: boolean; verification_reference: string | null}
+export interface StudyPhoto {id: string; review: string; pose: string; lighting: string; rating_count: number; created_at: string}
+export interface CollectionStudy {id: string; title: string; partition: "development" | "holdout"; status: string; fixture_only: boolean; retention_days: number; can_manage: boolean; can_administer: boolean; consent: StudyConsent | null; memberships: StudyMember[]; members: StudyMember[]; photos: StudyPhoto[]; seal_sha256: string | null; revision: number; photo_count: number; rating_count: number}
+export interface StudyAssignment {id: string; expires_at: string; not_before: string}
+export interface StudyExport {id: string; status: string; sha256: string; images: number; subjects: number; expires_at: string}

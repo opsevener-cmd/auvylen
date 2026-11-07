@@ -8,6 +8,7 @@ from aevyra_api.models import FoundationRecord
 from aevyra_api.preferences import models as preference_models
 from aevyra_api.preferences import training_models
 from aevyra_api.research import models as research_models
+from aevyra_api.studies import models as study_models
 from alembic import context
 
 target_metadata = Base.metadata
@@ -19,6 +20,7 @@ assert research_models.ResearchJob.__table__.metadata is target_metadata
 assert preference_models.PreferenceDataset.__table__.metadata is target_metadata
 assert training_models.CustomModel.__table__.metadata is target_metadata
 assert aesthetic_models.AestheticAnalysis.__table__.metadata is target_metadata
+assert study_models.Study.__table__.metadata is target_metadata
 
 
 def run_migrations() -> None:

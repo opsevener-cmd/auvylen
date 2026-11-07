@@ -102,3 +102,6 @@ logs
 
 # Original learned rating heads are private model artifacts.
 *.f64
+
+# Disposable browser fixture server never enters production builds.
+scripts/serve-study-fixtures.py

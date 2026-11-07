@@ -26,7 +26,7 @@ async function proxy(request: NextRequest, context: {params: Promise<{path: stri
   try {
     let body: Uint8Array<ArrayBuffer> | undefined;
     if (request.method === "POST") {
-      const limit = joined.startsWith("v1/research/preferences/") ? 6 * 1024 * 1024 : 1024 * 1024;
+      const limit = joined.startsWith("v1/research/preferences/") || joined.startsWith("v1/research/studies/") || joined.startsWith("v1/research/native-preview/") || joined.startsWith("v1/research/aesthetic/") ? 6 * 1024 * 1024 : 1024 * 1024;
       const chunks: Uint8Array[] = [];
       let size = 0;
       const reader = request.body?.getReader();
@@ -52,6 +52,7 @@ async function proxy(request: NextRequest, context: {params: Promise<{path: stri
       signal: AbortSignal.timeout(joined.startsWith("v1/research/preferences/datasets/") && joined.endsWith("/images") ? 125000 : 15000), redirect: "manual",
     });
     const outgoing = new Headers({"Content-Type": response.headers.get("content-type") ?? "application/json", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"});
+    if (joined.startsWith("v1/research/studies/") && response.headers.has("content-disposition")) outgoing.set("Content-Disposition", response.headers.get("content-disposition")!);
     for (const cookie of response.headers.getSetCookie()) outgoing.append("Set-Cookie", cookie);
     return new Response(response.body, {status: response.status, headers: outgoing});
   } catch {

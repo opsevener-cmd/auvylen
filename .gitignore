@@ -186,3 +186,8 @@ appendonlydir/
 !/docs/native-aesthetic/preview-ui/native-preview-fresh-signin-en-mobile.webp
 !/docs/native-aesthetic/preview-ui/native-preview-result-en-desktop.webp
 !/docs/native-aesthetic/preview-ui/native-preview-result-zh-mobile.webp
+
+# Phase 7A browser evidence: withdrawn disposable accounts, no portraits, labels or invitations.
+!/docs/phase7a/study-withdrawal-en-mobile.webp
+!/docs/phase7a/study-withdrawal-zh-mobile.webp
+!/docs/phase7a/study-withdrawal-en-desktop.webp
