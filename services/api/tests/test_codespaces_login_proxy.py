@@ -42,10 +42,24 @@ CREDENTIALS = {"login_identifier": "proxy-test-user", "password": PASSWORD}
 
 
 @pytest.fixture
-def proxy(commerce, tmp_path):
+def proxy(commerce, tmp_path, request):
     assert (ROOT / "apps/web/.next/BUILD_ID").exists(), "Run npm run build first"
+    extra = {}
+    if getattr(request, "param", False):
+        extra = dict(
+            research_mode=True,
+            native_preview_enabled=True,
+            native_preview_checkpoint=tmp_path / "fixture-checkpoint",
+            native_preview_manifest_sha256="a" * 64,
+            native_preview_review_reference="transport-fixture-only-not-model-evidence",
+            private_upload_root=tmp_path / "private",
+        )
     settings = Settings(
-        api_environment="test", cors_origins=[ORIGIN], session_cookie_secure=True, _env_file=None
+        api_environment="test",
+        cors_origins=[ORIGIN],
+        session_cookie_secure=True,
+        _env_file=None,
+        **extra,
     )
     app = create_app(settings)
     app.state.settings = settings
@@ -248,3 +262,136 @@ def test_normalization_does_not_bypass_csrf_or_change_fastapi_origin_policy(prox
             )
             assert response.status_code == 403
             assert response.json() == {"detail": "Request origin rejected"}
+
+
+@pytest.mark.parametrize("proxy", [True], indirect=True)
+def test_native_preview_four_mib_real_proxy_queue_and_retention(proxy, tmp_path):
+    """Real built proxy/API/queue; child output is an explicitly withheld transport fixture.
+
+    No checkpoint, human portrait or numerical attractiveness prediction is fabricated.
+    """
+    from io import BytesIO
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from urllib.parse import quote
+    from uuid import UUID, uuid4
+
+    from aevyra_api.owner import provision
+    from aevyra_api.research.models import ResearchJob
+    from aevyra_api.research.native_preview import NativePreview
+    from aevyra_api.research.worker import run_one
+    from PIL import Image
+    from sqlalchemy import select
+    from test_owner import OWNER_PASSWORD
+
+    client, sessions, _ = proxy
+    provision(sessions, OWNER_PASSWORD)
+    signed = client.post(
+        "/api/v1/auth/login",
+        headers=csrf(client),
+        json={"login_identifier": "owner_god", "password": OWNER_PASSWORD},
+    )
+    assert signed.status_code == 200
+    auth = {
+        **FORWARDED,
+        "cookie": f"{COOKIE}={signed.cookies[COOKIE]}",
+        "x-csrf-token": signed.json()["csrf_token"],
+    }
+    root = "/api/v1/research/native-preview"
+    metadata = quote(
+        json.dumps(
+            dict(
+                idempotency_key=str(uuid4()),
+                adult_subject_attested=True,
+                single_subject_attested=True,
+                authorized_consent=True,
+            )
+        )
+    )
+    payload = BytesIO()
+    Image.new("RGB", (256, 320), (40, 60, 80)).save(payload, "PNG")
+    # Valid PNG plus trailing padding: exercise the exact 4 MiB HTTP boundary.
+    data = payload.getvalue().ljust(4 * 1024**2, b"\0")
+    headers = {**auth, "Content-Type": "image/png", "X-Upload-Metadata": metadata}
+    manifest = SimpleNamespace(
+        collection=SimpleNamespace(name="transport-fixture", synthetic=True),
+        encoder="transport-fixture",
+        created_at=now().isoformat(),
+        report={},
+    )
+    settings = Settings(
+        api_environment="test",
+        research_mode=True,
+        native_preview_enabled=True,
+        native_preview_checkpoint=tmp_path / "fixture-checkpoint",
+        native_preview_manifest_sha256="a" * 64,
+        native_preview_review_reference="transport-fixture-only-not-model-evidence",
+        private_upload_root=tmp_path / "private",
+        _env_file=None,
+    )
+    service = NativePreview(sessions, settings)
+    with patch.object(NativePreview, "ready", return_value=manifest):
+        assert client.get(root + "/status", headers=auth).json()["available"]
+        assert (
+            client.post(
+                root + "/jobs", headers={**headers, "x-csrf-token": "bad"}, content=data
+            ).status_code
+            == 403
+        )
+        assert (
+            client.post(
+                root + "/jobs",
+                headers={**headers, "origin": "https://attacker.example"},
+                content=data,
+            ).status_code
+            == 403
+        )
+        assert client.post(root + "/jobs", headers=headers, content=data + b"x").status_code == 413
+        response = client.post(root + "/jobs", headers=headers, content=data)
+        assert response.status_code == 202, response.text
+        assert response.headers["cache-control"] == "private, no-store"
+        job_id = response.json()["id"]
+        assert client.post(root + "/jobs", headers=headers, content=data).json()["id"] == job_id
+        assert len(client.get(root + "/jobs", headers=auth).json()) == 1
+        withheld = dict(
+            predicted_rating=None,
+            input_check=dict(
+                verdict="outside", distance=4.4, caution_above=1.85, outside_above=2.82
+            ),
+            native_scale=[1, 7],
+            manifest_sha256="a" * 64,
+            encoder="transport-fixture",
+            collection="transport-fixture",
+            research_only=True,
+            synthetic=False,
+            consumer_enabled=False,
+            release_failures=["fixture_only"],
+            duration_ms=0,
+            peak_rss_kib=1,
+        )
+        with patch(
+            "aevyra_api.research.native_preview.subprocess.run",
+            return_value=SimpleNamespace(returncode=0, stdout=json.dumps(withheld)),
+        ):
+            assert run_one(service.queue)
+        result = client.get(root + "/jobs/" + job_id, headers=auth).json()
+        assert result["status"] == "COMPLETED" and result["result"]["predicted_rating"] is None
+        assert not list(service.store.root.rglob("*/*"))
+        assert (
+            client.post(root + "/jobs/" + job_id + "/delete", headers=auth, json={}).status_code
+            == 200
+        )
+        assert client.get(root + "/jobs/" + job_id, headers=auth).status_code == 404
+        assert client.get(root + "/jobs", headers=auth).json() == []
+        # Unrelated mutation paths did not inherit the expanded image-body budget.
+        assert (
+            client.post(
+                "/api/v1/auth/login", headers=auth, content=b"x" * (1024**2 + 1)
+            ).status_code
+            == 413
+        )
+        with sessions() as session:
+            assert (
+                session.scalar(select(ResearchJob).where(ResearchJob.id == UUID(job_id))).result
+                is None
+            )

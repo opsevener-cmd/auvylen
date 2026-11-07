@@ -1,0 +1,35 @@
+{
+  "policy": "development subjects only; held-out folds never subsampled; one portrait per subject",
+  "curve": {
+    "16": {
+      "mae": 0.6442530039551099,
+      "train_mean_mae": 0.6697256548515489,
+      "gain_vs_mean": 0.02547265089643902,
+      "spearman": 0.3534746368188383
+    },
+    "24": {
+      "mae": 0.6283622733342356,
+      "train_mean_mae": 0.659593059738956,
+      "gain_vs_mean": 0.031230786404720434,
+      "spearman": 0.39164705882352935
+    },
+    "32": {
+      "mae": 0.5937630871998673,
+      "train_mean_mae": 0.6672210998009895,
+      "gain_vs_mean": 0.07345801260112228,
+      "spearman": 0.45305882352941174
+    },
+    "48": {
+      "mae": 0.5756852818284027,
+      "train_mean_mae": 0.6588813400925129,
+      "gain_vs_mean": 0.08319605826411014,
+      "spearman": 0.48411764705882354
+    },
+    "64": {
+      "mae": 0.552629694702519,
+      "train_mean_mae": 0.6579164425559381,
+      "gain_vs_mean": 0.10528674785341907,
+      "spearman": 0.552235294117647
+    }
+  }
+}

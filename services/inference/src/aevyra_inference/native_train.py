@@ -22,6 +22,7 @@ from aevyra_inference.extractors import (
 from aevyra_inference.native import NativeHead, metrics, select_model
 from aevyra_inference.native_checkpoint import Manifest, new_manifest, release_failures, write
 from aevyra_inference.native_data import Collection, load_rows, perturb
+from aevyra_inference.native_input import profile
 
 
 def features(payloads: Iterable[bytes], extractor: FeatureExtractor) -> NDArray[np.float64]:
@@ -70,6 +71,8 @@ def run(
         train_views=views if selection == "validation" else None,
         development_views=views if selection == "grouped-cv" else None,
     )
+    # Fitted on the same clean training portraits as the head; no evaluation labels used.
+    report["input_profile"] = profile(head, matrices[encoder][fit_rows])
     report["cohorts"] = {}
     for cohort in sorted({cohorts[i] for i in test}):
         indices = np.asarray([i for i in test if cohorts[i] == cohort], dtype=int)
@@ -95,6 +98,7 @@ def run(
             "native_train.py",
             "native_checkpoint.py",
             "native_selection.py",
+            "native_input.py",
         )
     ]
     report["implementation_sha256"] = hashlib.sha256(

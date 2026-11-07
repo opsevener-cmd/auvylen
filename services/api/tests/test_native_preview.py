@@ -75,6 +75,12 @@ def submit(credits, payload=None, key=None, **overrides):
 def fixture_result():
     return dict(
         predicted_rating=4.25,
+        input_check={
+            "verdict": "typical",
+            "distance": 1.0,
+            "caution_above": 1.8,
+            "outside_above": 2.8,
+        },
         native_scale=[1, 7],
         manifest_sha256=PIN,
         encoder="contract-fixture",
@@ -353,3 +359,66 @@ def test_poll_expires_only_requested_job_and_status_does_not_lock(credits, tmp_p
     with patch.object(NativePreview, "access", autospec=True) as access:
         credits.client.get(BASE + "/status")
     assert access.call_args.kwargs == {"lock": False}
+
+
+def test_history_lists_retained_previews_with_their_model_version(credits, tmp_path):
+    service = setup(credits, tmp_path)
+    with patch.object(NativePreview, "ready", return_value=None):
+        first, second, third = (submit(credits).json()["id"] for _ in range(3))
+        with patch(
+            "aevyra_api.research.native_preview.subprocess.run",
+            return_value=SimpleNamespace(returncode=0, stdout=json.dumps(fixture_result())),
+        ):
+            assert run_one(service.queue)
+        assert (
+            credits.client.post(
+                BASE + "/jobs/" + second + "/delete", json={}, headers=csrf_headers(credits.client)
+            ).status_code
+            == 200
+        )
+        with credits.sessions.begin() as session:
+            session.get(ResearchJob, UUID(third)).created_at = now() - timedelta(hours=25)
+        rows = credits.client.get(BASE + "/jobs").json()
+    # Newest retained first; deleted and expired previews never reappear.
+    assert [row["id"] for row in rows] == [first]
+    assert rows[0]["result"]["manifest_sha256"] == PIN
+    register(credits.client, "ordinary-history")
+    assert credits.client.get(BASE + "/jobs").status_code == 403
+
+
+def test_model_context_reports_recorded_aggregate_evidence_only():
+    from aevyra_api.research.native_preview import model_context
+
+    item = SimpleNamespace(
+        created_at="2026-11-01T00:00:00+00:00",
+        report={
+            "test": {"mae": 0.51, "spearman": float("nan")},
+            "mean_baseline": {"mae": 0.57},
+            "subject_counts": {"train": 60, "test": 20},
+        },
+    )
+    context = model_context(item)
+    assert context["heldout_mae"] == 0.51 and context["baseline_mae"] == 0.57
+    assert context["heldout_spearman"] is None  # Undefined values are never invented.
+    assert context["training_subjects"] == 60 and context["heldout_subjects"] == 20
+    assert context["selection_protocol"] == "validation-3"
+    assert json.dumps(context, allow_nan=False)
+
+
+def test_worker_rejects_a_new_unchecked_score_but_history_keeps_legacy(credits, tmp_path):
+    service = setup(credits, tmp_path)
+    legacy = fixture_result()
+    legacy.pop("input_check")
+    with patch.object(NativePreview, "ready", return_value=None):
+        job_id = submit(credits).json()["id"]
+        with patch(
+            "aevyra_api.research.native_preview.subprocess.run",
+            return_value=SimpleNamespace(returncode=0, stdout=json.dumps(legacy)),
+        ):
+            assert run_one(service.queue)
+        row = credits.client.get(BASE + "/jobs/" + job_id).json()
+        assert row["status"] == "FAILED" and row["result"] is None
+        with credits.sessions.begin() as session:
+            job = session.get(ResearchJob, UUID(job_id))
+            job.status, job.result = "COMPLETED", legacy  # Historical contract fixture only.
+        assert credits.client.get(BASE + "/jobs").json()[0]["result"]["predicted_rating"] == 4.25

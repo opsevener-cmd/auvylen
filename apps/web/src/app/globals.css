@@ -292,6 +292,14 @@ details[open] > summary {margin-bottom: 8px;}
 .native-scale {position: relative; height: 2px; background: var(--line-strong); margin: 4px 0 8px; max-width: 520px;}
 .native-scale-marker {position: absolute; top: -7px; width: 2px; height: 16px; background: var(--ink); transform: translateX(-1px);}
 .native-scale-labels {display: flex; justify-content: space-between; max-width: 520px; color: var(--muted); font-variant-numeric: lining-nums tabular-nums;}
+.native-reading {padding: 16px 20px; background: var(--surface); border-left: 2px solid var(--brass);}
+#main .native-reading h3 {font-size: 18px;}
+.native-history-list {list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line);}
+.native-history-list li {display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line);}
+.native-history-list li[aria-current=true] {background: var(--surface);}
+.native-history-score {font-family: var(--serif); font-size: 26px; font-variant-numeric: lining-nums tabular-nums;}
+.native-history-label {font-family: var(--sans); font-size: 13px; color: var(--muted);}
+.native-history-meta {font-size: 13px; color: var(--muted); overflow-wrap: anywhere;}
 
 /* ── Motion: restrained, and disabled for reduced-motion users ───────────── */
 @keyframes rise {from {transform: translateY(12px);} to {transform: none;}}

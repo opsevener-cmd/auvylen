@@ -1,0 +1,38 @@
+{
+  "policy": "80 development faces only; adult raters; sealed test faces never read",
+  "adult_raters": 2324,
+  "agreement": {
+    "single_rater_icc": 0.25175027440082454,
+    "raters_needed_for_reliability": {
+      "0.7": 7,
+      "0.8": 12,
+      "0.9": 27
+    }
+  },
+  "k_rater_labels": {
+    "3": {
+      "r_with_consensus": 0.7054759886148902,
+      "label_mae_vs_consensus": 0.6375443918531268
+    },
+    "5": {
+      "r_with_consensus": 0.7959196364537169,
+      "label_mae_vs_consensus": 0.4906922654905335
+    },
+    "8": {
+      "r_with_consensus": 0.8562484137354189,
+      "label_mae_vs_consensus": 0.38586398719879517
+    },
+    "12": {
+      "r_with_consensus": 0.8968975267451785,
+      "label_mae_vs_consensus": 0.3131309613453815
+    },
+    "20": {
+      "r_with_consensus": 0.9334034856108968,
+      "label_mae_vs_consensus": 0.2421515759466437
+    },
+    "30": {
+      "r_with_consensus": 0.9543894372701354,
+      "label_mae_vs_consensus": 0.19955247776821572
+    }
+  }
+}
