@@ -46,6 +46,7 @@ def history(request: Request, user: CurrentUser) -> list[ResearchJobView]:
             for job in session.scalars(
                 select(ResearchJob)
                 .where(ResearchJob.user_id == user.id)
+                .where(ResearchJob.provider != "auvylen-native")
                 .order_by(ResearchJob.created_at.desc())
                 .limit(50)
             )
@@ -58,7 +59,7 @@ def result(job_id: UUID, request: Request, user: CurrentUser) -> ResearchJobView
         job = session.scalar(
             select(ResearchJob).where(ResearchJob.id == job_id, ResearchJob.user_id == user.id)
         )
-        if job is None:
+        if job is None or job.provider == "auvylen-native":
             raise DomainError("Research job not found", 404)
         return ResearchJobView.model_validate(job)
 
@@ -67,5 +68,9 @@ def result(job_id: UUID, request: Request, user: CurrentUser) -> ResearchJobView
 def cancel(
     job_id: UUID, body: EmptyRequest, request: Request, user: CurrentUser
 ) -> ResearchJobView:
+    with sessions(request)() as session:
+        job = session.get(ResearchJob, job_id)
+        if job is not None and job.provider == "auvylen-native":
+            raise DomainError("Use the private native preview workflow", 404)
     job = ResearchQueue(sessions(request), config(request)).cancel(user.id, job_id)
     return ResearchJobView.model_validate(job)

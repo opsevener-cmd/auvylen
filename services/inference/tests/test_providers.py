@@ -7,7 +7,7 @@ from aevyra_inference.providers import PROVIDERS, ProviderCatalog
 
 def test_every_optional_provider_is_honestly_unavailable_without_installation(tmp_path):
     catalog = ProviderCatalog(list(PROVIDERS), tmp_path)
-    assert len(catalog.statuses()) == 5
+    assert len(catalog.statuses()) == len(PROVIDERS)
     assert all(not status.available for status in catalog.statuses() if status.slug != "custom")
     for slug in PROVIDERS:
         with pytest.raises(RuntimeError, match="unavailable"):

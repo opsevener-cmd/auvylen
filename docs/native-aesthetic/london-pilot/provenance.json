@@ -1,0 +1,215 @@
+{
+  "model_format": "auvylen-native-ridge-v2",
+  "native_scale": [
+    1,
+    7
+  ],
+  "manifest_sha256": "362ed74e378989ee2b64f6478a12577410e257b5e633f695af9464f24fe5366e",
+  "learned_head_sha256": "bf56129d2789280db05bce4b20912f041c74551af0800c16923d89c0e2cab3d2",
+  "head_bytes": 24584,
+  "representation": {
+    "id": "mobilenetv3-small-imagenet-onnx-v1",
+    "dimension": 1024,
+    "architecture": "MobileNetV3-Small width 1.0, frozen ImageNet ILSVRC2012",
+    "model_version": "timm mobilenetv3_small_100.lamb_in1k; timm 1.0.30; ONNX opset 17",
+    "source": "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/mobilenetv3_small_100_lamb-266a294c.pth",
+    "source_revision": "0df212b369a5385b16dfe513d5143a7311ea1ddc",
+    "source_weight_sha256": "266a294cbf3d119000a760bf5664a4d80a9674d0616b5cc0836b093d20c38249",
+    "source_weight_bytes": 10256237,
+    "weight_sha256": "164c481657afe9d36e08ff58693df24e511b5bf1a07de9b9389dfc468eedd2a6",
+    "weight_bytes": 6078515,
+    "weight_license": "Apache-2.0",
+    "code_licenses": "timm/ONNX Apache-2.0; PyTorch/TorchVision BSD-3-Clause; ONNX Runtime MIT; NumPy BSD-3-Clause; Pillow MIT-CMU",
+    "preprocessing": "exif-transpose RGB; shorter edge 256 bicubic; center crop 224; float32 /255; NCHW",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "output": "1024 penultimate features; global average pooling, conv_head, hardswish; classifier removed",
+    "graph_transform": "timm reset_classifier(0); torch 2.10.0+cpu legacy export; dynamic batch; opset 17",
+    "export_toolchain": "timm==1.0.30; torch==2.10.0+cpu; torchvision==0.25.0+cpu; onnx==1.22.0",
+    "runtime": "onnxruntime==1.31.0; CPUExecutionProvider; sequential; 1 thread",
+    "pillow": "12.3.0",
+    "numpy": "2.5.4",
+    "batch_size": 8,
+    "telemetry": "disabled"
+  },
+  "collection_sha256": "76660c5c1a8d21ecc1e28903bf98f2ca16e318fb15b78e54d0c6d5474c837078",
+  "implementation_sha256_at_original_fit": "3b08ec12c3b69522e7dd549e8e764d0014a042a08ad97e5ae5a8702a0fc3aa81",
+  "protocol_sha256": "8acec94778d28e101807736d7e3e5a30c87e3855412cba2b8e3da8b0855802ae",
+  "original_training_report": {
+    "seed": 42,
+    "selected_encoder": "mobilenetv3-small-imagenet-onnx-v1",
+    "selected_alpha": 0.01,
+    "validation": {
+      "n": 20,
+      "mae": 0.5124445592635725,
+      "rmse": 0.579900733275631,
+      "spearman": 0.6842105263157895
+    },
+    "selection": [
+      {
+        "encoder": "mobilenetv3-small-imagenet-onnx-v1",
+        "alpha": 0.01,
+        "validation": {
+          "n": 20,
+          "mae": 0.5124445592635725,
+          "rmse": 0.579900733275631,
+          "spearman": 0.6842105263157895
+        }
+      },
+      {
+        "encoder": "mobilenetv3-small-imagenet-onnx-v1",
+        "alpha": 1.0,
+        "validation": {
+          "n": 20,
+          "mae": 0.5153229133188517,
+          "rmse": 0.5804624903403088,
+          "spearman": 0.6857142857142857
+        }
+      },
+      {
+        "encoder": "mobilenetv3-small-imagenet-onnx-v1",
+        "alpha": 100.0,
+        "validation": {
+          "n": 20,
+          "mae": 0.5142232708031517,
+          "rmse": 0.5800800291393153,
+          "spearman": 0.6706766917293233
+        }
+      },
+      {
+        "encoder": "rgb-grid-texture-v1",
+        "alpha": 0.01,
+        "validation": {
+          "n": 20,
+          "mae": 1.0587051993937944,
+          "rmse": 1.2943169861048225,
+          "spearman": -0.013533834586466165
+        }
+      },
+      {
+        "encoder": "rgb-grid-texture-v1",
+        "alpha": 1.0,
+        "validation": {
+          "n": 20,
+          "mae": 0.6671805979171916,
+          "rmse": 0.8107117905964397,
+          "spearman": 0.41353383458646614
+        }
+      },
+      {
+        "encoder": "rgb-grid-texture-v1",
+        "alpha": 100.0,
+        "validation": {
+          "n": 20,
+          "mae": 0.6651358346469591,
+          "rmse": 0.7739048778401965,
+          "spearman": 0.24661654135338343
+        }
+      }
+    ],
+    "test": {
+      "n": 20,
+      "mae": 0.5095491961496483,
+      "rmse": 0.6395132338142158,
+      "spearman": 0.3669172932330827
+    },
+    "mean_baseline": {
+      "n": 20,
+      "mae": 0.5716394148020654,
+      "rmse": 0.6515312085578568,
+      "spearman": null
+    },
+    "median_baseline": {
+      "n": 20,
+      "mae": 0.5627151462994836,
+      "rmse": 0.6365967269229538,
+      "spearman": null
+    },
+    "partition_sizes": {
+      "train": 60,
+      "validation": 20,
+      "test": 20
+    },
+    "subject_counts": {
+      "train": 60,
+      "validation": 20,
+      "test": 20
+    },
+    "encoder_comparison": {
+      "mobilenetv3-small-imagenet-onnx-v1": {
+        "n": 20,
+        "mae": 0.5095491961496483,
+        "rmse": 0.6395132338142158,
+        "spearman": 0.3669172932330827
+      },
+      "rgb-grid-texture-v1": {
+        "n": 20,
+        "mae": 0.48865588808482896,
+        "rmse": 0.6206399129692852,
+        "spearman": 0.2827067669172932
+      }
+    },
+    "subject_macro_mae": 0.5095491961496483,
+    "cohorts": {
+      "female": {
+        "n": 11,
+        "mae": 0.47704135971081885,
+        "rmse": 0.6122889646852273,
+        "spearman": 0.4272727272727273,
+        "subjects": 11
+      },
+      "male": {
+        "n": 9,
+        "mae": 0.5492809962415511,
+        "rmse": 0.6712896365654805,
+        "spearman": 0.13333333333333333,
+        "subjects": 9
+      }
+    },
+    "perturbations": {
+      "lighting": {
+        "n": 20,
+        "mae": 0.5516349975722198,
+        "rmse": 0.6771145549649661,
+        "spearman": 0.34586466165413526,
+        "mean_absolute_drift": 0.09044713515065785
+      },
+      "crop": {
+        "n": 20,
+        "mae": 0.5421788753702144,
+        "rmse": 0.6610905195472379,
+        "spearman": 0.3714285714285714,
+        "mean_absolute_drift": 0.21999199242414097
+      },
+      "rotation": {
+        "n": 20,
+        "mae": 0.5228619546695945,
+        "rmse": 0.7046352023042132,
+        "spearman": 0.34736842105263155,
+        "mean_absolute_drift": 0.17038822381455782
+      }
+    },
+    "pose_review_reference": "",
+    "implementation_sha256": "3b08ec12c3b69522e7dd549e8e764d0014a042a08ad97e5ae5a8702a0fc3aa81",
+    "labels_sha256": "5d5c035cb3f052bad1446a796bdf8099fef882e47091acd36e312c41eb1985fe",
+    "objective": "sum squared errors + alpha * squared weight norm; bounded output 1\u20137",
+    "augmentation": "train only: clean + brightness 0.85 + central 90% crop",
+    "test_policy": "winner fixed by validation MAE; no test-based selection"
+  },
+  "release_failures": [
+    "insufficient_test_subjects",
+    "real_pose_review_missing",
+    "cohort_review_underpowered"
+  ],
+  "public_weight_release": false,
+  "api_enabled": false,
+  "commercial_approved": false
+}

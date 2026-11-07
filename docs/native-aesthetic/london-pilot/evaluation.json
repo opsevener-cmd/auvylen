@@ -1,0 +1,639 @@
+{
+  "mean_baseline": {
+    "n": 20,
+    "mae": 0.5716394148020654,
+    "rmse": 0.6515312085578568,
+    "spearman": null,
+    "uncertainty": {
+      "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+      "level": 0.95,
+      "draws": 2000,
+      "seed": 20261101,
+      "subjects": 20,
+      "intervals": {
+        "mae": {
+          "low": 0.4348816695352842,
+          "high": 0.7005425989672979,
+          "valid_draws": 2000
+        },
+        "rmse": {
+          "low": 0.5341212280377081,
+          "high": 0.7540653588554983,
+          "valid_draws": 2000
+        },
+        "spearman": null,
+        "paired_mean_baseline_delta_mae": {
+          "low": 0.0,
+          "high": 0.0,
+          "valid_draws": 2000
+        }
+      }
+    }
+  },
+  "median_baseline": {
+    "n": 20,
+    "mae": 0.5627151462994836,
+    "rmse": 0.6365967269229538,
+    "spearman": null,
+    "uncertainty": {
+      "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+      "level": 0.95,
+      "draws": 2000,
+      "seed": 20261101,
+      "subjects": 20,
+      "intervals": {
+        "mae": {
+          "low": 0.4329222246127366,
+          "high": 0.6858003442340788,
+          "valid_draws": 2000
+        },
+        "rmse": {
+          "low": 0.5193134916708996,
+          "high": 0.7432795177440717,
+          "valid_draws": 2000
+        },
+        "spearman": null,
+        "paired_mean_baseline_delta_mae": {
+          "low": -0.041919104991394326,
+          "high": 0.02474612736660937,
+          "valid_draws": 2000
+        }
+      }
+    }
+  },
+  "encoders": {
+    "mobilenetv3-small-imagenet-onnx-v1": {
+      "n": 20,
+      "mae": 0.5095491961496483,
+      "rmse": 0.6395132338142158,
+      "spearman": 0.3669172932330827,
+      "selected_alpha_from_original_validation": 0.01,
+      "uncertainty": {
+        "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+        "level": 0.95,
+        "draws": 2000,
+        "seed": 20261101,
+        "subjects": 20,
+        "intervals": {
+          "mae": {
+            "low": 0.3456417900595406,
+            "high": 0.6807637954474669,
+            "valid_draws": 2000
+          },
+          "rmse": {
+            "low": 0.47054358364001947,
+            "high": 0.7879279253379605,
+            "valid_draws": 2000
+          },
+          "spearman": {
+            "low": -0.16323504787818535,
+            "high": 0.7466663541262804,
+            "valid_draws": 2000
+          },
+          "paired_mean_baseline_delta_mae": {
+            "low": -0.22156915178730913,
+            "high": 0.09543661799444439,
+            "valid_draws": 2000
+          }
+        }
+      },
+      "subgroups": {
+        "sex": {
+          "female": {
+            "n": 11,
+            "metrics": {
+              "n": 11,
+              "mae": 0.4770413597108188,
+              "rmse": 0.6122889646852272,
+              "spearman": 0.4272727272727273
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 11,
+              "intervals": {
+                "mae": {
+                  "low": 0.27105995158609375,
+                  "high": 0.707969896713488,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.36544886344313227,
+                  "high": 0.8134906468565133,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": -0.3175410816317491,
+                  "high": 0.86938725887502,
+                  "valid_draws": 2000
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.27981891205851145,
+                  "high": 0.15170729198172778,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          },
+          "male": {
+            "n": 9,
+            "metrics": {
+              "n": 9,
+              "mae": 0.5492809962415511,
+              "rmse": 0.6712896365654805,
+              "spearman": 0.13333333333333333
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 9,
+              "intervals": {
+                "mae": {
+                  "low": 0.3050709455097687,
+                  "high": 0.7971176828271871,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.42015000763851634,
+                  "high": 0.8732456771137858,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": -0.7392962417096537,
+                  "high": 0.8782608695652175,
+                  "valid_draws": 2000
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.30683379901184926,
+                  "high": 0.1624710206148669,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          }
+        },
+        "ethnicity": {
+          "black": {
+            "n": 4,
+            "metrics": null,
+            "uncertainty": null
+          },
+          "west_asian": {
+            "n": 2,
+            "metrics": null,
+            "uncertainty": null
+          },
+          "white": {
+            "n": 14,
+            "metrics": {
+              "n": 14,
+              "mae": 0.4793288777113469,
+              "rmse": 0.6251638490012815,
+              "spearman": 0.3626373626373627
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 14,
+              "intervals": {
+                "mae": {
+                  "low": 0.28090653799079607,
+                  "high": 0.6918388816080112,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.40377417888377365,
+                  "high": 0.8108527994790639,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": -0.29298967675916443,
+                  "high": 0.8076276886743097,
+                  "valid_draws": 2000
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.23157750022938048,
+                  "high": 0.15089213745077026,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          },
+          "east_asian": {
+            "n": 0,
+            "metrics": null,
+            "uncertainty": null
+          },
+          "eats_asian/white": {
+            "n": 0,
+            "metrics": null,
+            "uncertainty": null
+          }
+        },
+        "age_band": {
+          "18\u201329": {
+            "n": 14,
+            "metrics": {
+              "n": 14,
+              "mae": 0.43621766936068823,
+              "rmse": 0.5582867223194258,
+              "spearman": 0.5252747252747253
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 14,
+              "intervals": {
+                "mae": {
+                  "low": 0.26894704269864084,
+                  "high": 0.6244528690657672,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.35323455537313403,
+                  "high": 0.7339289215785954,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": -0.13395873552123555,
+                  "high": 0.8690918158433513,
+                  "valid_draws": 2000
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.2753282207518534,
+                  "high": 0.12193396071203047,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          },
+          "30+": {
+            "n": 6,
+            "metrics": {
+              "n": 6,
+              "mae": 0.6806560919905554,
+              "rmse": 0.7974925939066737,
+              "spearman": -0.7714285714285715
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 6,
+              "intervals": {
+                "mae": {
+                  "low": 0.3431896906847265,
+                  "high": 0.9959562787804803,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.4830309173656836,
+                  "high": 1.0164344164299985,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": -1.0,
+                  "high": 0.0,
+                  "valid_draws": 1999
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.2904480700388863,
+                  "high": 0.2125495556853668,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          }
+        }
+      },
+      "extraction_and_exact_head_reproduction_seconds": 38.00909134999995,
+      "winner_weight_bytes_identical": true
+    },
+    "rgb-grid-texture-v1": {
+      "n": 20,
+      "mae": 0.48865588808482896,
+      "rmse": 0.6206399129692852,
+      "spearman": 0.2827067669172932,
+      "selected_alpha_from_original_validation": 100.0,
+      "uncertainty": {
+        "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+        "level": 0.95,
+        "draws": 2000,
+        "seed": 20261101,
+        "subjects": 20,
+        "intervals": {
+          "mae": {
+            "low": 0.32615768023635267,
+            "high": 0.6543971690174919,
+            "valid_draws": 2000
+          },
+          "rmse": {
+            "low": 0.42688999424553764,
+            "high": 0.7852131202422049,
+            "valid_draws": 2000
+          },
+          "spearman": {
+            "low": -0.1627616579210617,
+            "high": 0.6692449641918647,
+            "valid_draws": 2000
+          },
+          "paired_mean_baseline_delta_mae": {
+            "low": -0.24344124755485722,
+            "high": 0.0681813631190974,
+            "valid_draws": 2000
+          }
+        }
+      },
+      "subgroups": {
+        "sex": {
+          "female": {
+            "n": 11,
+            "metrics": {
+              "n": 11,
+              "mae": 0.4843979492839155,
+              "rmse": 0.6433264467061403,
+              "spearman": 0.26363636363636367
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 11,
+              "intervals": {
+                "mae": {
+                  "low": 0.2582726507249971,
+                  "high": 0.7378413625083062,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.32611768498609134,
+                  "high": 0.8966439071438682,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": -0.38483412322274874,
+                  "high": 0.8591549295774648,
+                  "valid_draws": 2000
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.338588723688741,
+                  "high": 0.21017957173964358,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          },
+          "male": {
+            "n": 9,
+            "metrics": {
+              "n": 9,
+              "mae": 0.4938600355081676,
+              "rmse": 0.5917319160324964,
+              "spearman": -0.03333333333333333
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 9,
+              "intervals": {
+                "mae": {
+                  "low": 0.2876815240359332,
+                  "high": 0.7234132115778288,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.3668887871340481,
+                  "high": 0.7750689796559163,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": -0.8596491228070176,
+                  "high": 0.7217391304347827,
+                  "valid_draws": 2000
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.2616054405572029,
+                  "high": 0.01169989036644011,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          }
+        },
+        "ethnicity": {
+          "black": {
+            "n": 4,
+            "metrics": null,
+            "uncertainty": null
+          },
+          "west_asian": {
+            "n": 2,
+            "metrics": null,
+            "uncertainty": null
+          },
+          "white": {
+            "n": 14,
+            "metrics": {
+              "n": 14,
+              "mae": 0.5116110307404594,
+              "rmse": 0.6575221739668486,
+              "spearman": 0.1076923076923077
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 14,
+              "intervals": {
+                "mae": {
+                  "low": 0.30944640190625333,
+                  "high": 0.7397018386713322,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.42372438682006186,
+                  "high": 0.8649510275110783,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": -0.4661799145887863,
+                  "high": 0.5982164986090899,
+                  "valid_draws": 2000
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.2206475191014584,
+                  "high": 0.1965737621713372,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          },
+          "east_asian": {
+            "n": 0,
+            "metrics": null,
+            "uncertainty": null
+          },
+          "eats_asian/white": {
+            "n": 0,
+            "metrics": null,
+            "uncertainty": null
+          }
+        },
+        "age_band": {
+          "18\u201329": {
+            "n": 14,
+            "metrics": {
+              "n": 14,
+              "mae": 0.3919281035003337,
+              "rmse": 0.48493938697514316,
+              "spearman": 0.5780219780219781
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 14,
+              "intervals": {
+                "mae": {
+                  "low": 0.24857674277193634,
+                  "high": 0.5483589833823195,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.3016545460753661,
+                  "high": 0.6385504908533418,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": 0.06691939205457466,
+                  "high": 0.8555707836181875,
+                  "valid_draws": 2000
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.3301965703181338,
+                  "high": 0.06460492138057025,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          },
+          "30+": {
+            "n": 6,
+            "metrics": {
+              "n": 6,
+              "mae": 0.7143540521153177,
+              "rmse": 0.8574721671724832,
+              "spearman": -0.6571428571428573
+            },
+            "uncertainty": {
+              "method": "held-out subject cluster percentile bootstrap; conditional on fixed trained model and rater pool",
+              "level": 0.95,
+              "draws": 2000,
+              "seed": 20261101,
+              "subjects": 6,
+              "intervals": {
+                "mae": {
+                  "low": 0.3184569326241505,
+                  "high": 1.0856309098925128,
+                  "valid_draws": 2000
+                },
+                "rmse": {
+                  "low": 0.44205336209509144,
+                  "high": 1.1345864289643675,
+                  "valid_draws": 2000
+                },
+                "spearman": {
+                  "low": -1.0,
+                  "high": 0.23118279569891986,
+                  "valid_draws": 1999
+                },
+                "paired_mean_baseline_delta_mae": {
+                  "low": -0.24878424549468625,
+                  "high": 0.2845994416078074,
+                  "valid_draws": 2000
+                }
+              }
+            }
+          }
+        }
+      },
+      "extraction_and_exact_head_reproduction_seconds": 36.99377193099997,
+      "winner_weight_bytes_identical": null
+    }
+  },
+  "selected_encoder_frozen": "mobilenetv3-small-imagenet-onnx-v1",
+  "test_subjects": 20,
+  "collection_sha256": "76660c5c1a8d21ecc1e28903bf98f2ca16e318fb15b78e54d0c6d5474c837078",
+  "native_scale": [
+    1,
+    7
+  ],
+  "first_holdout_image_selection": "first test row in fixed subject-hash split; no outcome-based selection",
+  "subgroup_partition_counts": {
+    "sex": {
+      "female": {
+        "train": 31,
+        "validation": 6,
+        "test": 11
+      },
+      "male": {
+        "train": 29,
+        "validation": 14,
+        "test": 9
+      }
+    },
+    "ethnicity": {
+      "black": {
+        "train": 8,
+        "validation": 1,
+        "test": 4
+      },
+      "east_asian": {
+        "train": 6,
+        "validation": 3,
+        "test": 0
+      },
+      "eats_asian/white": {
+        "train": 1,
+        "validation": 0,
+        "test": 0
+      },
+      "west_asian": {
+        "train": 6,
+        "validation": 1,
+        "test": 2
+      },
+      "white": {
+        "train": 39,
+        "validation": 15,
+        "test": 14
+      }
+    },
+    "age_band": {
+      "18\u201329": {
+        "train": 41,
+        "validation": 14,
+        "test": 14
+      },
+      "30+": {
+        "train": 19,
+        "validation": 6,
+        "test": 6
+      }
+    }
+  }
+}

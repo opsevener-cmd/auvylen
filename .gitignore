@@ -171,3 +171,18 @@ logs/
 appendonly.aof
 appendonlydir/
 *.aof
+
+# Original learned rating heads are private model artifacts.
+*.f64
+
+# Native preview: disabled UI only, no portraits or predictions.
+!/docs/native-aesthetic/independent-cohort/native-preview-disabled-en-desktop.webp
+!/docs/native-aesthetic/independent-cohort/native-preview-disabled-zh-mobile.webp
+
+# Owner native preview UI screenshots: contract fixtures, no photographs or model output.
+!/docs/native-aesthetic/preview-ui/before-result-reload-en-desktop.webp
+!/docs/native-aesthetic/preview-ui/native-preview-disabled-en-desktop.webp
+!/docs/native-aesthetic/preview-ui/native-preview-disabled-zh-mobile.webp
+!/docs/native-aesthetic/preview-ui/native-preview-fresh-signin-en-mobile.webp
+!/docs/native-aesthetic/preview-ui/native-preview-result-en-desktop.webp
+!/docs/native-aesthetic/preview-ui/native-preview-result-zh-mobile.webp

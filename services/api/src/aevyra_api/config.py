@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     # Development/test only: lets automated tests exercise the pipeline with a checkpoint
     # trained on generated data. Results stay labelled synthetic.
     aesthetic_allow_synthetic_test_checkpoint: bool = False
+    # Separate Owner laboratory preview. Never changes NativeProvider release eligibility.
+    native_preview_enabled: bool = False
+    native_preview_checkpoint: Path | None = None
+    native_preview_manifest_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    native_preview_review_reference: str | None = Field(default=None, min_length=1, max_length=200)
 
     @field_validator("aesthetic_model_version", "aesthetic_manifest_sha256", mode="before")
     @classmethod
@@ -63,8 +68,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def production_defaults(self) -> "Settings":
+        if self.native_preview_enabled and (
+            self.api_environment not in {"development", "test"}
+            or not self.research_mode
+            or self.public_pilot
+            or not self.native_preview_checkpoint
+            or not self.native_preview_manifest_sha256
+            or not (self.native_preview_review_reference or "").strip()
+        ):
+            raise ValueError(
+                "Native preview requires private development/test research and a reviewed pin"
+            )
         if any(
-            slug not in {"custom", "comboloss", "fpem", "faclip", "swingfvqa-ca"}
+            slug not in {"custom", "comboloss", "fpem", "faclip", "swingfvqa-ca", "auvylen-native"}
             for slug in self.enabled_model_providers
         ):
             raise ValueError("Unknown enabled model provider")
