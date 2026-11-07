@@ -3,6 +3,8 @@
 import csv
 import hashlib
 import json
+import math
+import shutil
 from datetime import timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -11,6 +13,7 @@ from zipfile import ZIP_STORED, ZipFile
 
 from aevyra_contracts.studies import ExportView
 from aevyra_inference.native_data import Collection, Rights
+from aevyra_inference.rating_quality import fit_rater_model, reliability
 from pydantic import JsonValue
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -84,7 +87,15 @@ class Exports:
     def __init__(self, data: Studies):
         self.data = data
 
-    def create(self, user_id: UUID, study_id: UUID, token: str, key: UUID) -> ExportView:
+    def create(
+        self,
+        user_id: UUID,
+        study_id: UUID,
+        token: str,
+        key: UUID,
+        *,
+        include_adjusted: bool = False,
+    ) -> ExportView:
         self.data.enabled()
         artifact = None
         with self.data.sessions.begin() as session:
@@ -104,12 +115,21 @@ class Exports:
                 if previous.study_id != study.id or previous.owner_id != user.id:
                     raise DomainError("study_request_conflict", 409)
                 self.valid(previous, study)
+                assert previous.artifact_id is not None
+                stored = self.data.export_store().read(study.id, previous.artifact_id)
+                if hashlib.sha256(stored).hexdigest() != previous.sha256:
+                    raise DomainError("study_export_integrity", 503)
+                with ZipFile(BytesIO(stored)) as archived:
+                    if ("adjusted.csv" in archived.namelist()) != include_adjusted:
+                        raise DomainError("study_request_conflict", 409)
                 return export_view(previous)
             rows = eligible(session, study)
             if not rows:
                 raise DomainError("study_no_eligible_data", 409)
             export_id = uuid4()
-            bundle, subjects = self.bundle(session, study, rows, export_id)
+            bundle, subjects = self.bundle(
+                session, study, rows, export_id, include_adjusted=include_adjusted
+            )
             artifact, digest = self.data.export_store().put(study.id, bundle)
             try:
                 row = StudyExport(
@@ -194,6 +214,8 @@ class Exports:
         study: Study,
         rows: list[tuple[Photo, list[Assignment]]],
         export_id: UUID,
+        *,
+        include_adjusted: bool = False,
     ) -> tuple[bytes, int]:
         output = BytesIO()
         means, annotations = StringIO(), StringIO()
@@ -205,7 +227,9 @@ class Exports:
         receipts: dict[str, dict[str, str]] = {}
         subjects: set[str] = set()
         hashes: dict[str, str] = {}
-        total = 0
+        votes: list[tuple[str, str, float]] = []
+        label_rows: list[tuple[str, str, int, str]] = []
+        private_images: dict[str, dict[str, str]] = {}
         with ZipFile(output, "w", compression=ZIP_STORED, allowZip64=False) as archive:
             for photo, ratings in rows:
                 member = session.get(Member, photo.member_id)
@@ -271,22 +295,89 @@ class Exports:
                     "version_hashes": ",".join(sorted(v.sha256 for v in versions if v))
                 }
                 name = "images/" + str(photo.id) + ".jpg"
-                image = self.data.store(study).read(study.id, photo.artifact_id)
-                if hashlib.sha256(image).hexdigest() != photo.artifact_sha256:
-                    raise DomainError("study_image_integrity", 503)
-                total += len(image)
-                if total > MAX_EXPORT - 2 * 1024**2:
-                    raise DomainError("study_export_limit", 413)
-                archive.writestr(name, image)
-                hashes[name] = hashlib.sha256(image).hexdigest()
+                # Metadata snapshot only: browsers never download the source portraits.
+                assert photo.artifact_sha256 is not None
+                private_images[name] = {"photo_id": str(photo.id), "sha256": photo.artifact_sha256}
                 score = sum(a.score for a in ratings if a.score is not None) / len(ratings)
                 mw.writerow([name, subject, score, len(ratings), right, "not_reported"])
+                label_rows.append((name, subject, len(ratings), right))
                 for a in ratings:
                     rater = session.get(Member, a.member_id)
-                    assert rater is not None
+                    assert rater is not None and a.score is not None
+                    votes.append((name, str(rater.person_id), float(a.score)))
                     aw.writerow(
                         [name, subject, str(rater.person_id), a.score, right, "not_reported"]
                     )
+            candidate_files: dict[str, bytes] = {}
+            if include_adjusted:
+                model = fit_rater_model(votes)
+                adjusted_labels = model.adjusted(1.0, 7.0)
+                adjusted = StringIO()
+                writer = csv.writer(adjusted)
+                # Deliberately NOT a drop-in native training table: offsets used every
+                # development label. Ordinary split evaluation must reject this candidate.
+                writer.writerow(
+                    [
+                        "image",
+                        "subject_id",
+                        "rating",
+                        "rating_count",
+                        "rights_id",
+                        "cohort",
+                        "label_policy",
+                    ]
+                )
+                for name, subject, count, right in label_rows:
+                    writer.writerow(
+                        [
+                            name,
+                            subject,
+                            adjusted_labels[name],
+                            count,
+                            right,
+                            "not_reported",
+                            "full-development-fit-not-evaluation",
+                        ]
+                    )
+                quality = {
+                    "agreement": reliability(votes),
+                    "rater_model": {
+                        "method": "image-residualized-rater-ridge-mom-v2",
+                        "status": model.status,
+                        "rater_variance": model.rater_var,
+                        "noise_variance": model.noise_var
+                        if math.isfinite(model.noise_var)
+                        else None,
+                        "shrinkage": model.shrinkage,
+                        "adjusted": model.status == "estimated",
+                        "components": model.components,
+                        "output_bounds": [1, 7],
+                        "clipped_images": sum(
+                            bool(v < 1 or v > 7) for v in model.mean + model.image_effect
+                        ),
+                        "residual_dof": model.residual_dof,
+                        "offsets": dict(
+                            zip(model.raters, map(float, model.rater_offset), strict=True)
+                        ),
+                        "annotations_sha256": hashlib.sha256(
+                            annotations.getvalue().encode()
+                        ).hexdigest(),
+                    },
+                    "fit_scope": "all eligible development votes; exploratory labels only",
+                    "default_training_labels": "means.csv",
+                    "caution": (
+                        "Not model accuracy, label intervals or population confidence bounds. "
+                        "Rater offsets use all exported labels; fold-local fitting is required "
+                        "before model-selection or held-out evaluation. Missingness/interaction "
+                        "assumptions are unverified. Raw means remain the default."
+                    ),
+                }
+                candidate_files = {
+                    "adjusted.csv": adjusted.getvalue().encode(),
+                    "reliability.json": json.dumps(
+                        quality, sort_keys=True, allow_nan=False
+                    ).encode(),
+                }
             collection = Collection(
                 name="Auvylen consented development collection " + str(study.id),
                 rights=rights,
@@ -298,6 +389,7 @@ class Exports:
             )
             files = {
                 "means.csv": means.getvalue().encode(),
+                **candidate_files,
                 "annotations.csv": annotations.getvalue().encode(),
                 "collection.json": collection.model_dump_json(indent=2).encode(),
                 "consents.json": json.dumps(grants, sort_keys=True, ensure_ascii=False).encode(),
@@ -307,7 +399,7 @@ class Exports:
                 archive.writestr(name, payload)
                 hashes[name] = hashlib.sha256(payload).hexdigest()
             manifest = {
-                "format": "auvylen-study-export-v1",
+                "format": "auvylen-study-export-v2",
                 "partition": "development",
                 "independent_external_holdout": False,
                 "native_scale": [1, 7],
@@ -316,6 +408,9 @@ class Exports:
                 "export_id": str(export_id),
                 "revision": study.revision,
                 "sha256": hashes,
+                "private_images": private_images,
+                "include_adjusted": include_adjusted,
+                "default_training_labels": "means.csv",
                 "deletion": "Recheck live status before every use; downloads cannot be recalled",
                 "split_policy": (
                     "Internal splits are development diagnostics, not external holdouts"
@@ -327,42 +422,92 @@ class Exports:
         return output.getvalue(), len(subjects)
 
 
+def materialize(data: Studies, export_id: UUID, destination: Path) -> None:
+    """Private operator handoff. Lock snapshot/revocation and copy verified images one at a time."""
+    if destination.exists() or destination.is_symlink():
+        raise ValueError("Use a new private directory")
+    created = False
+    try:
+        with data.sessions.begin() as session:
+            row = session.get(StudyExport, export_id)
+            if row is None:
+                raise ValueError("Export unavailable")
+            user = session.get(User, row.owner_id)
+            assert user is not None
+            exports = Exports(data)
+            data.enabled()
+            study, row = exports.owned(session, user, row.study_id, export_id)  # FOR UPDATE study
+            assert row.artifact_id is not None
+            bundle = data.export_store().read(study.id, row.artifact_id)
+            if hashlib.sha256(bundle).hexdigest() != row.sha256:
+                raise ValueError("Export integrity failure")
+            with ZipFile(BytesIO(bundle)) as archive:
+                manifest = json.loads(archive.read("manifest.json"))
+                if (
+                    manifest["format"] not in {"auvylen-study-export-v1", "auvylen-study-export-v2"}
+                    or manifest["partition"] != "development"
+                    or manifest["independent_external_holdout"]
+                    or manifest["study_id"] != str(study.id)
+                    or manifest["export_id"] != str(row.id)
+                    or manifest["revision"] != study.revision
+                ):
+                    raise ValueError("Invalid development snapshot")
+                if (
+                    manifest["format"] == "auvylen-study-export-v2"
+                    and len(manifest.get("private_images", {})) != row.images
+                ):
+                    raise ValueError("Incomplete private image inventory")
+                paths = [*manifest["sha256"], *manifest.get("private_images", {}), "manifest.json"]
+                if any(Path(name).is_absolute() or ".." in Path(name).parts for name in paths):
+                    raise ValueError("Invalid snapshot path")
+                if len(set(paths)) != len(paths):
+                    raise ValueError("Duplicate snapshot path")
+                for name, digest in manifest["sha256"].items():
+                    if hashlib.sha256(archive.read(name)).hexdigest() != digest:
+                        raise ValueError("Export integrity failure")
+                destination.mkdir(parents=True, mode=0o700)
+                created = True
+
+                def write(name: str, payload: bytes) -> None:
+                    path = destination / name
+                    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    with path.open("xb") as file:
+                        path.chmod(0o600)
+                        file.write(payload)
+
+                for name in [*manifest["sha256"], "manifest.json"]:
+                    write(name, archive.read(name))
+                for name, ref in manifest.get("private_images", {}).items():
+                    photo = session.get(Photo, UUID(ref["photo_id"]))
+                    if (
+                        photo is None
+                        or photo.study_id != study.id
+                        or photo.review != "APPROVED"
+                        or photo.artifact_id is None
+                        or aware(photo.expires_at) <= now()
+                        or photo.artifact_sha256 != ref["sha256"]
+                        or name != "images/" + str(photo.id) + ".jpg"
+                    ):
+                        raise ValueError("Private image unavailable or changed")
+                    payload = data.store(study).read(study.id, photo.artifact_id)
+                    if hashlib.sha256(payload).hexdigest() != ref["sha256"]:
+                        raise ValueError("Private image integrity failure")
+                    write(name, payload)
+                exports.valid(row, study)  # No expiry during materialization.
+    except Exception:
+        if created:
+            shutil.rmtree(destination)
+        raise
+
+
 def prepare(export_id: UUID, destination: Path) -> None:
-    """Private operator CLI: recheck live revocation/integrity, then extract a new 0700 folder."""
     from aevyra_api.config import Settings
     from aevyra_api.database import DependencyChecks
 
     settings = Settings()
     checks = DependencyChecks(settings)
     try:
-        data = Studies(checks.sessions, settings)
-        with checks.sessions() as session:
-            row = session.get(StudyExport, export_id)
-            if row is None:
-                raise ValueError("Export unavailable")
-            user_id, study_id = row.owner_id, row.study_id
-        bundle = Exports(data).read(user_id, study_id, export_id)
-        if destination.exists():
-            raise ValueError("Use a new private directory")
-        with ZipFile(BytesIO(bundle)) as archive:
-            manifest = json.loads(archive.read("manifest.json"))
-            if manifest["partition"] != "development" or manifest["independent_external_holdout"]:
-                raise ValueError("Holdout cannot enter training")
-            for name, digest in manifest["sha256"].items():
-                path = Path(name)
-                if (
-                    path.is_absolute()
-                    or ".." in path.parts
-                    or hashlib.sha256(archive.read(name)).hexdigest() != digest
-                ):
-                    raise ValueError("Export integrity failure")
-            destination.mkdir(parents=True, mode=0o700)
-            for name in [*manifest["sha256"], "manifest.json"]:
-                path = destination / name
-                path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-                with path.open("xb") as file:
-                    path.chmod(0o600)
-                    file.write(archive.read(name))
+        materialize(Studies(checks.sessions, settings), export_id, destination)
     finally:
         checks.close()
 

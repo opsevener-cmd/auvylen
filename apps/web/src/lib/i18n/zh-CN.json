@@ -1015,5 +1015,8 @@
   "Diffuse lighting": "均匀柔光",
   "Side lighting": "侧面光",
   "Low light": "弱光",
-  "Other lighting": "其他光照"
+  "Other lighting": "其他光照",
+  "Rejected portrait access was removed. Submit a new authorized portrait; physical deletion is retried if needed.": "已移除被拒肖像的访问权限。请重新提交已获授权的肖像；如有需要，系统会重试物理删除。",
+  "Include exploratory rater adjustment. It uses all development labels and is not valid for ordinary held-out evaluation.": "包含探索性的评分者效应校正。该结果使用全部开发标签，不能用于常规留出评估。",
+  "Browser archives contain labels and consent metadata only. The private operator CLI materializes hash-verified portraits after checking live revocation.": "浏览器导出仅包含标签和同意元数据。私密管理命令行工具会检查实时撤销状态，再提取经哈希验证的肖像。"
 }

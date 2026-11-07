@@ -122,3 +122,34 @@ test("real browser/API study workflow: consent, verification, upload, independen
   expect(errors).toEqual([]);
   await contributorContext.close();
 });
+
+test("a new consent version requires fresh checkbox confirmations",async({page,browser})=>{
+  test.setTimeout(60000);
+  await login(page.request,"owner_god");
+  const created=await post(page.request,base,{...command(),title:"Consent version fixture"});
+  expect(created.status()).toBe(201);
+  const id=(await created.json()).id;
+  const terms={text_en:"Authorized generated fixture research, voluntary adults and native 1–7 ratings. No real collection. Research only; no public display or consumer use. Withdrawal removes data and revokes exports.",text_zh:"这是已获授权的生成素材测试研究，不进行真实参与者采集。仅用于自愿成人研究评分，不公开展示或提供消费者评分。参与者可撤回并删除照片与评分，撤销导出。",contact_en:"Fixture contact only",contact_zh:"测试负责人",rights_reference:"generated-fixtures-only"};
+  expect((await post(page.request,`${base}/${id}/consent`,{...command(),...terms})).status()).toBe(200);
+  const code=(await (await post(page.request,`${base}/${id}/action`,{...command(),action:"rotate_invite",reason:"Generated version fixture"})).json()).value;
+  expect((await post(page.request,`${base}/${id}/action`,{...command(),action:"open",reason:"Generated version fixture"})).status()).toBe(200);
+  const context=await browser.newContext({baseURL:origin,reducedMotion:"reduce"});
+  await login(context.request,"study-fixture-contributor");
+  const participant=await context.newPage();
+  await participant.goto("/research/studies");
+  await participant.getByLabel("Private invitation code",{exact:true}).fill(code);
+  await participant.getByRole("button",{name:"Read study invitation",exact:true}).click();
+  await expect(participant.getByRole("checkbox")).toHaveCount(4);
+  for(const checkbox of await participant.getByRole("checkbox").all()) await checkbox.check();
+  await participant.getByRole("button",{name:"Accept this consent version",exact:true}).click();
+  await expect(participant.getByRole("button",{name:"Download my consent receipts",exact:true})).toBeVisible();
+  expect((await post(page.request,`${base}/${id}/consent`,{...command(),...terms,text_en:terms.text_en+" Version two.",text_zh:terms.text_zh+" 第二版。"})).status()).toBe(200);
+  expect((await post(page.request,`${base}/${id}/action`,{...command(),action:"open",reason:"Reviewed fixture version two"})).status()).toBe(200);
+  await participant.getByRole("button",{name:"Refresh study status",exact:true}).click();
+  await participant.getByText("Read the exact consent version: 2",{exact:true}).click();
+  const checkboxes=participant.getByRole("checkbox");
+  await expect(checkboxes).toHaveCount(4);
+  for(const checkbox of await checkboxes.all()) await expect(checkbox).not.toBeChecked();
+  await expect(participant.getByRole("button",{name:"Accept this consent version",exact:true})).toBeDisabled();
+  await context.close();
+});

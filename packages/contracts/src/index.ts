@@ -149,3 +149,5 @@ export interface StudyPhoto {id: string; review: string; pose: string; lighting:
 export interface CollectionStudy {id: string; title: string; partition: "development" | "holdout"; status: string; fixture_only: boolean; retention_days: number; can_manage: boolean; can_administer: boolean; consent: StudyConsent | null; memberships: StudyMember[]; members: StudyMember[]; photos: StudyPhoto[]; seal_sha256: string | null; revision: number; photo_count: number; rating_count: number}
 export interface StudyAssignment {id: string; expires_at: string; not_before: string}
 export interface StudyExport {id: string; status: string; sha256: string; images: number; subjects: number; expires_at: string}
+
+export interface StudyExportRequest {idempotency_key: string; include_adjusted?: boolean}

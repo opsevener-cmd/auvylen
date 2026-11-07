@@ -6,6 +6,7 @@ from uuid import UUID
 from aevyra_contracts.studies import (
     AssignmentView,
     ConsentPublish,
+    ExportCreate,
     ExportView,
     InviteResolve,
     MemberReview,
@@ -152,8 +153,9 @@ def review_content(study_id: UUID, photo_id: UUID, request: Request, user: Curre
 def photo_review(
     study_id: UUID, photo_id: UUID, body: PhotoReview, request: Request, user: CurrentUser
 ) -> dict[str, bool]:
-    service(request).review_photo(user.id, study_id, photo_id, token(request), body)
-    return {"saved": True}
+    data = service(request)
+    data.review_photo(user.id, study_id, photo_id, token(request), body)
+    return {"saved": True, "cleanup_pending": not body.approved and data.drain(study_id) > 0}
 
 
 @router.post("/{study_id}/photos/{photo_id}/delete", dependencies=[Depends(csrf)])
@@ -287,9 +289,15 @@ def study_audit(study_id: UUID, request: Request, user: CurrentUser) -> list[dic
 @router.post(
     "/{study_id}/exports", response_model=ExportView, status_code=201, dependencies=[Depends(csrf)]
 )
-def export(study_id: UUID, body: StudyCommand, request: Request, user: Owner) -> ExportView:
+def export(study_id: UUID, body: ExportCreate, request: Request, user: Owner) -> ExportView:
     rate(request, "study-export", 10, user.public_user_id)
-    return Exports(service(request)).create(user.id, study_id, token(request), body.idempotency_key)
+    return Exports(service(request)).create(
+        user.id,
+        study_id,
+        token(request),
+        body.idempotency_key,
+        include_adjusted=body.include_adjusted,
+    )
 
 
 @router.get("/{study_id}/exports/{export_id}", response_model=ExportView)
