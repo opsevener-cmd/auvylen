@@ -15,7 +15,7 @@ import numpy as np
 from aevyra_inference.extractors import create_extractor
 from aevyra_inference.native import NativeHead
 from aevyra_inference.native_checkpoint import Manifest, load, release_failures
-from aevyra_inference.native_input import distance, verdict
+from aevyra_inference.native_input import checked_profile, distance, verdict
 
 
 def reviewed_checkpoint(root: Path, pin: str) -> tuple[NativeHead, Manifest]:
@@ -38,14 +38,14 @@ def predict(root: Path, pin: str, encoder_root: Path, image: bytes) -> dict[str,
     head, item = reviewed_checkpoint(root, pin)
     extractor = create_extractor(item.encoder, encoder_root)
     features = np.asarray(extractor.extract_batch([image]))
-    input_profile = item.report.get("input_profile")
+    input_profile = checked_profile(item.report.get("input_profile"))
     gap = float(distance(head, features)[0])
     check = verdict(gap, input_profile)
     raw = float(head.predict(features)[0])
     if not np.isfinite(raw) or not 1 <= raw <= 7:
         raise ValueError("Invalid native prediction")
     # Never publish a number for an image unlike any training portrait.
-    value = None if check == "outside" else raw
+    value = None if check in {"outside", "unchecked"} else raw
     return {
         "predicted_rating": value,
         "input_check": {

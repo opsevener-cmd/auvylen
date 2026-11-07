@@ -1,16 +1,24 @@
 """Dev-only paired grouped CV over precomputed development-image embeddings."""
 
-import csv
 import json
+import os
 from pathlib import Path
 
 import numpy as np
 from aevyra_inference.native import metrics
-from aevyra_inference.native_dev_study import paired_bootstrap, protocol_a, protocol_b
+from aevyra_inference.native_dev_study import (
+    checked_development_rows,
+    paired_bootstrap,
+    protocol_a,
+    protocol_b,
+)
 from aevyra_inference.native_selection import grouped_folds
 
 out = Path("private-data/encoder-study")
-rows = list(csv.DictReader(open(out / "development.csv")))
+
+rows = checked_development_rows(
+    out / "development.csv", Path(os.environ["AUVYLEN_LONDON_REGISTRY"])
+)
 assert [r["image"] for r in rows] == json.load(open(out / "development-images.json"))
 y = np.asarray([float(r["rating"]) for r in rows])
 subjects = [r["subject_id"] for r in rows]

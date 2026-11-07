@@ -186,6 +186,8 @@ for (const state of ["QUEUED", "FAILED"]) test(`a ${state} response cannot displ
 for (const [name, result, expected] of [
   ["an input outside the training portraits shows no number", {...fixtureResult, predicted_rating: null, input_check: {verdict: "outside", distance: 4.4, caution_above: 1.85, outside_above: 2.82}}, "No score for this image"],
   ["an unusual input is scored with a caution", {...fixtureResult, input_check: {verdict: "unusual", distance: 2.1, caution_above: 1.85, outside_above: 2.82}}, "Treat the number with extra caution"],
+  ["an unsupported profile withholds a new result", {...fixtureResult,predicted_rating:null,input_check:{verdict:"unchecked"}}, "No supported input check is available for this checkpoint."],
+  ["a typical verdict cannot disguise an outside distance", {...fixtureResult,input_check:{verdict:"typical",distance:4.4,caution_above:1.85,outside_above:2.82}}, "The research result could not be verified."],
   ["a score claimed for an outside input is rejected", {...fixtureResult, input_check: {verdict: "outside", distance: 4.4, caution_above: 1.85, outside_above: 2.82}}, "The research result could not be verified."],
 ] as const) test(name, async ({page}) => {
   await page.route("**/api/v1/**", async route => {
@@ -198,4 +200,21 @@ for (const [name, result, expected] of [
   await expect(page.getByText(expected)).toBeVisible();
   if (result.predicted_rating === null || expected.startsWith("The research")) await expect(page.locator(".score-hero")).toHaveCount(0);
   else await expect(page.locator(".score-hero")).toContainText("4.25");
+});
+
+
+test("history selection rechecks deletion instead of opening a cached score",async({page})=>{
+  let reads=0;
+  const retained={...job,status:"COMPLETED",result:fixtureResult};
+  await page.route("**/api/v1/**",async route=>{
+    const endpoint=new URL(route.request().url()).pathname;
+    if(endpoint===base+"/status") {await route.fulfill({json:available});return;}
+    if(endpoint===base+"/jobs") {await route.fulfill({json:[retained]});return;}
+    reads++;await route.fulfill({status:404,json:{detail:"Research job not found"}});
+  });
+  await page.goto("/research/native-preview");
+  await page.getByRole("button",{name:"Open",exact:true}).click();
+  await expect(page.getByText("That preview request has expired or was deleted. Nothing was kept.")).toBeVisible();
+  expect(reads).toBe(1);
+  await expect(page.locator(".score-hero")).toHaveCount(0);
 });

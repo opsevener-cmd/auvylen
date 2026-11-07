@@ -256,3 +256,33 @@ def test_study_preserves_undefined_rank_instead_of_crashing(tmp_path, monkeypatc
     summary = report["encoders"]["fixture"]["outer_cv"]
     assert summary["a"]["spearman"] is None and summary["b"]["spearman"] is None
     assert summary["a"]["undefined_spearman_repeats"] == 1
+
+
+def test_precomputed_research_tables_cannot_reintroduce_sealed_subjects(tmp_path, monkeypatch):
+    import json
+
+    from aevyra_inference import native_dev_study as study
+
+    subjects = [f"generated-{i:03}" for i in range(100)]
+    monkeypatch.setattr(
+        study,
+        "LONDON_SUBJECTS_SHA256",
+        hashlib.sha256("\n".join(sorted(subjects)).encode()).hexdigest(),
+    )
+    registry = tmp_path / "registry.json"
+    registry.write_text(json.dumps(dict.fromkeys(subjects, {})))
+    train, val, test = split_by_subject(subjects, 42)
+    table = tmp_path / "development.csv"
+
+    def write(ids):
+        with table.open("w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(study.COLUMNS)
+            w.writerows([s + "_03.jpg", s, "not-parsed", 3, "fixture", "fixture"] for s in ids)
+
+    allowed = [subjects[i] for i in [*train, *val]]
+    write(allowed)
+    assert len(study.checked_development_rows(table, registry)) == 80
+    write([*allowed[:-1], subjects[test[0]]])
+    with pytest.raises(ValueError, match="fixed development"):
+        study.checked_development_rows(table, registry)

@@ -24,7 +24,13 @@ const statusSchema = z.object({
 const historySchema = z.array(researchJobSchema);
 const shortPin = (pin: string) => pin.slice(0, 12);
 const inputCheckSchema = z.object({verdict: z.enum(["typical", "unusual", "outside", "unchecked"]), distance: z.number().finite().nullable().optional(), caution_above: z.number().finite().nullable().optional(), outside_above: z.number().finite().nullable().optional()});
-export const nativeResultSchema = z.object({predicted_rating: z.number().finite().min(1).max(7).nullable(), input_check: inputCheckSchema.default({verdict: "unchecked"}), native_scale: z.tuple([z.literal(1), z.literal(7)]), research_only: z.literal(true), consumer_enabled: z.literal(false), synthetic: z.literal(false), manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), collection: z.string(), encoder: z.string()}).refine(v => (v.predicted_rating === null) === (v.input_check.verdict === "outside"), "A score is withheld exactly when the input is outside");
+export const nativeResultSchema = z.object({predicted_rating: z.number().finite().min(1).max(7).nullable(), input_check: inputCheckSchema.default({verdict: "unchecked"}), native_scale: z.tuple([z.literal(1), z.literal(7)]), research_only: z.literal(true), consumer_enabled: z.literal(false), synthetic: z.literal(false), manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), collection: z.string(), encoder: z.string()}).refine(v => {
+  const c=v.input_check;
+  if(c.verdict === "unchecked") return true; // Historical records, explicitly labelled below.
+  if(c.distance == null || c.caution_above == null || c.outside_above == null || c.distance < 0 || c.caution_above <= 0 || c.outside_above <= c.caution_above) return false;
+  const expected=c.distance > c.outside_above ? "outside" : c.distance > c.caution_above ? "unusual" : "typical";
+  return c.verdict === expected && (v.predicted_rating === null) === (c.verdict === "outside");
+}, "Input check and score must agree");
 const pending = (job: ResearchJob | null) => job?.status === "QUEUED" || job?.status === "RUNNING";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RESULT_HOURS = 24;
@@ -165,7 +171,18 @@ export function NativePreviewPage() {
   const failures = status?.release_failures ?? [];
   const model = status?.model;
   const activePin = status?.manifest_sha256;
-  const open = (row: ResearchJob) => {setJob(row); setJobParam(row.id); setNotice(null); setError(null);};
+  const open = async (row: ResearchJob) => {
+    if (busyRef.current) return;
+    busyRef.current=true; setBusy(true); setJob(null); setProgress(null); setError(null);
+    try {
+      const current=await accountRequest(`${path}/jobs/${row.id}`,researchJobSchema);
+      setJob(current); setJobParam(current.id); setNotice(null);
+    } catch(e) {
+      const value=failure(e);
+      if(value.status === 404) {clearRequest();setHistory(rows=>rows?.filter(r=>r.id!==row.id)??null);setNotice("That preview request has expired or was deleted. Nothing was kept.");}
+      else setError(value);
+    } finally {busyRef.current=false;setBusy(false);}
+  };
   return <section aria-labelledby="native-preview-title" className="aesthetic-workspace native-preview">
     <header className="research-heading">
       <p className="eyebrow">{t("Owner laboratory · private research")}</p>
@@ -175,6 +192,7 @@ export function NativePreviewPage() {
     <div className="aesthetic-content">
       <div className="research-notice" role="note">
         <p>{t("Consumer release remains blocked. The pilot is small, uncertainty is substantial, and independent pose, lighting and demographic evaluation is incomplete. No calibrated interval is available for an individual portrait.")}</p>
+        <p className="mt-3 text-sm">{t("The experimental input check measures feature distance, not face detection, adulthood, fairness or prediction accuracy. A passing check is not evidence that an image is suitable.")}</p>
       </div>
       {error && <p ref={alertRef} tabIndex={-1} role="alert" className="mt-6 scroll-mt-28">{t(error.message)} {signIn && <Link href="/login" className="underline">{t("Sign in again")}</Link>}</p>}
       {notice && <p role="status" className="mt-6">{t(notice)}</p>}
@@ -207,9 +225,10 @@ export function NativePreviewPage() {
         {pending(job) && <p className="mt-4" role="status">{t("Native inference queued or running. The result appears only after verified worker completion.")}</p>}
         {job.status === "FAILED" && <p className="mt-4" role="alert">{t("Research inference failed or expired. No score was generated. Delete this request before starting again.")}</p>}
         {job.status === "COMPLETED" && !result && <p className="mt-4" role="alert">{t("The research result could not be verified.")}</p>}
+        {result?.input_check.verdict === "unchecked" && <p role="status" className="mt-4">{t("This checkpoint has no supported input check. New predictions are withheld; an older retained score may predate this safeguard.")}</p>}
         {result && result.predicted_rating === null && <div className="native-reading mt-5" role="status">
           <h3>{t("No score for this image")}</h3>
-          <p className="mt-2 text-sm">{t("It does not resemble the frontal adult portraits the model learned from, so no number is shown. Use a clear, front-facing photograph of one adult that fills most of the frame.")}</p>
+          <p className="mt-2 text-sm">{result.input_check.verdict === "unchecked" ? t("No supported input check is available for this checkpoint.") : t("It does not resemble the frontal adult portraits the model learned from, so no number is shown. Use a clear, front-facing photograph of one adult that fills most of the frame.")}</p>
         </div>}
         {result && result.predicted_rating !== null && <>
           {result.input_check.verdict === "unusual" && <p className="mt-4" role="status">{t("This image looks unlike the frontal portraits the model learned from (for example rotated, tightly cropped or unusually lit). Treat the number with extra caution.")}</p>}
@@ -219,7 +238,7 @@ export function NativePreviewPage() {
           <p className="mt-5">{t("For research inspection only. This result does not unlock consumer scoring or establish model validity for this photograph.")}</p>
           <div className="native-reading mt-5">
             <h3>{t("How to read this number")}</h3>
-            <p className="mt-2 text-sm">{t("4 is the raters' average on this relative scale. The prediction estimates how the original adult raters would have scored a similar frontal portrait.")}</p>
+            <p className="mt-2 text-sm">{t("4 is the scale's average anchor, not necessarily the observed sample mean. The prediction estimates the original adult raters' response to a similar portrait.")}</p>
             {model?.heldout_mae != null && model.heldout_subjects != null && result.manifest_sha256 === activePin && <p className="mt-2 text-sm">{t("On {count} people the model never saw, its predictions differed from the raters' average by {mae} points on average. Always guessing the training average differed by {baseline}.", {count: model.heldout_subjects, mae: model.heldout_mae.toFixed(2), baseline: model.baseline_mae == null ? "—" : model.baseline_mae.toFixed(2)})}</p>}
           </div>
           <dl className="model-facts mt-4 text-sm"><dt>{t("Prediction checkpoint SHA-256")}</dt><dd className="font-mono text-xs">{result.manifest_sha256}</dd></dl>
@@ -239,7 +258,7 @@ export function NativePreviewPage() {
           return <li key={row.id} aria-current={row.id === job?.id ? "true" : undefined}>
             {scored?.predicted_rating != null ? <span className="native-history-score">{scored.predicted_rating.toFixed(2)}</span> : <span className="native-history-score native-history-label">{t(scored || row.status === "FAILED" ? "No score" : "Pending")}</span>}
             <span className="native-history-meta">{new Date(row.created_at).toLocaleString(locale)}{scored && <> · <span className="font-mono">{shortPin(scored.manifest_sha256)}</span> · {scored.manifest_sha256 === activePin ? t("current model") : t("earlier model")}</>}</span>
-            <button className="button-secondary" disabled={locked || row.id === job?.id} onClick={() => open(row)}>{t("Open")}</button>
+            <button className="button-secondary" disabled={locked || row.id === job?.id} onClick={() => void open(row)}>{t("Open")}</button>
           </li>;})}</ul>}
       </section>}
     </div>

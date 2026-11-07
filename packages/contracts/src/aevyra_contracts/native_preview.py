@@ -17,7 +17,7 @@ class InputCheck(BaseModel):
 
 class NativePreviewResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    # None only when the input check says the image is outside the training portraits.
+    # None for an outside input or an unavailable input check. Legacy scored records stay readable.
     predicted_rating: float | None = Field(ge=1, le=7, allow_inf_nan=False)
     input_check: InputCheck = InputCheck(verdict="unchecked")
     native_scale: tuple[Literal[1], Literal[7]]
@@ -33,6 +33,29 @@ class NativePreviewResult(BaseModel):
 
     @model_validator(mode="after")
     def score_only_for_comparable_inputs(self) -> "NativePreviewResult":
-        if (self.predicted_rating is None) != (self.input_check.verdict == "outside"):
-            raise ValueError("A score is withheld exactly when the input is outside")
+        if self.input_check.verdict == "outside" and self.predicted_rating is not None:
+            raise ValueError("Outside inputs must not have a score")
+        if self.predicted_rating is None and self.input_check.verdict not in {
+            "outside",
+            "unchecked",
+        }:
+            raise ValueError("Comparable checked inputs require a score")
+        if self.input_check.verdict != "unchecked":
+            check = self.input_check
+            if (
+                check.distance is None
+                or check.caution_above is None
+                or check.outside_above is None
+                or check.caution_above >= check.outside_above
+            ):
+                raise ValueError("Checked results require ordered thresholds and a finite distance")
+            expected = (
+                "outside"
+                if check.distance > check.outside_above
+                else "unusual"
+                if check.distance > check.caution_above
+                else "typical"
+            )
+            if check.verdict != expected:
+                raise ValueError("Input verdict disagrees with its distance")
         return self

@@ -35,6 +35,8 @@ def profile(head: NativeHead, train_features: Array) -> dict[str, Any]:
     values = distance(head, train_features)
     if len(values) < 5 or not np.isfinite(values).all():
         raise ValueError("Input profile needs at least five finite training portraits")
+    if values.max() <= 0:
+        raise ValueError("Degenerate training input profile")
     caution = float(values.max() * CAUTION_MARGIN)
     outside = float(max(np.median(values) * OUTSIDE_FACTOR, caution * 1.25))
     return {
@@ -48,8 +50,22 @@ def profile(head: NativeHead, train_features: Array) -> dict[str, Any]:
     }
 
 
-def verdict(value: float, input_profile: dict[str, Any] | None) -> Verdict:
+def checked_profile(input_profile: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Unknown/legacy profiles remain readable; malformed known profiles fail closed."""
     if not input_profile or input_profile.get("statistic") != STATISTIC:
+        return None
+    for key in ("caution_above", "outside_above"):
+        value = input_profile.get(key)
+        if isinstance(value, bool) or not isinstance(value, int | float) or not np.isfinite(value):
+            raise ValueError("Invalid input-check thresholds")
+    if not 0 < input_profile["caution_above"] < input_profile["outside_above"]:
+        raise ValueError("Input-check thresholds must be ordered and positive")
+    return input_profile
+
+
+def verdict(value: float, input_profile: dict[str, Any] | None) -> Verdict:
+    input_profile = checked_profile(input_profile)
+    if input_profile is None:
         return "unchecked"
     if not np.isfinite(value) or value > input_profile["outside_above"]:
         return "outside"

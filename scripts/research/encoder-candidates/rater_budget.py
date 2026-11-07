@@ -11,9 +11,13 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from aevyra_inference.native_dev_study import checked_development_rows
 
 root, study = Path(sys.argv[1]), Path(sys.argv[2])
-development = [r["image"] for r in csv.DictReader(open(study / "development.csv"))]
+development = [
+    r["image"]
+    for r in checked_development_rows(study / "development.csv", root / "subject-metadata.json")
+]
 columns = ["X" + name.split("_")[0] for name in development]
 with open(root / "source-ratings.csv", newline="") as file:
     raters = [r for r in csv.DictReader(file) if 18 <= float(r["rater_age"] or 0) <= 120]

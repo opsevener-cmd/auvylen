@@ -1,16 +1,19 @@
 """Dev-only learning curve: MobileNet-A trained on subsets of each outer training fold."""
 
-import csv
 import json
+import os
 from pathlib import Path
 
 import numpy as np
 from aevyra_inference.native import metrics
-from aevyra_inference.native_dev_study import protocol_a
+from aevyra_inference.native_dev_study import checked_development_rows, protocol_a
 from aevyra_inference.native_selection import grouped_folds
 
 out = Path("private-data/encoder-study")
-rows = list(csv.DictReader(open(out / "development.csv")))
+
+rows = checked_development_rows(
+    out / "development.csv", Path(os.environ["AUVYLEN_LONDON_REGISTRY"])
+)
 y = np.asarray([float(r["rating"]) for r in rows])
 subjects = [r["subject_id"] for r in rows]
 f = dict(np.load(out / "mobilenetv3_small_100.lamb_in1k.npz"))

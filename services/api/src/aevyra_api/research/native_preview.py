@@ -337,6 +337,8 @@ class NativePreview:
         if process.returncode != 0 or len(process.stdout) > 16384:
             raise ValueError("Native preview execution failed")
         result = NativePreviewResult.model_validate_json(process.stdout)
+        if result.input_check.verdict == "unchecked" and result.predicted_rating is not None:
+            raise ValueError("New scores require a supported input check")
         if result.manifest_sha256 != pin:
             raise ValueError("Native preview checkpoint mismatch")
         heartbeat.check()

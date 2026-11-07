@@ -75,6 +75,12 @@ def submit(credits, payload=None, key=None, **overrides):
 def fixture_result():
     return dict(
         predicted_rating=4.25,
+        input_check={
+            "verdict": "typical",
+            "distance": 1.0,
+            "caution_above": 1.8,
+            "outside_above": 2.8,
+        },
         native_scale=[1, 7],
         manifest_sha256=PIN,
         encoder="contract-fixture",
@@ -397,3 +403,22 @@ def test_model_context_reports_recorded_aggregate_evidence_only():
     assert context["training_subjects"] == 60 and context["heldout_subjects"] == 20
     assert context["selection_protocol"] == "validation-3"
     assert json.dumps(context, allow_nan=False)
+
+
+def test_worker_rejects_a_new_unchecked_score_but_history_keeps_legacy(credits, tmp_path):
+    service = setup(credits, tmp_path)
+    legacy = fixture_result()
+    legacy.pop("input_check")
+    with patch.object(NativePreview, "ready", return_value=None):
+        job_id = submit(credits).json()["id"]
+        with patch(
+            "aevyra_api.research.native_preview.subprocess.run",
+            return_value=SimpleNamespace(returncode=0, stdout=json.dumps(legacy)),
+        ):
+            assert run_one(service.queue)
+        row = credits.client.get(BASE + "/jobs/" + job_id).json()
+        assert row["status"] == "FAILED" and row["result"] is None
+        with credits.sessions.begin() as session:
+            job = session.get(ResearchJob, UUID(job_id))
+            job.status, job.result = "COMPLETED", legacy  # Historical contract fixture only.
+        assert credits.client.get(BASE + "/jobs").json()[0]["result"]["predicted_rating"] == 4.25

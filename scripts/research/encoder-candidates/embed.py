@@ -2,7 +2,8 @@
 
 Run in a separate PyTorch environment, never the application's. Checkpoints come from the
 pinned timm configurations' GitHub release URLs and are checked against the hash prefix in
-their filenames. Usage: python -I embed.py IMAGES_DIR PRIVATE_STUDY_DIR
+their filenames. Requires the project inference package in the isolated research environment.
+Usage: python -I embed.py IMAGES_DIR PRIVATE_STUDY_DIR SUBJECT_REGISTRY_JSON
 """
 
 import hashlib
@@ -14,10 +15,14 @@ from pathlib import Path
 import numpy as np
 import timm
 import torch
+from aevyra_inference.native_dev_study import checked_development_rows
 from PIL import Image
 
-root, out = Path(sys.argv[1]), Path(sys.argv[2])
+root, out, registry = (Path(v) for v in sys.argv[1:4])
+rows = checked_development_rows(out / "development.csv", registry)
 names = json.load(open(out / "development-images.json"))
+if names != [r["image"] for r in rows]:
+    raise ValueError("Embedding inventory must match the checked development table")
 models = [
     "mobilenetv3_small_100.lamb_in1k",
     "mobilenetv3_large_100.ra_in1k",

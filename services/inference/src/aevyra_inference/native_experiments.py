@@ -74,6 +74,8 @@ def study(
     seed: int = 42,
     draws: int = 2000,
 ) -> dict[str, Any]:
+    if outer_repeats < 1 or draws < 1:
+        raise ValueError("Positive repeat and bootstrap counts required")
     with tempfile.TemporaryDirectory(prefix="native-exp-") as temporary:
         dev_labels = Path(temporary) / "development.csv"
         sizes = development_table(labels, HOLDOUT_SEED, dev_labels)
@@ -121,7 +123,11 @@ def study(
             "rmse": float(np.mean([s["rmse"] for s in scores])),
             "spearman": None
             if name == "train-mean"
-            else float(np.mean([s["spearman"] for s in scores])),
+            else (
+                None
+                if any(s["spearman"] is None for s in scores)
+                else float(np.mean([s["spearman"] for s in scores]))
+            ),
             "repeat_averaged_spearman": None
             if name == "train-mean"
             else spearman(np.mean(values, axis=0), y),

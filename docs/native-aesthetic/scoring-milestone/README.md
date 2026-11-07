@@ -54,8 +54,8 @@ Screenshots (generated patterns only, no person or real prediction):
 training statistics. Thresholds come from the clean training portraits only and are stored in
 the manifest report, so the checkpoint pin covers them. Above 1.1 × the training maximum the
 input is *unusual* (scored, with a caution). Above max(3 × training median, 1.25 × caution
-threshold) it is *outside* (no number; the contract enforces this). Older checkpoints without a
-profile report *unchecked*. Retraining with the profile produced **byte-identical weights**.
+threshold) it is *outside* (no number; the contract enforces this). Older retained results without a profile report *unchecked*. New inference with an absent
+or unsupported profile withholds its score; malformed supported profiles fail closed. Retraining with the profile produced **byte-identical weights**.
 
 Development calibration (MobileNet; training and validation portraits; no test subjects):
 
@@ -96,11 +96,11 @@ any rating is parsed. Intervals are descriptive resampling of fixed out-of-fold 
 coverage guarantees. Aggregate outputs are in [model-research/](../model-research/); code is
 in `native_experiments.py` and `scripts/research/encoder-candidates/`.
 
-**1. MobileNet is genuinely better than guessing; the handcrafted encoder is not.**
+**1. These development results favour MobileNet over the train-mean baseline.**
 MobileNet + ridge (current pilot rule): MAE 0.553, RMSE 0.684, Spearman 0.58, against a
 train-mean MAE of 0.658. The paired difference is −0.105 (−0.19 to −0.02). The handcrafted
-encoder's interval crosses zero, and it is 0.09 worse than MobileNet. Its lower error on the
-20-person London test was noise; the validation-based choice of MobileNet was right.
+encoder's interval crosses zero, and it is 0.09 worse than MobileNet. The small test and development CV rank the encoders differently. These observations do
+not establish why the ranking reversed or prove that the handcrafted encoder has no value.
 
 **2. Head and selection tweaks do not help:**
 
@@ -110,7 +110,7 @@ encoder's interval crosses zero, and it is 0.09 worse than MobileNet. Its lower 
 | Mirror augmentation + mirror averaging | +0.000 |
 | Handcrafted + MobileNet fusion | −0.020 (−0.046 to +0.005) |
 
-**3. Larger lawful encoders do not help at n=80.** Apache-2.0 timm ImageNet checkpoints
+**3. No reliable improvement from the larger candidates was established at n=80.** Apache-2.0 timm ImageNet checkpoints
 from GitHub releases were checked against the hash prefixes in their filenames. The same
 PyTorch pipeline reproduced the production ONNX MobileNet result exactly:
 
@@ -121,14 +121,15 @@ PyTorch pipeline reproduced the production ONNX MobileNet result exactly:
 | EfficientNet-B0 | 4.0 M | −0.015 |
 | EfficientNet-B3 | 10.7 M | −0.009 |
 
-**4. Data is the bottleneck.** Training on subsets of each fold:
+**4. The observed development learning curve favours more data.** Training on subsets of each fold:
 
 | Training subjects | 16 | 24 | 32 | 48 | 64 |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | MAE | 0.644 | 0.628 | 0.594 | 0.576 | 0.553 |
 | Spearman | 0.35 | 0.39 | 0.45 | 0.48 | 0.55 |
 
-That is roughly −0.045 MAE per doubling, with no plateau. Extrapolating to 400 people would
+That is roughly −0.045 MAE per doubling, over the measured range. The overlapping-fold point estimates alone cannot establish a plateau
+or identify data as the only bottleneck. Extrapolating to 400 people would
 be speculation; the curve only says more people still help.
 
 **5. Labels need many raters.** On the real development faces, single-rater ICC is
@@ -149,10 +150,13 @@ plausibly separate.
 
 ## 3. Shortest credible path to a public scoring MVP
 
-Datasets reviewed in the repository (London CC BY, SCUT-FBP5500, MEBeauty, Chicago Face
-Database) permit research at most. **None grants rights for a consumer scoring service.**
+For the reviewed datasets (London, SCUT-FBP5500, MEBeauty, Chicago Face Database),
+**sufficient combined image, annotation and subject/intended-use rights for this consumer
+service have not been established**. London image copyright is CC BY; that is not itself
+a non-commercial restriction, and does not independently settle subject consent, privacy
+or personality rights.
 The public model must therefore be trained on first-party consented data, or on data licensed
-from its owners for that purpose. The data, not the model, is the critical path.
+from its owners for that purpose. Intended-use rights and independent evaluation remain critical-path gates alongside model quality.
 
 | Stage | Exit criterion | Status |
 | --- | --- | --- |
@@ -177,8 +181,10 @@ from its owners for that purpose. The data, not the model, is the critical path.
   margin. Never infer protected traits.
 - S4. Robustness on real repeat captures (pose, lighting, device), not synthetic
   perturbations: within-person drift ≤ 0.3 native points.
-- S5. Displayed uncertainty calibrated on the holdout (for example conformal intervals with
-  verified coverage). The input check validated on real out-of-scope uploads.
+- S5. Fit uncertainty and input-suitability thresholds on subject-disjoint development
+  calibration data, freeze them before the external holdout, and evaluate coverage and
+  false-accept/reject rates once on that untouched holdout. Never calibrate on the same
+  holdout used to verify coverage.
 
 **Licensing and rights**
 - L1. Training images, labels and derived weights covered by consent for the intended
@@ -232,3 +238,56 @@ from its owners for that purpose. The data, not the model, is the critical path.
 ## 5. Verification
 
 See the PR description for the full suite results.
+
+
+## Independent review qualification (Codex, 2026-11-07)
+
+The reported aggregate numbers above are Claude's development observations. This fresh
+review environment has no London source ratings, authorized development portraits,
+checkpoint or reviewed encoder graph. I checked the fold/exclusion code, aggregate
+arithmetic and generated-fixture regressions; I did **not** independently rerun the real
+80-subject comparison, six real-weight checks or human-portrait inference. No new data
+was downloaded and no sealed labels were inspected. Do not confuse transport-fixture
+browser tests with genuine trained-model evidence.
+
+The `1.85`/`2.82` thresholds are experimental training-feature distance rules. No
+false-acceptance/rejection study or subgroup uncertainty supports them. In particular,
+near-feature non-faces can pass and lawful pose/lighting/camera variation can fail;
+this is not face detection. They were not retuned in review. The corrected wire
+contracts check verdict/distance consistency. Missing profiles cannot produce a new
+score, while historical unchecked scores remain readable and explicitly labelled.
+History selection now re-fetches the job so another-tab deletion/expiry is respected.
+Only exact image-submit routes receive the larger proxy budget.
+
+The reported rater statistic is a one-way variance-components estimate under this
+particular face/rater population and missingness pattern, not a universally applicable
+single-rater ICC. The finite-k panel is part of its 2,324-person reference consensus,
+which slightly favours agreement; a disjoint reference and uncertainty over subjects
+and raters are needed for a confirmatory budget analysis. `12` and `30`, and the
+400/200 subject targets, are planning hypotheses rather than validated sample sizes
+or universal sufficiency guarantees. Select budgets from independent agreement and
+precision targets on an approved feasibility pilot, without changing the frozen test.
+
+All encoder comparisons and intervals are exploratory, conditional on fixed OOF
+predictions and repeated overlapping folds. They exclude retraining, model-selection,
+rater and threshold uncertainty; no multiple-comparison correction or equivalence
+margin was specified. Not detecting a gain is not proof of inferiority or equivalence.
+TTA's selector scores clean inner-validation views, so it does not fully select the
+same averaged estimator evaluated outside; compare that estimator prospectively if
+pursued. Recorded timm licence metadata/hash prefixes are not a complete independent
+service-use rights audit, and none of those encoders was promoted.
+
+The current Phase 7A consent/export policy is **non-commercial research only**. First-
+party collection does not automatically grant consumer-service rights. A consumer beta
+requires purpose-specific rights/consent review and authorization in addition to
+separate calibration, external evaluation, privacy/withdrawal operations and abuse
+controls. Code merging and those activation decisions are distinct.
+
+
+Precomputed research runners now validate their development table against the immutable
+subject registry before reading numeric labels, embeddings or rating cells. For `compare`
+and `learning_curve`, set `AUVYLEN_LONDON_REGISTRY` to the approved private
+`subject-metadata.json`; `embed.py` takes that registry as its third argument and requires
+the inference package in its separate research environment. `rater_budget.py` checks the
+registry under its existing private root. No runner can rely on a filename alone to
+certify that its input excludes the sealed subjects.
