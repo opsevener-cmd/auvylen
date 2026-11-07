@@ -153,3 +153,37 @@ test("a new consent version requires fresh checkbox confirmations",async({page,b
   await expect(participant.getByRole("button",{name:"Accept this consent version",exact:true})).toBeDisabled();
   await context.close();
 });
+
+
+test("real browser/proxy native preview transport: private queue, withholding, history and deletion",async({page,browser})=>{
+  test.setTimeout(60000);
+  // No page.route mocks: the real proxy, auth, upload decoder, storage, queue and
+  // result validation run. Only model execution in the isolated test server is a
+  // withheld-result fixture; this test is NOT trained-model inference evidence.
+  await login(page.request,"owner_god");
+  await page.goto("/research/native-preview");
+  await expect(page.getByText("TRANSPORT FIXTURE — NO MODEL INFERENCE",{exact:true})).toBeVisible();
+  await page.getByLabel("Authorized adult portrait",{exact:true}).setInputFiles({name:"generated-native-transport.png",mimeType:"image/png",buffer:image()});
+  await page.getByRole("checkbox").check();
+  const saved=page.waitForResponse(r=>r.url().endsWith("/native-preview/jobs")&&r.request().method()==="POST");
+  await page.getByRole("button",{name:"Run private native preview",exact:true}).click();
+  const response=await saved;expect(response.status()).toBe(202);
+  expect(response.headers()["cache-control"]).toBe("private, no-store");
+  const id=(await response.json()).id;
+  await expect(page.getByText("No score for this image",{exact:true})).toBeVisible({timeout:15000});
+  await expect(page.locator(".score-hero")).toHaveCount(0);
+  await expect(page.locator(".native-history-list li")).toHaveCount(1);
+  await page.getByRole("button",{name:"中文",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Auvylen 原生模型研究预览",exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.getByRole("button",{name:"English",exact:true}).click();
+  await page.getByRole("button",{name:"Delete this preview now",exact:true}).click();
+  await expect(page.getByText("Preview deleted. Its image and result were removed.",{exact:true})).toBeVisible();
+  await expect(page.locator(".native-history-list li")).toHaveCount(0);
+  expect((await page.request.get(`/api/v1/research/native-preview/jobs/${id}`)).status()).toBe(404);
+  const other=await browser.newContext({baseURL:origin});
+  await login(other.request,"study-fixture-rater-0");
+  expect((await other.request.get("/api/v1/research/native-preview/status")).status()).toBe(403);
+  expect((await other.request.get(`/api/v1/research/native-preview/jobs/${id}`)).status()).toBe(403);
+  await other.close();
+});
