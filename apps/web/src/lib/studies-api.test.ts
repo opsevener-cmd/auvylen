@@ -21,6 +21,8 @@ describe("private study contracts and proxy boundary",()=>{
   it("retains disabled consumer scoring and hides blind-repeat metadata",()=>{
     expect(studyStatusSchema.safeParse({enabled:true,real_collection_enabled:false,owner:false,consumer_scoring_enabled:true}).success).toBe(false);
     expect(studyAssignmentSchema.parse({id,expires_at:"time",not_before:"time",repeat:true})).not.toHaveProperty("repeat");
-    for(const key of ["DRAFT","OPEN","PAUSED","CLOSED","SEALED","contributor","rater","custodian","I confirm I am an adult (18+).","I read and understood this version and am participating voluntarily.","I authorize the described private research processing, human ratings and research-derived weights, without commercial or public-display permission.","I confirm this is an authorized test-fixture workflow, not real participant collection."]) expect(translate("zh-CN",key)).not.toBe(key);
+    expect(translate("zh-CN","left")).toBe("更喜欢左侧");
+    expect(translate("zh-CN","right")).toBe("更喜欢右侧");
+    for(const key of ["Front-facing","Left-facing","Right-facing","Other pose","Diffuse lighting","Side lighting","Low light","Other lighting","DRAFT","OPEN","PAUSED","CLOSED","SEALED","contributor","rater","custodian","I confirm I am an adult (18+).","I read and understood this version and am participating voluntarily.","I authorize the described private research processing, human ratings and research-derived weights, without commercial or public-display permission.","I confirm this is an authorized test-fixture workflow, not real participant collection."]) expect(translate("zh-CN",key)).not.toBe(key);
   });
 });

@@ -314,8 +314,8 @@
   "PAID": "已付款",
   "TRAIN": "训练",
   "PREDICT": "预测",
-  "left": "向左",
-  "right": "向右",
+  "left": "更喜欢左侧",
+  "right": "更喜欢右侧",
   "equal": "同样喜欢",
   "skip": "已跳过",
   "enabled": "已启用",
@@ -1007,5 +1007,13 @@
   "Sealed": "已封存",
   "Awaiting review": "等待审核",
   "Portrait approved": "肖像已通过审核",
-  "Portrait rejected": "肖像未通过审核"
+  "Portrait rejected": "肖像未通过审核",
+  "Front-facing": "正面",
+  "Left-facing": "向左侧脸",
+  "Right-facing": "向右侧脸",
+  "Other pose": "其他姿态",
+  "Diffuse lighting": "均匀柔光",
+  "Side lighting": "侧面光",
+  "Low light": "弱光",
+  "Other lighting": "其他光照"
 }
