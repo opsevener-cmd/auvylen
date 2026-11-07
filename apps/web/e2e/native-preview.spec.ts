@@ -25,7 +25,7 @@ test("native preview disabled in both languages, no numeric result", async ({pag
 test("private upload: language switching, binary body, queued state and cancellation", async ({page}) => {
   let submits = 0; let deleted = false;
   await page.route("**/api/v1/**", async route => {
-    const endpoint = new URL(route.request().url()).pathname;
+    const endpoint = new URL(route.request().url()).pathname; if (endpoint === base + "/jobs" && route.request().method() === "GET") {await route.fulfill({json: []}); return;}
     if (endpoint === base + "/status") {await route.fulfill({json: {available: true, consumer_enabled: false, native_scale: [1, 7], collection: "UI contract fixture, not inference evidence", encoder: "contract-fixture", manifest_sha256: "a".repeat(64)}}); return;}
     if (endpoint.endsWith("/auth/csrf")) {await route.fulfill({json: {csrf_token: "test-only-token"}}); return;}
     if (endpoint === base + "/jobs") {
@@ -68,7 +68,7 @@ test("reload restores a completed request with release-gate reasons; screenshots
   const errors: string[] = [];
   page.on("pageerror", e => errors.push(e.message));
   await page.route("**/api/v1/**", async route => {
-    const endpoint = new URL(route.request().url()).pathname;
+    const endpoint = new URL(route.request().url()).pathname; if (endpoint === base + "/jobs" && route.request().method() === "GET") {await route.fulfill({json: []}); return;}
     if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
     if (endpoint === `${base}/jobs/${job.id}`) {await route.fulfill({json: {...job, status: "COMPLETED", progress: 100, result: fixtureResult, completed_at: "2026-11-01T00:00:05Z"}}); return;}
     await route.fulfill({status: 404, json: {detail: "Not found"}});
@@ -91,7 +91,7 @@ test("reload restores a completed request with release-gate reasons; screenshots
 
 test("an expired restored request is dropped from the URL; no score shown", async ({page}) => {
   await page.route("**/api/v1/**", async route => {
-    const endpoint = new URL(route.request().url()).pathname;
+    const endpoint = new URL(route.request().url()).pathname; if (endpoint === base + "/jobs" && route.request().method() === "GET") {await route.fulfill({json: []}); return;}
     if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
     await route.fulfill({status: 404, json: {detail: "Research job not found"}});
   });
@@ -103,7 +103,7 @@ test("an expired restored request is dropped from the URL; no score shown", asyn
 
 test("a stale Owner sign-in gets a specific message and keeps the chosen photograph", async ({page}, info) => {
   await page.route("**/api/v1/**", async route => {
-    const endpoint = new URL(route.request().url()).pathname;
+    const endpoint = new URL(route.request().url()).pathname; if (endpoint === base + "/jobs" && route.request().method() === "GET") {await route.fulfill({json: []}); return;}
     if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
     if (endpoint.endsWith("/auth/csrf")) {await route.fulfill({json: {csrf_token: "test-only-token"}}); return;}
     if (endpoint === base + "/jobs") {await route.fulfill({status: 403, json: {detail: "Fresh Owner sign-in required for this operation"}}); return;}
@@ -127,7 +127,7 @@ test("a stale Owner sign-in gets a specific message and keeps the chosen photogr
 test("an expired poll clears the pending job and unlocks a new request", async ({page}) => {
   let reads = 0;
   await page.route("**/api/v1/**", async route => {
-    const endpoint = new URL(route.request().url()).pathname;
+    const endpoint = new URL(route.request().url()).pathname; if (endpoint === base + "/jobs" && route.request().method() === "GET") {await route.fulfill({json: []}); return;}
     if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
     if (endpoint === `${base}/jobs/${job.id}` && reads++ === 0) {await route.fulfill({json: job}); return;}
     await route.fulfill({status: 404, json: {detail: "Research job not found"}});
@@ -144,7 +144,7 @@ test("a slow restoration cannot overwrite a new portrait request", async ({page}
   let release!: () => void;
   const delayed = new Promise<void>(resolve => {release = resolve;});
   await page.route("**/api/v1/**", async route => {
-    const endpoint = new URL(route.request().url()).pathname;
+    const endpoint = new URL(route.request().url()).pathname; if (endpoint === base + "/jobs" && route.request().method() === "GET") {await route.fulfill({json: []}); return;}
     if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
     await delayed;
     await route.fulfill({json: {...job, status: "COMPLETED", result: fixtureResult}});
@@ -162,7 +162,7 @@ test("a slow restoration cannot overwrite a new portrait request", async ({page}
 
 test("restored results show their own checkpoint when the active pin changed", async ({page}) => {
   await page.route("**/api/v1/**", async route => {
-    const endpoint = new URL(route.request().url()).pathname;
+    const endpoint = new URL(route.request().url()).pathname; if (endpoint === base + "/jobs" && route.request().method() === "GET") {await route.fulfill({json: []}); return;}
     if (endpoint === base + "/status") {await route.fulfill({json: {...available, manifest_sha256: "b".repeat(64)}}); return;}
     await route.fulfill({json: {...job, status: "COMPLETED", result: fixtureResult}});
   });
@@ -174,7 +174,7 @@ test("restored results show their own checkpoint when the active pin changed", a
 
 for (const state of ["QUEUED", "FAILED"]) test(`a ${state} response cannot display a score`, async ({page}) => {
   await page.route("**/api/v1/**", async route => {
-    const endpoint = new URL(route.request().url()).pathname;
+    const endpoint = new URL(route.request().url()).pathname; if (endpoint === base + "/jobs" && route.request().method() === "GET") {await route.fulfill({json: []}); return;}
     if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
     await route.fulfill({json: {...job, status: state, result: fixtureResult}});
   });

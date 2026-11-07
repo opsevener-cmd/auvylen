@@ -59,6 +59,11 @@ async def submit(request: Request, user: Owner) -> ResearchJobView:
         upload_slots.release()
 
 
+@router.get("/jobs", response_model=list[ResearchJobView])
+def history(request: Request, user: Owner) -> list[ResearchJobView]:
+    return service(request).history(user.id)
+
+
 @router.get("/jobs/{job_id}", response_model=ResearchJobView)
 def result(job_id: UUID, request: Request, user: Owner) -> ResearchJobView:
     return service(request).get(user.id, job_id)

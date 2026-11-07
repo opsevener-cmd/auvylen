@@ -14,7 +14,15 @@ const statusSchema = z.object({
   available: z.boolean(), consumer_enabled: z.literal(false), native_scale: z.tuple([z.literal(1), z.literal(7)]),
   collection: z.string().optional(), encoder: z.string().optional(), manifest_sha256: z.string().optional(),
   release_failures: z.array(z.string()).optional(),
+  model: z.object({
+    trained_at: z.string().optional(), selection_protocol: z.string().optional(),
+    training_subjects: z.number().int().nullable().optional(), heldout_subjects: z.number().int().nullable().optional(),
+    heldout_mae: z.number().finite().nullable().optional(), heldout_spearman: z.number().finite().nullable().optional(),
+    baseline_mae: z.number().finite().nullable().optional(),
+  }).optional(),
 });
+const historySchema = z.array(researchJobSchema);
+const shortPin = (pin: string) => pin.slice(0, 12);
 export const nativeResultSchema = z.object({predicted_rating: z.number().finite().min(1).max(7), native_scale: z.tuple([z.literal(1), z.literal(7)]), research_only: z.literal(true), consumer_enabled: z.literal(false), synthetic: z.literal(false), manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), collection: z.string(), encoder: z.string()});
 const pending = (job: ResearchJob | null) => job?.status === "QUEUED" || job?.status === "RUNNING";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -57,6 +65,8 @@ export function NativePreviewPage() {
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<Failure | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [history, setHistory] = useState<ResearchJob[] | null>(null);
+  const [historyFailed, setHistoryFailed] = useState(false);
   const key = useRef("");
   const busyRef = useRef(false);
   const abort = useRef<AbortController | null>(null);
@@ -68,6 +78,16 @@ export function NativePreviewPage() {
   }, []);
   const currentId = job?.id;
   const currentStatus = job?.status;
+  const settled = !["QUEUED", "RUNNING"].includes(currentStatus ?? "");
+  // Refresh the list whenever the open request settles, is created or is removed.
+  useEffect(() => {
+    if (!settled) return;
+    let active = true;
+    accountRequest(`${path}/jobs`, historySchema)
+      .then(rows => {if (active) {setHistory(rows); setHistoryFailed(false);}})
+      .catch(() => {if (active) setHistoryFailed(true);});
+    return () => {active = false;};
+  }, [currentId, settled]);
   useEffect(() => {
     let active = true;
     const checking = accountRequest(`${path}/status`, statusSchema).then(value => {if (active) setStatus(value);}).catch(e => {if (active) setError(failure(e));});
@@ -93,14 +113,14 @@ export function NativePreviewPage() {
     let active = true;
     const stop = pollWhileVisible(async () => {
       const value = await accountRequest(`${path}/jobs/${currentId}`, researchJobSchema);
-      if (active) setJob(value);
+      if (active) {setJob(value); if (!pending(value)) setProgress(null);}
       return pending(value);
     }, e => {
       if (!active) return;
       const value = failure(e);
       if (value.status === 404) {clearRequest(); setError(null); setNotice("That preview request has expired or was deleted. Nothing was kept.");}
       else setError(value);
-    });
+    }, 1000); // Owner-only, one job: inference takes well under a second on CPU.
     return () => {active = false; stop();};
   }, [currentId, currentStatus, clearRequest]);
   function choose(next: File | null) {
@@ -142,6 +162,9 @@ export function NativePreviewPage() {
   const signIn = error && (error.status === 401 || error.message === freshOwnerSignIn);
   const locked = busy || restoring || pending(job);
   const failures = status?.release_failures ?? [];
+  const model = status?.model;
+  const activePin = status?.manifest_sha256;
+  const open = (row: ResearchJob) => {setJob(row); setJobParam(row.id); setNotice(null); setError(null);};
   return <section aria-labelledby="native-preview-title" className="aesthetic-workspace native-preview">
     <header className="research-heading">
       <p className="eyebrow">{t("Owner laboratory · private research")}</p>
@@ -188,11 +211,30 @@ export function NativePreviewPage() {
           <div className="native-scale" aria-hidden="true"><span className="native-scale-marker" style={{left: `${(result.predicted_rating - 1) / 6 * 100}%`}} /></div>
           <p className="native-scale-labels text-xs" aria-hidden="true"><span>1</span><span>4</span><span>7</span></p>
           <p className="mt-5">{t("For research inspection only. This result does not unlock consumer scoring or establish model validity for this photograph.")}</p>
+          <div className="native-reading mt-5">
+            <h3>{t("How to read this number")}</h3>
+            <p className="mt-2 text-sm">{t("4 is the raters' average on this relative scale. The prediction estimates how the original adult raters would have scored a similar frontal portrait.")}</p>
+            {model?.heldout_mae != null && model.heldout_subjects != null && result.manifest_sha256 === activePin && <p className="mt-2 text-sm">{t("On {count} people the model never saw, its predictions differed from the raters' average by {mae} points on average. Always guessing the training average differed by {baseline}.", {count: model.heldout_subjects, mae: model.heldout_mae.toFixed(2), baseline: model.baseline_mae == null ? "—" : model.baseline_mae.toFixed(2)})}</p>}
+          </div>
           <dl className="model-facts mt-4 text-sm"><dt>{t("Prediction checkpoint SHA-256")}</dt><dd className="font-mono text-xs">{result.manifest_sha256}</dd></dl>
           <p className="mt-3 text-sm wizard-note">{t("Two decimals are shown for inspection; they do not indicate precision.")}</p>
         </>}
         {expires && <p className="mt-4 text-sm wizard-note">{t("This request and any result are removed by {time}.", {time: expires.toLocaleString(locale)})}</p>}
         <button className="button-secondary mt-6" disabled={busy} onClick={() => void remove()}>{pending(job) ? t("Delete preview and cancel pending work") : t("Delete this preview now")}</button>
+      </section>}
+      {status?.available && <section className="native-history mt-12" aria-labelledby="native-history-title">
+        <h2 id="native-history-title" className="native-section-title">{t("Your retained previews")}</h2>
+        <p className="mt-2 text-sm wizard-note">{t("Each result keeps the checkpoint that produced it. Results are deleted automatically after 24 hours.")}</p>
+        {historyFailed && <p className="mt-4 text-sm" role="status">{t("Preview history is temporarily unavailable.")}</p>}
+        {history && history.length === 0 && <p className="mt-4 text-sm">{t("No retained previews.")}</p>}
+        {history && history.length > 0 && <ul className="native-history-list mt-4">{history.map(row => {
+          const value = row.status === "COMPLETED" && row.result ? nativeResultSchema.safeParse(row.result) : null;
+          const scored = value?.success ? value.data : null;
+          return <li key={row.id} aria-current={row.id === job?.id ? "true" : undefined}>
+            <span className="native-history-score">{scored ? scored.predicted_rating.toFixed(2) : t(row.status === "FAILED" ? "No score" : "Pending")}</span>
+            <span className="native-history-meta">{new Date(row.created_at).toLocaleString(locale)}{scored && <> · <span className="font-mono">{shortPin(scored.manifest_sha256)}</span> · {scored.manifest_sha256 === activePin ? t("current model") : t("earlier model")}</>}</span>
+            <button className="button-secondary" disabled={locked || row.id === job?.id} onClick={() => open(row)}>{t("Open")}</button>
+          </li>;})}</ul>}
       </section>}
     </div>
   </section>;

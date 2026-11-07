@@ -814,5 +814,17 @@
   "Too many preview requests or the research queue is full. Wait a moment, then retry with the same photograph.": "预览请求过多或研究队列已满。请稍候，再用同一张照片重试。",
   "The research preview is disabled or its reviewed checkpoint is no longer valid. No score was generated.": "研究预览已停用，或已审核的模型检查点不再有效。未生成任何分数。",
   "Private preview request": "私密预览请求",
-  "Prediction checkpoint SHA-256": "本次预测模型清单 SHA-256"
+  "Prediction checkpoint SHA-256": "本次预测模型清单 SHA-256",
+  "How to read this number": "如何理解这个分数",
+  "4 is the raters' average on this relative scale. The prediction estimates how the original adult raters would have scored a similar frontal portrait.": "在这个相对量表中，4 代表评分者的平均水平。预测值估计原始成年评分者会如何为类似的正面肖像打分。",
+  "On {count} people the model never saw, its predictions differed from the raters' average by {mae} points on average. Always guessing the training average differed by {baseline}.": "在模型从未见过的 {count} 人身上，其预测与评分者平均分的平均差距为 {mae} 分；若始终猜测训练集平均分，差距为 {baseline} 分。",
+  "Your retained previews": "您保留的预览",
+  "Each result keeps the checkpoint that produced it. Results are deleted automatically after 24 hours.": "每个结果都会记录生成它的模型检查点。结果会在 24 小时后自动删除。",
+  "Preview history is temporarily unavailable.": "预览记录暂时无法加载。",
+  "No retained previews.": "没有保留的预览。",
+  "No score": "无分数",
+  "Pending": "处理中",
+  "current model": "当前模型",
+  "earlier model": "较早的模型",
+  "Open": "打开"
 }

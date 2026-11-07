@@ -20,3 +20,9 @@ describe("Owner boundary contracts", () => {
     expect(adminPageSchema.parse({items: [], total: 0, page: 1, page_size: 20}).items).toEqual([]);
   });
 });
+
+it("forwards the Owner native preview namespace and nothing beside it", () => {
+  const job = "80000000-0000-4000-8000-000000000001";
+  for (const path of ["v1/research/native-preview/status", "v1/research/native-preview/jobs", `v1/research/native-preview/jobs/${job}`, `v1/research/native-preview/jobs/${job}/delete`]) expect(allowedApiPath(path)).toBe(true);
+  for (const path of ["v1/research/native-preview", "v1/research/native-preview/checkpoint", `v1/research/native-preview/jobs/${job}/image`, "v1/research/native-preview/../owner/users"]) expect(allowedApiPath(path)).toBe(false);
+});
