@@ -315,3 +315,9 @@ deployment. See [Owner system and safe Codespaces update](docs/owner-account.md)
 [verification evidence](docs/owner-verification.md). Never put passwords in Git, command
 arguments or chat. `/owner` uses server-side authorization; private model ownership remains
 unchanged. Owner product usage is free, while bounded resource and provider policies apply.
+
+## Consented human rating studies (Phase 7A)
+
+The new private `/research/studies` workflow is disabled by default and verified with
+authorized generated fixtures only. See [the implementation, privacy and release report](docs/phase7a/README.md).
+Consumer scoring and real participant collection remain disabled.

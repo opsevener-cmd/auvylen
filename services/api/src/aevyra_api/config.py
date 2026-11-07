@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     aesthetic_allow_synthetic_test_checkpoint: bool = False
     # Separate Owner laboratory preview. Never changes NativeProvider release eligibility.
     native_preview_enabled: bool = False
+    # Phase 7A: collection is off until reviewed. Fixtures never become human training data.
+    study_collection_enabled: bool = False
+    study_real_collection_enabled: bool = False
+    study_collection_review_reference: str | None = Field(
+        default=None, min_length=3, max_length=200
+    )
+    study_max_photos: int = Field(default=200, ge=10, le=1000)
     native_preview_checkpoint: Path | None = None
     native_preview_manifest_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     native_preview_review_reference: str | None = Field(default=None, min_length=1, max_length=200)
@@ -68,6 +75,16 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def production_defaults(self) -> "Settings":
+        if self.study_collection_enabled and (not self.research_mode or self.public_pilot):
+            raise ValueError("Study collection requires private research mode")
+        if self.study_real_collection_enabled and (
+            not self.study_collection_enabled
+            or not self.study_collection_review_reference
+            or not self.study_collection_review_reference.strip()
+            or self.api_environment not in {"staging", "production"}
+            or not self.session_cookie_secure
+        ):
+            raise ValueError("Real study collection requires an explicit review reference")
         if self.native_preview_enabled and (
             self.api_environment not in {"development", "test"}
             or not self.research_mode

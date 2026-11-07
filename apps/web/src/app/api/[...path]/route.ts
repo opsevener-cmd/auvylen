@@ -52,6 +52,7 @@ async function proxy(request: NextRequest, context: {params: Promise<{path: stri
       signal: AbortSignal.timeout(joined.startsWith("v1/research/preferences/datasets/") && joined.endsWith("/images") ? 125000 : 15000), redirect: "manual",
     });
     const outgoing = new Headers({"Content-Type": response.headers.get("content-type") ?? "application/json", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"});
+    if (joined.startsWith("v1/research/studies/") && response.headers.has("content-disposition")) outgoing.set("Content-Disposition", response.headers.get("content-disposition")!);
     for (const cookie of response.headers.getSetCookie()) outgoing.append("Set-Cookie", cookie);
     return new Response(response.body, {status: response.status, headers: outgoing});
   } catch {
