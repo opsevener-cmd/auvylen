@@ -1,4 +1,7 @@
-# Phase 7A verification report
+# Phase 7A original verification report
+
+The subsequent [PR #16 independent review](peer-review.md) adds focused tests and
+changes new snapshots to metadata-only v2 with private image materialization.
 
 Test environment: managed Linux cloud workspace; local test PostgreSQL/Redis, isolated
 randomized PostgreSQL schemas and fresh in-memory SQLite. No live Codespace, persistent

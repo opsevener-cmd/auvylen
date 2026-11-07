@@ -81,6 +81,10 @@ class StudyCommand(Strict):
     idempotency_key: UUID
 
 
+class ExportCreate(StudyCommand):
+    include_adjusted: bool = Field(default=False, strict=True)
+
+
 class ConsentView(Strict):
     id: UUID
     version: int

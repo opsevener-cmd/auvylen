@@ -1,6 +1,7 @@
 # Phase 7A — consented portrait and independent rating studies
 
 This is a collection workflow, **not a new scoring model or a consumer release**.
+The [PR #16 peer review](peer-review.md) updates the export and rating diagnostics below.
 It adds `/research/studies` to the merged development baseline `3df2ff1` without
 changing accounts, Credits, existing datasets, checkpoints, model providers or release gates.
 No real participant was enrolled, contacted or photographed for this implementation.
@@ -75,10 +76,13 @@ tables. No live database or Codespace migration was executed.
    review; unusual aesthetic opinions are not automatically excluded.
 8. **Owner closes development collection and exports a stable private snapshot.** Only
    approved, active contributors and at least three approved independent primary raters
-   per photo are eligible. The archive has native `means.csv`, raw `annotations.csv`,
+   per photo are eligible. New v2 browser archives omit portrait bytes; the private
+   operator CLI materializes their verified source files. The archive has native `means.csv`, raw `annotations.csv`,
    `collection.json`, exact consent policies, and a SHA-256 manifest. Pseudonymous global
    person IDs keep the same subject grouped across development studies. Login IDs,
    account UUIDs, private invitation codes and identity proofs are not exported.
+   Exploratory rater adjustment is explicit opt-in, marked as full-development fitting,
+   and deliberately rejected by the ordinary trainer; raw means stay the default.
 9. **Withdrawal and deletion remain available when collection is off or sealed.** A
    participant can withdraw all their study roles, delete source derivatives and ratings,
    cancel assignments, and revoke exports. Individual portrait deletion also removes its
@@ -115,6 +119,8 @@ not the independent external test. No study labels were used to tune existing mo
 
 ## Export and native training handoff
 
+New v2 exports contain metadata/labels and a pinned private image inventory; the
+operator CLI copies one verified portrait at a time. Legacy v1 archives remain readable.
 Exports expire after 24 hours. Any data, membership, consent or relevant state change
 revokes prior snapshots. Files are digest verified when served. The download endpoint
 and metadata are private Owner-only and do not use shared caching. ZIP creation is
@@ -130,7 +136,7 @@ uv run python -m aevyra_api.studies.exports \
 ```
 
 `means.csv` uses `images/<uuid>.jpg`; point the native trainer's `--images` argument to
-`private-data/study-run-unique` (the archive root, **not** its `images` subdirectory),
+`private-data/study-run-unique` (the materialized root, **not** its `images` subdirectory),
 `--labels` to its `means.csv`, and `--plan` to its `collection.json`. See
 [the native training protocol](../native-aesthetic/README.md). Fixture exports remain
 `synthetic=true`; they are not real portrait evidence or release candidates. Real
@@ -156,6 +162,9 @@ budget checks; database unique indexes remain the final duplicate fence. No new 
 or frontend dependency and no external analytics/image request was added. Portrait review
 renders twelve images initially, revokes Blob URLs and has explicit pagination controls.
 There is no rating polling or model initialization in the collection path.
+
+Rejected portraits lose access immediately and their physical deletion is retried
+through the erasure outbox; pending erasures still consume the global disk budget.
 
 The existing supervised research worker purges expired portraits/exports and retries
 physical erasure every minute, even after the collection flag is turned off. It reconciles

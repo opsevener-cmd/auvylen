@@ -369,6 +369,13 @@ class Studies:
                 {"version": number, "sha256": digest},
             )
             study.status = "PAUSED"
+            # New work must capture the newly accepted version, never an old pending lease.
+            for assignment in session.scalars(
+                select(Assignment).where(
+                    Assignment.study_id == study.id, Assignment.status == "ASSIGNED"
+                )
+            ):
+                assignment.status = "CANCELLED"
             self.invalidate(session, study, "consent_version")
 
     def action(self, user_id: UUID, study_id: UUID, token: str, body: StudyAction) -> str | None:
@@ -652,7 +659,7 @@ class Studies:
             photo_count=session.scalar(
                 select(func.count())
                 .select_from(Photo)
-                .where(Photo.study_id == study.id, Photo.review != "DELETED")
+                .where(Photo.study_id == study.id, Photo.artifact_id.is_not(None))
             )
             or 0,
             rating_count=sum(rating_counts.values()),
@@ -796,7 +803,7 @@ class Studies:
             self.collection_lock(session)
             count = (
                 session.scalar(
-                    select(func.count()).select_from(Photo).where(Photo.review != "DELETED")
+                    select(func.count()).select_from(Photo).where(Photo.artifact_id.is_not(None))
                 )
                 or 0
             )
@@ -804,11 +811,20 @@ class Studies:
                 session.scalar(
                     select(func.count())
                     .select_from(Photo)
-                    .where(Photo.member_id == member.id, Photo.review != "DELETED")
+                    .where(Photo.member_id == member.id, Photo.artifact_id.is_not(None))
                 )
                 or 0
             )
-            if count >= self.settings.study_max_photos or own >= 6:
+            # Physically pending erasures still consume disk budget until the outbox drains.
+            pending = (
+                session.scalar(
+                    select(func.count())
+                    .select_from(StudyGarbage)
+                    .where(StudyGarbage.namespace.in_(["study-development", "study-holdout"]))
+                )
+                or 0
+            )
+            if count + pending >= self.settings.study_max_photos or own >= 6:
                 raise DomainError("study_limit", 429)
             if session.scalar(select(Photo.id).where(Photo.sha256 == decoded.content_hash)):
                 raise DomainError("study_duplicate_image", 409)
@@ -870,6 +886,10 @@ class Studies:
                 {"photo": str(photo.id), **body.model_dump(mode="json")},
             ):
                 return
+            if body.approved and photo.artifact_id is None:
+                raise DomainError("study_not_found", 404)
+            if not body.approved:
+                self.erase_photo(session, study, photo)
             photo.review = "APPROVED" if body.approved else "REJECTED"
             for a in session.scalars(
                 select(Assignment).where(
@@ -939,9 +959,8 @@ class Studies:
                     .scalar_subquery()
                 )
                 # Balanced coverage: the least-rated eligible portrait first, ties broken at
-                # random. Every portrait reaches k independent ratings before any gets k+1, so
-                # the collection minimum is met with the fewest rater-hours, and no portrait
-                # is starved by arbitrary row order (the old 1000-row sample never saw the rest).
+                # random. Balance is conditional on this rater's eligibility and includes live
+                # reservations. There is no arbitrary 1000-row truncation.
                 least_covered = session.scalar(
                     query.where(Photo.id.not_in(seen), slots < 30)
                     .order_by(slots, func.random())

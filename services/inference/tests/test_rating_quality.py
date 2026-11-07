@@ -83,3 +83,86 @@ def test_reliability_refuses_to_guess_from_little_data():
         reliability([(f"i{i}", f"r{r}", 4) for i in range(20) for r in range(3)])["status"]
         == "insufficient_variation"
     )
+
+
+def test_unbalanced_adjustment_matches_declared_penalized_least_squares():
+    rng = np.random.default_rng(97)
+    rows = []
+    for i in range(30):
+        for r in range(5):
+            if r == 0 or rng.random() < 0.35:
+                rows.append(
+                    (
+                        f"i{i}",
+                        f"r{r}",
+                        4 + 0.02 * i + [-0.8, 0.6, 0.5, -0.4, 0.2][r] + rng.normal(0, 0.1),
+                    )
+                )
+    model = fit_rater_model(rows)
+    assert model.status == "estimated"
+    ip = {v: k for k, v in enumerate(model.images)}
+    rp = {v: k for k, v in enumerate(model.raters)}
+    design = np.zeros((len(rows), len(ip) + len(rp)))
+    for j, (i, r, _) in enumerate(rows):
+        design[j, ip[i]] = 1
+        design[j, len(ip) + rp[r]] = 1
+    penalty = np.zeros((len(rp), design.shape[1]))
+    penalty[:, len(ip) :] = np.eye(len(rp)) * np.sqrt(model.shrinkage)
+    reference = np.linalg.lstsq(
+        np.vstack([design, penalty]), np.r_[[y for _, _, y in rows], np.zeros(len(rp))], rcond=None
+    )[0]
+    np.testing.assert_allclose(model.mean + model.image_effect, reference[: len(ip)], atol=1e-9)
+    np.testing.assert_allclose(model.rater_offset, reference[len(ip) :], atol=1e-9)
+    assert abs(model.rater_offset.sum()) < 1e-9
+
+
+def test_disconnected_saturated_and_resource_bound_designs_return_raw_means():
+    rows = [
+        (f"{c}-i{i}", f"{c}-r{r}", 3 + 0.05 * i + r)
+        for c in range(2)
+        for i in range(12)
+        for r in range(3)
+    ]
+    model = fit_rater_model(rows)
+    assert model.status == "disconnected" and model.components == 2
+    np.testing.assert_allclose(list(model.adjusted().values()), model.raw_mean)
+    assert fit_rater_model([("i", "r", 4)]).status == "insufficient_overlap"
+    rows = [(f"i{i}", f"r{r}", 3 + i % 2 + r % 2) for i in range(3) for r in range(257)]
+    assert fit_rater_model(rows).status == "resource_limit"
+
+
+def test_heterogeneous_missingness_reports_observed_agreement_without_false_projection():
+    _, rows = simulate(15, images=80, raters=20, k=8)
+    # Retain different panel sizes. Using their mean in a nonlinear inversion is invalid.
+    counts = {}
+    uneven = []
+    for i, r, y in rows:
+        counts[i] = counts.get(i, 0) + 1
+        if counts[i] <= (2 if int(i[1:]) % 2 else 8):
+            uneven.append((i, r, y))
+    result = reliability(uneven, draws=40)
+    assert result["status"] == "unequal_coverage_no_projection"
+    assert result["observed_half_interval"] is not None
+    assert result["single_rater"] is None and result["interval_95"] is None
+    assert all(v is None for v in result["raters_needed"].values())
+
+
+def test_invalid_parameters_and_out_of_scale_votes_are_rejected():
+    rows = [(f"i{i}", f"r{r}", 4) for i in range(20) for r in range(3)]
+    with pytest.raises(ValueError):
+        reliability(rows, draws=0)
+    with pytest.raises(ValueError):
+        fit_rater_model([("i", "r", 8)])
+    with pytest.raises(ValueError):
+        fit_rater_model([("", "r", 4)])
+    with pytest.raises(ValueError):
+        projected(-0.1, 3)
+
+
+def test_negative_half_agreement_is_not_replaced_by_zero():
+    rows = [(f"i{i}", "a", float(1 + i % 7)) for i in range(30)]
+    rows += [(f"i{i}", "b", float(7 - i % 7)) for i in range(30)]
+    result = reliability(rows, draws=40)
+    assert result["status"] == "nonpositive_or_uncertain_agreement"
+    assert result["observed_half_correlation"] == pytest.approx(-1)
+    assert result["single_rater"] is None and result["interval_95"] is None

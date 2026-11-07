@@ -227,22 +227,84 @@ def test_full_fixture_collection_rating_export_and_withdrawal(credits, tmp_path)
         assert post(credits, f"/{study}/assignments", key()).json() is None
     login_owner(credits)
     assert act(credits, study, "close").status_code == 200
-    response = post(credits, f"/{study}/exports", key())
+    raw_key = key()
+    from unittest.mock import patch
+
+    with patch(
+        "aevyra_api.research.storage.PrivateArtifactStore.read",
+        side_effect=AssertionError("Metadata snapshots must not read portrait bytes"),
+    ):
+        raw_response = post(credits, f"/{study}/exports", raw_key)
+    assert raw_response.status_code == 201
+    raw_id = raw_response.json()["id"]
+    with ZipFile(
+        BytesIO(credits.client.get(BASE + f"/{study}/exports/{raw_id}/content").content)
+    ) as z:
+        assert "adjusted.csv" not in z.namelist()
+        assert not any(name.startswith("images/") for name in z.namelist())
+    assert (
+        post(credits, f"/{study}/exports", {**raw_key, "include_adjusted": True}).status_code == 409
+    )
+    response = post(credits, f"/{study}/exports", {**key(), "include_adjusted": True})
     assert response.status_code == 201, response.text
     export = response.json()["id"]
     archive = credits.client.get(BASE + f"/{study}/exports/{export}/content")
     assert archive.status_code == 200
     root = tmp_path / "export"
+    from aevyra_api.studies.exports import materialize
+
     with ZipFile(BytesIO(archive.content)) as zipfile:
-        zipfile.extractall(root)  # Server-generated fixture archive only.
+        assert not any(name.startswith("images/") for name in zipfile.namelist())
+    materialize(data, UUID(export), root)
+    # Corrupted source blocks private materialization and leaves no partial dataset.
+    with credits.sessions() as session:
+        source = session.get(Photo, UUID(photo_id))
+        source_path = data.store(session.get(Study, UUID(study)))._path(
+            UUID(study), source.artifact_id
+        )
+    original = source_path.read_bytes()
+    source_path.write_bytes(b"corrupt generated fixture")
+    with pytest.raises(ValueError, match="image integrity"):
+        materialize(data, UUID(export), tmp_path / "partial-export")
+    assert not (tmp_path / "partial-export").exists()
+    source_path.write_bytes(original)
+    # Preserve legacy v1 image-containing snapshots while new browser exports use v2.
+    legacy = BytesIO()
+    raw_archive = credits.client.get(BASE + f"/{study}/exports/{raw_id}/content").content
+    with ZipFile(BytesIO(raw_archive)) as old, ZipFile(legacy, "w") as writer:
+        info = json.loads(old.read("manifest.json"))
+        info["format"] = "auvylen-study-export-v1"
+        inventory = info.pop("private_images")
+        for name in info["sha256"]:
+            writer.writestr(name, old.read(name))
+        import hashlib
+
+        for name in inventory:
+            image_bytes = (root / name).read_bytes()
+            writer.writestr(name, image_bytes)
+            info["sha256"][name] = hashlib.sha256(image_bytes).hexdigest()
+        writer.writestr("manifest.json", json.dumps(info).encode())
+    from aevyra_api.studies.models import StudyExport
+
+    with credits.sessions.begin() as session:
+        old_row = session.get(StudyExport, UUID(raw_id))
+        data.export_store()._path(UUID(study), old_row.artifact_id).write_bytes(legacy.getvalue())
+        old_row.sha256 = hashlib.sha256(legacy.getvalue()).hexdigest()
+    materialize(data, UUID(raw_id), tmp_path / "legacy-export")
+    assert (tmp_path / "legacy-export" / next(iter(inventory))).read_bytes() == original
     plan = Collection.model_validate_json((root / "collection.json").read_bytes())
     assert plan.synthetic and plan.rating_max == 7
     payloads, subjects, labels, _, _ = load_rows(root / "means.csv", root, plan)
     assert len(payloads) == len(set(subjects)) == 1 and labels.tolist() == [4.0]
     assert len(list(csv.DictReader((root / "annotations.csv").open()))) == 3
     # One portrait cannot identify rater offsets: the adjusted label equals the plain mean.
-    adjusted, *_ = load_rows(root / "adjusted.csv", root, plan)[2:3]
-    assert adjusted.tolist() == [4.0]
+    with pytest.raises(ValueError, match="Expected image"):
+        load_rows(
+            root / "adjusted.csv", root, plan
+        )  # Full-development fitting cannot masquerade as heldout labels.
+    adjusted = list(csv.DictReader((root / "adjusted.csv").open()))
+    assert float(adjusted[0]["rating"]) == 4.0
+    assert adjusted[0]["label_policy"] == "full-development-fit-not-evaluation"
     quality = json.loads((root / "reliability.json").read_text())
     assert quality["agreement"]["status"] == "insufficient_data"
     assert quality["rater_model"]["adjusted"] is False
@@ -280,6 +342,11 @@ def test_full_fixture_collection_rating_export_and_withdrawal(credits, tmp_path)
     assert post(credits, f"/{study}/withdraw", key()).status_code == 200
     login_owner(credits)
     assert credits.client.get(BASE + f"/{study}/exports/{export}/content").status_code == 410
+    from aevyra_api.commercial.state import DomainError
+
+    with pytest.raises(DomainError, match="study_export_revoked"):
+        materialize(data, UUID(export), tmp_path / "revoked-export")
+    assert not (tmp_path / "revoked-export").exists()
     with credits.sessions() as session:
         assert session.get(Photo, UUID(photo_id)).artifact_id is None
         assert (
@@ -662,6 +729,37 @@ def test_postgres_duplicate_assignment_and_evidence_guards(tmp_path):
             session.execute(text("TRUNCATE collection_audit"))
         with pytest.raises(DBAPIError), sessions.begin() as session:
             session.execute(text("DELETE FROM collection_receipts"))
+        # Different concurrent raters reserve the least-covered eligible slots, not
+        # just duplicate requests by one rater. Capacity remains the configured value.
+        login(fixture, "fixture-pg-subject")
+        second = photo(fixture, study, color=130).json()["id"]
+        login_owner(fixture)
+        assert (
+            post(
+                fixture,
+                f"/{study}/photos/{second}/review",
+                {**key(), "approved": True, "reason": "Second generated concurrency fixture"},
+            ).status_code
+            == 200
+        )
+        from aevyra_api.studies.models import Member, Person
+
+        all_users = [user.id]
+        for index in range(3):
+            _, member_id = join(fixture, code, "rater", f"fixture-pg-parallel-{index}")
+            approve(fixture, study, member_id, f"fixture-pg-parallel-proof-{index}")
+            with sessions() as session:
+                person = session.get(Person, session.get(Member, UUID(member_id)).person_id)
+                all_users.append(person.user_id)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(lambda uid: data.assignment(uid, UUID(study)), all_users * 2))
+        with sessions() as session:
+            counts = session.execute(
+                select(Assignment.photo_id, func.count())
+                .where(Assignment.study_id == UUID(study), Assignment.status == "ASSIGNED")
+                .group_by(Assignment.photo_id)
+            ).all()
+            assert sorted(count for _, count in counts) == [2, 2]
         fixture.client.close()
 
 
@@ -717,3 +815,169 @@ def test_assignment_fills_least_covered_portraits_first(credits, tmp_path):
             for p in photos
         ]
     assert sorted(counts) == [1, 1, 2, 2]
+
+
+def test_rejection_revokes_access_erases_source_and_cannot_resurrect(credits, tmp_path):
+    data = setup(credits, tmp_path)
+    study, code = create(credits)
+    _, member = join(credits, code, "contributor", "fixture-reject-subject")
+    approve(credits, study, member, "fixture-reject-proof")
+    login(credits, "fixture-reject-subject")
+    photo_id = photo(credits, study).json()["id"]
+    login_owner(credits)
+    response = post(
+        credits,
+        f"/{study}/photos/{photo_id}/review",
+        {**key(), "approved": False, "reason": "Authorized rejection fixture"},
+    )
+    assert response.status_code == 200 and not response.json()["cleanup_pending"]
+    assert credits.client.get(BASE + f"/{study}").json()["photo_count"] == 0
+    assert credits.client.get(BASE + f"/{study}/photos/{photo_id}/content").status_code == 404
+    assert not list(
+        data.store(type("StudyFixture", (), {"partition": "development"})()).root.rglob("*/*")
+    )
+    assert (
+        post(
+            credits,
+            f"/{study}/photos/{photo_id}/review",
+            {**key(), "approved": True, "reason": "Must not restore a removed source"},
+        ).status_code
+        == 404
+    )
+    login(credits, "fixture-reject-subject")
+    assert photo(credits, study).status_code == 201  # Resubmission uses a new immutable upload id.
+
+
+def test_least_covered_assignment_is_not_truncated_at_one_thousand(credits, tmp_path):
+    """Logical DB-only stress fixture; does not raise the real photo cap or ingest images."""
+    data = setup(credits, tmp_path)
+    study, code = create(credits)
+    _, contributor = join(credits, code, "contributor", "fixture-large-contributor")
+    approve(credits, study, contributor, "fixture-large-contributor-proof")
+    _, old_rater = join(credits, code, "rater", "fixture-large-old-rater")
+    approve(credits, study, old_rater, "fixture-large-old-rater-proof")
+    _, new_rater = join(credits, code, "rater", "fixture-large-new-rater")
+    approve(credits, study, new_rater, "fixture-large-new-rater-proof")
+    from aevyra_api.credits.models import User
+    from aevyra_api.studies.models import Member, Person
+
+    with credits.sessions.begin() as session:
+        consent_id = session.get(Member, UUID(contributor)).consent_id
+        photos = []
+        for _ in range(1001):
+            p = Photo(
+                study_id=UUID(study),
+                member_id=UUID(contributor),
+                consent_id=consent_id,
+                request_key=str(uuid4()),
+                artifact_id=uuid4(),
+                review="APPROVED",
+                pose="frontal",
+                lighting="diffuse",
+                expires_at=now() + timedelta(days=1),
+            )
+            session.add(p)
+            photos.append(p)
+        session.flush()
+        for p in photos[:-1]:
+            session.add(
+                Assignment(
+                    study_id=UUID(study),
+                    member_id=UUID(old_rater),
+                    photo_id=p.id,
+                    consent_id=consent_id,
+                    status="SAVED",
+                    score=4,
+                    repeat=False,
+                    expires_at=now() + timedelta(days=1),
+                )
+            )
+        expected = photos[-1].id
+        user_id = session.scalar(
+            select(User.id).join(Person).join(Member).where(Member.id == UUID(new_rater))
+        )
+    assignment = data.assignment(user_id, UUID(study))
+    with credits.sessions() as session:
+        assert session.get(Assignment, assignment.id).photo_id == expected
+    assert data.settings.study_max_photos == 200
+
+
+def test_new_consent_cancels_pending_assignment_before_reacceptance(credits, tmp_path):
+    setup(credits, tmp_path)
+    study, code = create(credits)
+    _, contributor = join(credits, code, "contributor", "fixture-version-subject")
+    approve(credits, study, contributor, "fixture-version-subject-proof")
+    login(credits, "fixture-version-subject")
+    photo_id = photo(credits, study).json()["id"]
+    login_owner(credits)
+    assert (
+        post(
+            credits,
+            f"/{study}/photos/{photo_id}/review",
+            {**key(), "approved": True, "reason": "Generated consent-version fixture"},
+        ).status_code
+        == 200
+    )
+    _, rater = join(credits, code, "rater", "fixture-version-rater")
+    approve(credits, study, rater, "fixture-version-rater-proof")
+    login(credits, "fixture-version-rater")
+    before = post(credits, f"/{study}/assignments", key()).json()["id"]
+    login_owner(credits)
+    assert (
+        post(
+            credits,
+            f"/{study}/consent",
+            {
+                **key(),
+                "text_en": TEXT_EN + " Reviewed version two.",
+                "text_zh": TEXT_ZH + " 第二版。",
+                "contact_en": "Fixture operator",
+                "contact_zh": "测试负责人",
+                "rights_reference": "fixture-v2",
+            },
+        ).status_code
+        == 200
+    )
+    assert act(credits, study, "open").status_code == 200
+    login(credits, "fixture-version-rater")
+    latest = post(credits, "/resolve-invite", {"invite_code": code}).json()["consent"]
+    assert (
+        post(
+            credits,
+            "/join",
+            dict(
+                invite_code=code,
+                role="rater",
+                consent_id=latest["id"],
+                consent_sha256=latest["sha256"],
+                adult_confirmed=True,
+                voluntary=True,
+                understood=True,
+                research_permission=True,
+                fixture_confirmed=True,
+            ),
+        ).status_code
+        == 200
+    )
+    after = post(credits, f"/{study}/assignments", key()).json()["id"]
+    assert after != before
+    with credits.sessions() as session:
+        assert session.get(Assignment, UUID(before)).status == "CANCELLED"
+        assert session.get(Assignment, UUID(after)).consent_id == UUID(latest["id"])
+
+
+def test_pending_erasures_still_reserve_physical_upload_budget(credits, tmp_path):
+    setup(credits, tmp_path)
+    study, code = create(credits)
+    _, member = join(credits, code, "contributor", "fixture-pending-budget")
+    approve(credits, study, member, "fixture-pending-budget-proof")
+    from aevyra_api.studies.models import StudyGarbage
+
+    with credits.sessions.begin() as session:
+        session.add_all(
+            StudyGarbage(study_id=UUID(study), namespace="study-development", artifact_id=uuid4())
+            for _ in range(200)
+        )
+    login(credits, "fixture-pending-budget")
+    assert photo(credits, study).status_code == 429
+    assert credits.client.app.state.settings.study_max_photos == 200
