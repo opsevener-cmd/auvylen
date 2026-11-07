@@ -6,3 +6,9 @@ const owner = /^v1\/owner\/(overview|users(?:\/usr_[0-9a-f]{32}\/(status|researc
 export function allowedApiPath(path: string): boolean {
   return account.test(path) || research.test(path) || owner.test(path) || nativePreview.test(path);
 }
+
+const uploadPrefixes = ["v1/research/preferences/", "v1/research/native-preview/", "v1/research/aesthetic/"];
+/** Upload routes accept the server's 4 MiB images plus framing; everything else stays at 1 MiB. */
+export function requestBodyLimit(path: string): number {
+  return uploadPrefixes.some(prefix => path.startsWith(prefix)) ? 6 * 1024 * 1024 : 1024 * 1024;
+}

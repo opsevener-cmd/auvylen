@@ -298,6 +298,7 @@ details[open] > summary {margin-bottom: 8px;}
 .native-history-list li {display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line);}
 .native-history-list li[aria-current=true] {background: var(--surface);}
 .native-history-score {font-family: var(--serif); font-size: 26px; font-variant-numeric: lining-nums tabular-nums;}
+.native-history-label {font-family: var(--sans); font-size: 13px; color: var(--muted);}
 .native-history-meta {font-size: 13px; color: var(--muted); overflow-wrap: anywhere;}
 
 /* ── Motion: restrained, and disabled for reduced-motion users ───────────── */

@@ -182,3 +182,20 @@ for (const state of ["QUEUED", "FAILED"]) test(`a ${state} response cannot displ
   await expect(page.getByRole("heading", {name: "Private preview request"})).toBeVisible();
   await expect(page.getByRole("heading", {name: "Research prediction · native scale 1–7"})).toHaveCount(0);
 });
+
+for (const [name, result, expected] of [
+  ["an input outside the training portraits shows no number", {...fixtureResult, predicted_rating: null, input_check: {verdict: "outside", distance: 4.4, caution_above: 1.85, outside_above: 2.82}}, "No score for this image"],
+  ["an unusual input is scored with a caution", {...fixtureResult, input_check: {verdict: "unusual", distance: 2.1, caution_above: 1.85, outside_above: 2.82}}, "Treat the number with extra caution"],
+  ["a score claimed for an outside input is rejected", {...fixtureResult, input_check: {verdict: "outside", distance: 4.4, caution_above: 1.85, outside_above: 2.82}}, "The research result could not be verified."],
+] as const) test(name, async ({page}) => {
+  await page.route("**/api/v1/**", async route => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint === base + "/status") {await route.fulfill({json: available}); return;}
+    if (endpoint === base + "/jobs") {await route.fulfill({json: []}); return;}
+    await route.fulfill({json: {...job, status: "COMPLETED", progress: 100, result, completed_at: "2026-11-01T00:00:05Z"}});
+  });
+  await page.goto(`/research/native-preview?job=${job.id}`);
+  await expect(page.getByText(expected)).toBeVisible();
+  if (result.predicted_rating === null || expected.startsWith("The research")) await expect(page.locator(".score-hero")).toHaveCount(0);
+  else await expect(page.locator(".score-hero")).toContainText("4.25");
+});

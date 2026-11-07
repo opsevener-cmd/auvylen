@@ -826,5 +826,8 @@
   "Pending": "处理中",
   "current model": "当前模型",
   "earlier model": "较早的模型",
-  "Open": "打开"
+  "Open": "打开",
+  "No score for this image": "这张图片没有分数",
+  "It does not resemble the frontal adult portraits the model learned from, so no number is shown. Use a clear, front-facing photograph of one adult that fills most of the frame.": "它与模型学习过的成人正面肖像差异过大，因此不显示分数。请使用一张清晰、正面、并占据画面大部分的单人成人照片。",
+  "This image looks unlike the frontal portraits the model learned from (for example rotated, tightly cropped or unusually lit). Treat the number with extra caution.": "这张图片与模型学习过的正面肖像不太相似（例如被旋转、裁剪过紧或光线异常）。请格外谨慎地看待这个分数。"
 }

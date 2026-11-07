@@ -23,7 +23,8 @@ const statusSchema = z.object({
 });
 const historySchema = z.array(researchJobSchema);
 const shortPin = (pin: string) => pin.slice(0, 12);
-export const nativeResultSchema = z.object({predicted_rating: z.number().finite().min(1).max(7), native_scale: z.tuple([z.literal(1), z.literal(7)]), research_only: z.literal(true), consumer_enabled: z.literal(false), synthetic: z.literal(false), manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), collection: z.string(), encoder: z.string()});
+const inputCheckSchema = z.object({verdict: z.enum(["typical", "unusual", "outside", "unchecked"]), distance: z.number().finite().nullable().optional(), caution_above: z.number().finite().nullable().optional(), outside_above: z.number().finite().nullable().optional()});
+export const nativeResultSchema = z.object({predicted_rating: z.number().finite().min(1).max(7).nullable(), input_check: inputCheckSchema.default({verdict: "unchecked"}), native_scale: z.tuple([z.literal(1), z.literal(7)]), research_only: z.literal(true), consumer_enabled: z.literal(false), synthetic: z.literal(false), manifest_sha256: z.string().regex(/^[a-f0-9]{64}$/), collection: z.string(), encoder: z.string()}).refine(v => (v.predicted_rating === null) === (v.input_check.verdict === "outside"), "A score is withheld exactly when the input is outside");
 const pending = (job: ResearchJob | null) => job?.status === "QUEUED" || job?.status === "RUNNING";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RESULT_HOURS = 24;
@@ -202,11 +203,16 @@ export function NativePreviewPage() {
         </form>
       </>}
       {job && <section className="result-card native-result mt-10" aria-live="polite" aria-labelledby="native-result-title">
-        <h2 id="native-result-title">{result ? t("Research prediction · native scale 1–7") : t("Private preview request")}</h2>
+        <h2 id="native-result-title">{result?.predicted_rating != null ? t("Research prediction · native scale 1–7") : t("Private preview request")}</h2>
         {pending(job) && <p className="mt-4" role="status">{t("Native inference queued or running. The result appears only after verified worker completion.")}</p>}
         {job.status === "FAILED" && <p className="mt-4" role="alert">{t("Research inference failed or expired. No score was generated. Delete this request before starting again.")}</p>}
         {job.status === "COMPLETED" && !result && <p className="mt-4" role="alert">{t("The research result could not be verified.")}</p>}
-        {result && <>
+        {result && result.predicted_rating === null && <div className="native-reading mt-5" role="status">
+          <h3>{t("No score for this image")}</h3>
+          <p className="mt-2 text-sm">{t("It does not resemble the frontal adult portraits the model learned from, so no number is shown. Use a clear, front-facing photograph of one adult that fills most of the frame.")}</p>
+        </div>}
+        {result && result.predicted_rating !== null && <>
+          {result.input_check.verdict === "unusual" && <p className="mt-4" role="status">{t("This image looks unlike the frontal portraits the model learned from (for example rotated, tightly cropped or unusually lit). Treat the number with extra caution.")}</p>}
           <p className="score-hero">{result.predicted_rating.toFixed(2)}<span> / 7</span></p>
           <div className="native-scale" aria-hidden="true"><span className="native-scale-marker" style={{left: `${(result.predicted_rating - 1) / 6 * 100}%`}} /></div>
           <p className="native-scale-labels text-xs" aria-hidden="true"><span>1</span><span>4</span><span>7</span></p>
@@ -231,7 +237,7 @@ export function NativePreviewPage() {
           const value = row.status === "COMPLETED" && row.result ? nativeResultSchema.safeParse(row.result) : null;
           const scored = value?.success ? value.data : null;
           return <li key={row.id} aria-current={row.id === job?.id ? "true" : undefined}>
-            <span className="native-history-score">{scored ? scored.predicted_rating.toFixed(2) : t(row.status === "FAILED" ? "No score" : "Pending")}</span>
+            {scored?.predicted_rating != null ? <span className="native-history-score">{scored.predicted_rating.toFixed(2)}</span> : <span className="native-history-score native-history-label">{t(scored || row.status === "FAILED" ? "No score" : "Pending")}</span>}
             <span className="native-history-meta">{new Date(row.created_at).toLocaleString(locale)}{scored && <> · <span className="font-mono">{shortPin(scored.manifest_sha256)}</span> · {scored.manifest_sha256 === activePin ? t("current model") : t("earlier model")}</>}</span>
             <button className="button-secondary" disabled={locked || row.id === job?.id} onClick={() => open(row)}>{t("Open")}</button>
           </li>;})}</ul>}
