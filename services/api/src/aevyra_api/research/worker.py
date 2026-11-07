@@ -19,6 +19,7 @@ from aevyra_api.preferences.training import ModelService
 from aevyra_api.research.jobs import ResearchQueue
 from aevyra_api.research.lease import HEARTBEAT, LeaseHeartbeat
 from aevyra_api.research.native_preview import NativePreview
+from aevyra_api.studies.service import Studies
 
 logger = logging.getLogger("aevyra.worker")
 
@@ -91,6 +92,7 @@ def main() -> None:
                     PreferenceService(checks.sessions, settings).purge()
                     AestheticService(checks.sessions, settings).purge()
                     NativePreview(checks.sessions, settings).purge()
+                    Studies(checks.sessions, settings).purge()
                     last_cleanup = time.monotonic()
                 checks.redis.set(
                     "auvylen:worker:heartbeat:" + settings.worker_queue, str(time.time()), ex=120

@@ -30,6 +30,7 @@ from aevyra_api.routes import (
     preferences,
     research,
     scoring,
+    studies,
 )
 
 
@@ -183,6 +184,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(custom_models.router)
     application.include_router(aesthetic.router)
     application.include_router(native_preview.router)
+    application.include_router(studies.router)
     return application
 
 

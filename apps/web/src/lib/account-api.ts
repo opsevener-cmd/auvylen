@@ -1,5 +1,6 @@
 import type {Account, CreditProduct, RedemptionResult} from "@auvylen/contracts";
 import {z} from "zod";
+import {studyErrors} from "./studies-api";
 import {analysisSchema} from "./api-schemas";
 
 const credits = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
@@ -62,6 +63,13 @@ function serverDetail(responseBody: string): unknown {
 
 /** Only map exact known server error codes; never expose arbitrary error bodies. */
 export function requestError(path: string, status: number, responseBody = ""): AccountError {
+    if (path.startsWith("/research/studies")) {
+      const detail = serverDetail(responseBody);
+      if (typeof detail === "string" && Object.hasOwn(studyErrors, detail)) return new AccountError(status, studyErrors[detail]);
+      const fallback: Record<number, string> = {401: "Sign in to participate in a private study.", 403: "This study action is not authorized. Check your sign-in and permissions.", 404: "This study item is unavailable or you do not have access.", 413: "Image upload exceeds the size limit.", 422: "Check the study fields and required confirmations.", 429: "Too many study requests. Wait a moment and retry safely."};
+      return new AccountError(status, fallback[status] ?? "Service temporarily unavailable.");
+    }
+
     if (path.startsWith("/research/native-preview")) {
       const detail = status === 403 ? serverDetail(responseBody) : undefined;
       const forbidden: Record<string, string> = {

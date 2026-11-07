@@ -69,7 +69,7 @@ export function AccountPage({historyOnly = false}: {historyOnly?: boolean}) {
     {!historyOnly && <>
       <p className="mt-5">{account.user.login_identifier}{account.user.role === "owner" ? t(" · OWNER") : ""}</p>
       <p className="mt-6 text-2xl">{account.user.role === "owner" ? t("Owner access · No Credit charge") : t("Balance: {value0} Credits", {value0: account.wallet.balance})}</p>
-      <div className="mt-5 flex gap-5">{account.user.role === "owner" ? <Link href="/owner" className="underline">{t("Owner dashboard")}</Link> : <Link href="/redeem" className="underline">{t("Redeem Code")}</Link>}<Link href="/analyze" className="underline">{t("Run Analysis")}</Link></div>
+      <div className="mt-5 flex gap-5">{account.user.role === "owner" ? <Link href="/owner" className="underline">{t("Owner dashboard")}</Link> : <Link href="/redeem" className="underline">{t("Redeem Code")}</Link>}<Link href="/analyze" className="underline">{t("Run Analysis")}</Link><Link href="/research/studies" className="underline">{t("Human rating studies")}</Link></div>
       <h2 className="mt-10 text-xl">{t("Recent credit transactions")}</h2>
       <ul className="mt-4 divide-y divide-black/10">{account.wallet.transactions.map(entry => <li key={entry.id} className="py-3">
         {entry.amount > 0 ? "+" : ""}{entry.amount} · {t(entry.transaction_type)} {t("· Balance")} {entry.balance_after}
