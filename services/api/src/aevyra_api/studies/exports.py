@@ -3,6 +3,7 @@
 import csv
 import hashlib
 import json
+import math
 from datetime import timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -11,6 +12,7 @@ from zipfile import ZIP_STORED, ZipFile
 
 from aevyra_contracts.studies import ExportView
 from aevyra_inference.native_data import Collection, Rights
+from aevyra_inference.rating_quality import fit_rater_model, reliability
 from pydantic import JsonValue
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -205,6 +207,8 @@ class Exports:
         receipts: dict[str, dict[str, str]] = {}
         subjects: set[str] = set()
         hashes: dict[str, str] = {}
+        votes: list[tuple[str, str, float]] = []
+        label_rows: list[tuple[str, str, int, str]] = []
         total = 0
         with ZipFile(output, "w", compression=ZIP_STORED, allowZip64=False) as archive:
             for photo, ratings in rows:
@@ -281,12 +285,41 @@ class Exports:
                 hashes[name] = hashlib.sha256(image).hexdigest()
                 score = sum(a.score for a in ratings if a.score is not None) / len(ratings)
                 mw.writerow([name, subject, score, len(ratings), right, "not_reported"])
+                label_rows.append((name, subject, len(ratings), right))
                 for a in ratings:
                     rater = session.get(Member, a.member_id)
-                    assert rater is not None
+                    assert rater is not None and a.score is not None
+                    votes.append((name, str(rater.person_id), float(a.score)))
                     aw.writerow(
                         [name, subject, str(rater.person_id), a.score, right, "not_reported"]
                     )
+            # Rater-adjusted labels in the means.csv format, so the native trainer can use
+            # either file unchanged. Offsets are fitted on this snapshot's primary votes only.
+            model = fit_rater_model(votes)
+            adjusted_labels = model.adjusted(1.0, 7.0)
+            adjusted = StringIO()
+            adjusted_writer = csv.writer(adjusted)
+            adjusted_writer.writerow(
+                ["image", "subject_id", "rating", "rating_count", "rights_id", "cohort"]
+            )
+            for name, subject, count, right in label_rows:
+                adjusted_writer.writerow(
+                    [name, subject, adjusted_labels[name], count, right, "not_reported"]
+                )
+            quality = {
+                "agreement": reliability(votes),
+                "rater_model": {
+                    "method": "additive image + rater offsets; method-of-moments shrinkage",
+                    "rater_variance": model.rater_var,
+                    "noise_variance": model.noise_var if math.isfinite(model.noise_var) else None,
+                    "shrinkage": model.shrinkage,
+                    "adjusted": model.shrinkage is not None,
+                },
+                "caution": (
+                    "Agreement among these raters, not model accuracy or validity. Offsets use "
+                    "every exported image, so internal train/test splits share rater estimates."
+                ),
+            }
             collection = Collection(
                 name="Auvylen consented development collection " + str(study.id),
                 rights=rights,
@@ -298,6 +331,8 @@ class Exports:
             )
             files = {
                 "means.csv": means.getvalue().encode(),
+                "adjusted.csv": adjusted.getvalue().encode(),
+                "reliability.json": json.dumps(quality, sort_keys=True, allow_nan=False).encode(),
                 "annotations.csv": annotations.getvalue().encode(),
                 "collection.json": collection.model_dump_json(indent=2).encode(),
                 "consents.json": json.dumps(grants, sort_keys=True, ensure_ascii=False).encode(),

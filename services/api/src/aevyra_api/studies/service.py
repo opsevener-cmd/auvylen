@@ -938,9 +938,16 @@ class Studies:
                     .correlate(Photo)
                     .scalar_subquery()
                 )
-                candidates = list(
-                    session.scalars(query.where(Photo.id.not_in(seen), slots < 30).limit(1000))
+                # Balanced coverage: the least-rated eligible portrait first, ties broken at
+                # random. Every portrait reaches k independent ratings before any gets k+1, so
+                # the collection minimum is met with the fewest rater-hours, and no portrait
+                # is starved by arbitrary row order (the old 1000-row sample never saw the rest).
+                least_covered = session.scalar(
+                    query.where(Photo.id.not_in(seen), slots < 30)
+                    .order_by(slots, func.random())
+                    .limit(1)
                 )
+                candidates = [] if least_covered is None else [least_covered]
                 repeat = False
                 # A blind consistency repeat never counts as another independent rating.
                 saved = (

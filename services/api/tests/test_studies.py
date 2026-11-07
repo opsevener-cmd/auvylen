@@ -240,6 +240,12 @@ def test_full_fixture_collection_rating_export_and_withdrawal(credits, tmp_path)
     payloads, subjects, labels, _, _ = load_rows(root / "means.csv", root, plan)
     assert len(payloads) == len(set(subjects)) == 1 and labels.tolist() == [4.0]
     assert len(list(csv.DictReader((root / "annotations.csv").open()))) == 3
+    # One portrait cannot identify rater offsets: the adjusted label equals the plain mean.
+    adjusted, *_ = load_rows(root / "adjusted.csv", root, plan)[2:3]
+    assert adjusted.tolist() == [4.0]
+    quality = json.loads((root / "reliability.json").read_text())
+    assert quality["agreement"]["status"] == "insufficient_data"
+    assert quality["rater_model"]["adjusted"] is False
     assert "fixture-rater" not in archive.content.decode("latin1")
     import hashlib
 
@@ -672,3 +678,42 @@ def test_portrait_deletion_is_idempotent_without_touching_other_research(credits
     assert post(credits, f"/{study}/photos/{photo_id}/delete", payload).status_code == 200
     assert credits.client.get(BASE + f"/{study}").json()["revision"] == revision
     assert post(credits, f"/{study}/withdraw", payload).status_code == 409
+
+
+def test_assignment_fills_least_covered_portraits_first(credits, tmp_path):
+    setup(credits, tmp_path)
+    study, code = create(credits)
+    _, contributor = join(credits, code, "contributor", "balance-contributor")
+    approve(credits, study, contributor, "balance-person-1")
+    login(credits, "balance-contributor")
+    photos = [photo(credits, study, color=40 + 30 * i).json()["id"] for i in range(4)]
+    login_owner(credits)
+    for photo_id in photos:
+        response = post(
+            credits,
+            f"/{study}/photos/{photo_id}/review",
+            {**key(), "approved": True, "reason": "Authorized generated test fixture"},
+        )
+        assert response.status_code == 200, response.text
+    seen: dict[str, list[str]] = {}
+    for name in ("balance-rater-a", "balance-rater-b", "balance-rater-c"):
+        _, member = join(credits, code, "rater", name)
+        approve(credits, study, member, name + "-proof")
+        login(credits, name)
+        seen[name] = []
+        for _ in range(2):
+            with credits.sessions() as session:
+                aid = rate(credits, study)
+                seen[name].append(str(session.get(Assignment, UUID(aid)).photo_id))
+    # Rater B must first cover the two portraits rater A never saw; C then fills the rest.
+    assert set(seen["balance-rater-b"]) == set(photos) - set(seen["balance-rater-a"])
+    with credits.sessions() as session:
+        counts = [
+            session.scalar(
+                select(func.count())
+                .select_from(Assignment)
+                .where(Assignment.photo_id == UUID(p), Assignment.status == "SAVED")
+            )
+            for p in photos
+        ]
+    assert sorted(counts) == [1, 1, 2, 2]
