@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import math
 import os
 import subprocess
 import sys
@@ -40,6 +41,30 @@ RESULT_TTL = timedelta(hours=24)
 
 def is_preview(job: ResearchJob) -> bool:
     return job.provider == SLUG and (job.payload or {}).get("operation") == OPERATION
+
+
+def model_context(item: Manifest) -> dict[str, JsonValue]:
+    """Aggregate provenance and held-out evidence recorded at training time.
+
+    These are the checkpoint's own recorded numbers, shown so a 1–7 prediction can be read
+    against the model's typical error. They are aggregate, not an interval for one portrait.
+    """
+    report = item.report
+
+    def metric(section: str, key: str) -> JsonValue:
+        value = (report.get(section) or {}).get(key)
+        return value if isinstance(value, int | float) and math.isfinite(value) else None
+
+    counts = report.get("subject_counts") or {}
+    return {
+        "trained_at": item.created_at,
+        "selection_protocol": report.get("selection_protocol", "validation-3"),
+        "training_subjects": counts.get("train"),
+        "heldout_subjects": counts.get("test"),
+        "heldout_mae": metric("test", "mae"),
+        "heldout_spearman": metric("test", "spearman"),
+        "baseline_mae": metric("mean_baseline", "mae"),
+    }
 
 
 def canonical(payload: bytes) -> bytes:
@@ -123,6 +148,7 @@ class NativePreview:
             "collection": item.collection.name,
             "encoder": item.encoder,
             "release_failures": list[JsonValue](release_failures(item)),
+            "model": model_context(item),
         }
 
     def submit(
@@ -182,6 +208,27 @@ class NativePreview:
         if job is None or not is_preview(job) or (job.payload or {}).get("deleted"):
             raise DomainError("Research job not found", 404)
         return job
+
+    def history(self, user: UUID, limit: int = 20) -> list[ResearchJobView]:
+        """The Owner's own retained previews, newest first; retention is applied first."""
+        with self.sessions.begin() as session:
+            self.access(session, user)
+            jobs = session.scalars(
+                select(ResearchJob)
+                .where(ResearchJob.user_id == user, ResearchJob.provider == SLUG)
+                .where(ResearchJob.payload["deleted"].as_boolean().is_(None))
+                .order_by(ResearchJob.created_at.desc())
+                .limit(limit)
+                .with_for_update()
+            )
+            views = []
+            for job in jobs:
+                if not is_preview(job):
+                    continue
+                self.expire(job)
+                if not (job.payload or {}).get("deleted"):
+                    views.append(ResearchJobView.model_validate(job))
+        return views
 
     def get(self, user: UUID, job_id: UUID) -> ResearchJobView:
         # Polling expires only the requested job. The worker's periodic purge() owns the
@@ -290,6 +337,8 @@ class NativePreview:
         if process.returncode != 0 or len(process.stdout) > 16384:
             raise ValueError("Native preview execution failed")
         result = NativePreviewResult.model_validate_json(process.stdout)
+        if result.input_check.verdict == "unchecked" and result.predicted_rating is not None:
+            raise ValueError("New scores require a supported input check")
         if result.manifest_sha256 != pin:
             raise ValueError("Native preview checkpoint mismatch")
         heartbeat.check()

@@ -68,6 +68,38 @@ def development_table(labels: Path, seed: int, destination: Path) -> dict[str, i
     }
 
 
+def checked_development_rows(labels: Path, subject_registry: Path) -> list[dict[str, str]]:
+    """Validate a precomputed London development table before any label/image is consumed.
+
+    The registry contains subject identifiers only for this check; no sealed labels are read.
+    An arbitrary filename called development.csv is not itself an exclusion guarantee.
+    """
+    registry = json.loads(subject_registry.read_bytes())
+    if (
+        not isinstance(registry, dict)
+        or hashlib.sha256("\n".join(sorted(registry)).encode()).hexdigest()
+        != LONDON_SUBJECTS_SHA256
+    ):
+        raise ValueError("The fixed adult London subject registry changed")
+    subjects = sorted(registry)
+    train, val, _ = split_by_subject(subjects, HOLDOUT_SEED)
+    allowed = {subjects[i] for i in [*train, *val]}
+    with labels.open(newline="", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        if reader.fieldnames != COLUMNS:
+            raise ValueError("Unexpected native label columns")
+        rows = list(reader)
+    if (
+        len(rows) != len(allowed)
+        or {row["subject_id"] for row in rows} != allowed
+        or any(row["image"] != row["subject_id"] + "_03.jpg" for row in rows)
+    ):
+        raise ValueError(
+            "Only the fixed development subjects and their declared portraits are allowed"
+        )
+    return rows
+
+
 def inner_validation_split(subjects: list[str], seed: int) -> tuple[list[int], list[int]]:
     """Protocol A's single subject-hash split: ~25% of subjects validate (20 of the 80)."""
     unique = sorted(set(subjects), key=lambda s: hashlib.sha256(f"{seed}:{s}".encode()).digest())

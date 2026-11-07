@@ -1,5 +1,5 @@
 import {NextRequest} from "next/server";
-import {allowedApiPath} from "@/lib/api-proxy-policy";
+import {allowedApiPath, requestBodyLimit} from "@/lib/api-proxy-policy";
 import {getApiUrl} from "@/lib/environment";
 import {proxyOrigin} from "@/lib/proxy-origin";
 
@@ -26,7 +26,7 @@ async function proxy(request: NextRequest, context: {params: Promise<{path: stri
   try {
     let body: Uint8Array<ArrayBuffer> | undefined;
     if (request.method === "POST") {
-      const limit = joined.startsWith("v1/research/preferences/") || joined.startsWith("v1/research/studies/") || joined.startsWith("v1/research/native-preview/") || joined.startsWith("v1/research/aesthetic/") ? 6 * 1024 * 1024 : 1024 * 1024;
+      const limit = requestBodyLimit(joined);
       const chunks: Uint8Array[] = [];
       let size = 0;
       const reader = request.body?.getReader();

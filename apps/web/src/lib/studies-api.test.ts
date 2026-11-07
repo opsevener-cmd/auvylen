@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {allowedApiPath} from "./api-proxy-policy";
+import {allowedApiPath,requestBodyLimit} from "./api-proxy-policy";
 import {requestError} from "./account-api";
 import {studyErrors,studyAssignmentSchema,studyStatusSchema} from "./studies-api";
 import {translate} from "./i18n/catalog";
@@ -25,4 +25,10 @@ describe("private study contracts and proxy boundary",()=>{
     expect(translate("zh-CN","right")).toBe("更喜欢右侧");
     for(const key of ["Front-facing","Left-facing","Right-facing","Other pose","Diffuse lighting","Side lighting","Low light","Other lighting","DRAFT","OPEN","PAUSED","CLOSED","SEALED","contributor","rater","custodian","I confirm I am an adult (18+).","I read and understood this version and am participating voluntarily.","I authorize the described private research processing, human ratings and research-derived weights, without commercial or public-display permission.","I confirm this is an authorized test-fixture workflow, not real participant collection."]) expect(translate("zh-CN",key)).not.toBe(key);
   });
+});
+
+
+it("keeps large bodies limited to the exact study photograph endpoint",()=>{
+  expect(requestBodyLimit(`v1/research/studies/${id}/photos`)).toBe(6*1024*1024);
+  for(const path of [`v1/research/studies/${id}/exports`,`v1/research/studies/${id}/consent`,`v1/research/studies/${id}/photos/${id}/review`,`v1/research/studies/${id}/assignments`]) expect(requestBodyLimit(path)).toBe(1024*1024);
 });

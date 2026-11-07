@@ -5,5 +5,11 @@ const study = new RegExp(`^v1/research/studies(?:/(?:status|join|resolve-invite|
 const nativePreview = new RegExp(`^v1/research/native-preview/(?:status|jobs(?:/${id}(?:/delete)?)?)$`);
 const owner = /^v1\/owner\/(overview|users(?:\/usr_[0-9a-f]{32}\/(status|research|credits))?|batches(?:\/batch_[0-9a-f]{32}\/disable)?|jobs|audit)$/;
 export function allowedApiPath(path: string): boolean {
-  return account.test(path) || research.test(path) || owner.test(path) || study.test(path) || nativePreview.test(path);
+  return account.test(path) || research.test(path) || owner.test(path) || nativePreview.test(path) || study.test(path);
+}
+
+const imageSubmission = new RegExp(`^v1/research/(?:preferences/datasets/${id}/images|native-preview/jobs|aesthetic/analyses|studies/${id}/photos)$`);
+/** Only exact image submission routes accept the 4 MiB payload plus framing. */
+export function requestBodyLimit(path: string): number {
+  return imageSubmission.test(path) ? 6 * 1024 * 1024 : 1024 * 1024;
 }

@@ -1,10 +1,14 @@
 """Disposable Phase 7A browser test server. NEVER a real deployment entry point."""
 
+import json
 import os
 import tempfile
 import threading
 import time
+from contextlib import ExitStack
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 if (
     os.environ.get("AUVYLEN_TEST_FIXTURES") != "ISOLATED_SQLITE_ONLY"
@@ -14,11 +18,14 @@ if (
 
 import uvicorn
 from aevyra_api.accounts import AccountService
+from aevyra_api.commercial.models import now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.config import Settings
 from aevyra_api.credits.models import User
 from aevyra_api.main import create_app
 from aevyra_api.owner import provision
+from aevyra_api.research.native_preview import NativePreview
+from aevyra_api.research.worker import run_one
 from alembic import command
 from alembic.config import Config
 from pydantic import SecretStr
@@ -65,10 +72,15 @@ with tempfile.TemporaryDirectory(prefix="auvylen-study-fixtures-") as temporary:
     sessions = sessionmaker(engine, expire_on_commit=False)
     with sessions() as session:
         assert session.scalar(select(func.count()).select_from(User)) == 0
+    native_transport = os.environ.get("AUVYLEN_NATIVE_TRANSPORT_FIXTURE") == "WITHHELD_ONLY"
     settings = Settings(
         api_environment="test",
         log_level="WARNING",
         research_mode=True,
+        native_preview_enabled=native_transport,
+        native_preview_checkpoint=Path(temporary) / "no-model-artifact",
+        native_preview_manifest_sha256="a" * 64,
+        native_preview_review_reference="isolated-transport-fixture-no-inference-evidence",
         study_collection_enabled=True,
         study_real_collection_enabled=False,
         shared_proxy_rate_limits=True,
@@ -93,13 +105,55 @@ with tempfile.TemporaryDirectory(prefix="auvylen-study-fixtures-") as temporary:
     application.state.sessions = sessions
     application.state.rate_limiter = FixtureLimiter()
     try:
-        uvicorn.run(
-            application,
-            host="127.0.0.1",
-            port=int(os.environ.get("STUDY_FIXTURE_PORT", "8148")),
-            lifespan="off",
-            access_log=False,
-            log_level="warning",
-        )
+        with ExitStack() as fixtures:
+            if native_transport:
+                # Test-only transport seam: exercise API/storage/queue/fencing with NO
+                # attractiveness number. Never a trained-model inference claim or provider.
+                item = SimpleNamespace(
+                    encoder="transport-fixture",
+                    created_at=now().isoformat(),
+                    collection=SimpleNamespace(
+                        name="TRANSPORT FIXTURE — NO MODEL INFERENCE", synthetic=True
+                    ),
+                    report={},
+                )
+                fixtures.enter_context(patch.object(NativePreview, "ready", return_value=item))
+                original_submit = NativePreview.submit
+
+                def submit_and_process(self, user, token, meta, image):
+                    queued = original_submit(self, user, token, meta, image)
+                    withheld = dict(
+                        predicted_rating=None,
+                        native_scale=[1, 7],
+                        manifest_sha256="a" * 64,
+                        encoder=item.encoder,
+                        collection=item.collection.name,
+                        research_only=True,
+                        synthetic=False,
+                        consumer_enabled=False,
+                        release_failures=["synthetic_data"],
+                        input_check=dict(
+                            verdict="outside", distance=4.4, caution_above=1.85, outside_above=2.82
+                        ),
+                        duration_ms=0,
+                        peak_rss_kib=1,
+                    )
+                    with patch(
+                        "aevyra_api.research.native_preview.subprocess.run",
+                        return_value=SimpleNamespace(returncode=0, stdout=json.dumps(withheld)),
+                    ):
+                        if not run_one(self.queue):
+                            raise RuntimeError("Isolated transport fixture did not execute")
+                    return queued
+
+                fixtures.enter_context(patch.object(NativePreview, "submit", submit_and_process))
+            uvicorn.run(
+                application,
+                host="127.0.0.1",
+                port=int(os.environ.get("STUDY_FIXTURE_PORT", "8148")),
+                lifespan="off",
+                access_log=False,
+                log_level="warning",
+            )
     finally:
         engine.dispose()
