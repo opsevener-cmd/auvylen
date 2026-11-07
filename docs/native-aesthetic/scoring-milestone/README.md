@@ -112,7 +112,7 @@ not establish why the ranking reversed or prove that the handcrafted encoder has
 
 **3. No reliable improvement from the larger candidates was established at n=80.** Apache-2.0 timm ImageNet checkpoints
 from GitHub releases were checked against the hash prefixes in their filenames. The same
-PyTorch pipeline reproduced the production ONNX MobileNet result exactly:
+PyTorch pipeline closely reproduced the aggregate production-ONNX MobileNet result:
 
 | Encoder (best selector) | Parameters | MAE change |
 | --- | ---: | --- |
@@ -291,3 +291,13 @@ and `learning_curve`, set `AUVYLEN_LONDON_REGISTRY` to the approved private
 the inference package in its separate research environment. `rater_budget.py` checks the
 registry under its existing private root. No runner can rely on a filename alone to
 certify that its input excludes the sealed subjects.
+
+
+Aggregate cross-check: the committed ONNX/PyTorch development reports differ in MAE by
+about **4.98e-7** and in mean repeat-level Spearman by **2.25e-4**. This is close aggregate
+agreement, not exact per-image numerical equivalence. The learning-curve script averages
+fold-level correlations (0.552 at 64 training subjects), whereas the main comparison
+averages correlations of whole-repeat OOF predictions (0.580); those rank summaries are
+different estimands. The repeat-averaged prediction correlation is separately 0.623 and
+must not be presented as the single-fit score. No aggregate discrepancy was resolved by
+retuning or reading sealed labels.
