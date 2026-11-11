@@ -191,3 +191,8 @@ appendonlydir/
 !/docs/native-aesthetic/scoring-milestone/before-input-check-pattern-scored-en-desktop.webp
 !/docs/native-aesthetic/scoring-milestone/input-check-no-score-en-desktop.webp
 !/docs/native-aesthetic/scoring-milestone/input-check-no-score-zh-mobile.webp
+
+# Editor and notebook working files.
+.ipynb_checkpoints/
+*.swp
+*.swo
