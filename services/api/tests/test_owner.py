@@ -502,3 +502,29 @@ def test_occupied_reserved_login_cannot_be_hijacked_by_bootstrap(credits):
         "owner_god", PASSWORD
     )
     assert user.role == "user"
+
+
+def test_owner_cli_needs_a_codespace_or_explicit_deployment_terminal(monkeypatch):
+    for name in ("CODESPACES", "CODESPACE_NAME", "AUVYLEN_OWNER_TERMINAL"):
+        monkeypatch.delenv(name, raising=False)
+    tty = [patch(f"sys.{s}.isatty", return_value=True) for s in ("stdin", "stdout", "stderr")]
+    with tty[0], tty[1], tty[2], patch("sys.argv", ["owner"]):
+        with pytest.raises(SystemExit, match="AUVYLEN_OWNER_TERMINAL=deployment"):
+            main()
+        monkeypatch.setenv("AUVYLEN_OWNER_TERMINAL", "yes")  # Only the exact opt-in counts.
+        with pytest.raises(SystemExit, match="Codespace"):
+            main()
+        monkeypatch.setenv("AUVYLEN_OWNER_TERMINAL", "deployment")
+        with (
+            patch("aevyra_api.owner.DependencyChecks", side_effect=RuntimeError("guard passed")),
+            pytest.raises(RuntimeError, match="guard passed"),
+        ):
+            main()
+
+
+def test_owner_terminal_opt_in_is_never_committed_to_deployment_config():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    files = [*root.glob("docker-compose*.yml"), *root.glob(".env*.example")]
+    assert files and not any("AUVYLEN_OWNER_TERMINAL" in f.read_text() for f in files)
