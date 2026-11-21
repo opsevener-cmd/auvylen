@@ -102,17 +102,31 @@ def rotate(
         )
 
 
+def _require_private_terminal(settings: Settings) -> None:
+    """Allow only an interactive Codespaces terminal or an explicitly authorized VPS terminal."""
+    if not sys.stdin.isatty() or not sys.stderr.isatty() or not sys.stdout.isatty():
+        raise SystemExit("Owner management requires an interactive private terminal, never a pipe")
+    codespaces_terminal = (
+        os.environ.get("CODESPACES") == "true" and bool(os.environ.get("CODESPACE_NAME"))
+    )
+    production_terminal = (
+        settings.api_environment == "production"
+        and os.environ.get("AUVYLEN_OWNER_TERMINAL") == "production"
+    )
+    if not (codespaces_terminal or production_terminal):
+        raise SystemExit(
+            "Owner management requires a private Codespaces terminal or an explicitly "
+            "authorized production terminal"
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["init", "rotate", "recover"], nargs="?", default="init")
     args = parser.parse_args()
-    if not sys.stdin.isatty() or not sys.stderr.isatty() or not sys.stdout.isatty():
-        raise SystemExit("Owner management requires an interactive private terminal, never a pipe")
-    if os.environ.get("CODESPACES") != "true" or not os.environ.get("CODESPACE_NAME"):
-        raise SystemExit(
-            "Use the private Codespace terminal with its existing database credentials"
-        )
-    checks = DependencyChecks(Settings())
+    settings = Settings()
+    _require_private_terminal(settings)
+    checks = DependencyChecks(settings)
     try:
         try:
             current = None
