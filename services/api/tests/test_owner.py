@@ -10,7 +10,8 @@ from aevyra_api.commercial.state import DomainError
 from aevyra_api.credits.analysis import CreditAnalysisService
 from aevyra_api.credits.models import AccountSession, CreditTransaction, User, Wallet
 from aevyra_api.entitlements import product_access, research_limits
-from aevyra_api.owner import main, provision, rotate
+from aevyra_api.owner import _require_private_terminal, main, provision, rotate
+from aevyra_api.config import Settings
 from aevyra_api.preferences.service import PreferenceService
 from aevyra_api.research.jobs import ResearchQueue
 from aevyra_api.research.models import ResearchAccess, ResearchJob
@@ -19,6 +20,37 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import DBAPIError
 from test_credits import PASSWORD, csrf_headers, register, run_analysis
 from test_credits import credits as credits
+
+
+def test_owner_private_terminal_authorization(monkeypatch):
+    settings = Settings()
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stderr.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.delenv("CODESPACES", raising=False)
+    monkeypatch.delenv("CODESPACE_NAME", raising=False)
+    monkeypatch.delenv("AUVYLEN_OWNER_TERMINAL", raising=False)
+
+    with pytest.raises(SystemExit, match="private Codespaces"):
+        _require_private_terminal(settings)
+
+    settings.api_environment = "production"
+    monkeypatch.setenv("AUVYLEN_OWNER_TERMINAL", "production")
+    _require_private_terminal(settings)
+
+    monkeypatch.setenv("AUVYLEN_OWNER_TERMINAL", "anything-else")
+    with pytest.raises(SystemExit, match="private Codespaces"):
+        _require_private_terminal(settings)
+
+    settings.api_environment = "development"
+    monkeypatch.setenv("CODESPACES", "true")
+    monkeypatch.setenv("CODESPACE_NAME", "private-codespace")
+    _require_private_terminal(settings)
+
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    with pytest.raises(SystemExit, match="interactive"):
+        _require_private_terminal(settings)
+
 
 OWNER_PASSWORD = "synthetic-owner-test-password-only"
 
