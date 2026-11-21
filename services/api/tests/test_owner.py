@@ -23,7 +23,7 @@ from test_credits import credits as credits
 
 
 def test_owner_private_terminal_authorization(monkeypatch):
-    settings = Settings()
+    settings = Settings(api_environment="test")
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr("sys.stderr.isatty", lambda: True)
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
