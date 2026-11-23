@@ -4,6 +4,43 @@ x-logging: &logging
   options:
     max-size: "10m"
     max-file: "3"
+# Shared by api and worker. Research, private storage and limits come from the env file;
+# every limit default equals the application's own default (asserted by a unit test).
+x-app-environment: &app-environment
+  APP_ENV: ${APP_ENV:-production}
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL explicitly}
+  REDIS_URL: ${REDIS_URL:?Set REDIS_URL explicitly}
+  CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS explicitly, e.g. []}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+  REDEMPTION_CODE_PEPPER: ${REDEMPTION_CODE_PEPPER:?Set and securely back up REDEMPTION_CODE_PEPPER}
+  SESSION_COOKIE_SECURE: "true"
+  SESSION_LIFETIME_SECONDS: ${SESSION_LIFETIME_SECONDS:-86400}
+  SHARED_PROXY_RATE_LIMITS: "true"
+  RESEARCH_MODE: ${RESEARCH_MODE:-false}
+  ENABLED_MODEL_PROVIDERS: ${ENABLED_MODEL_PROVIDERS:-[]}
+  PRIVATE_UPLOAD_ROOT: /var/lib/auvylen/uploads
+  PRIVATE_MODEL_ROOT: /var/lib/auvylen/models
+  RESEARCH_MAX_PENDING: ${RESEARCH_MAX_PENDING:-2}
+  RESEARCH_DAILY_LIMIT: ${RESEARCH_DAILY_LIMIT:-50}
+  RESEARCH_MAX_RUNNING: ${RESEARCH_MAX_RUNNING:-1}
+  OWNER_MAX_PROJECTS: ${OWNER_MAX_PROJECTS:-100}
+  OWNER_MAX_DATASETS: ${OWNER_MAX_DATASETS:-300}
+  OWNER_MAX_IMAGES: ${OWNER_MAX_IMAGES:-1000}
+  OWNER_STORAGE_MIB: ${OWNER_STORAGE_MIB:-2048}
+  OWNER_MAX_PAIRS: ${OWNER_MAX_PAIRS:-50000}
+  OWNER_MAX_MODELS: ${OWNER_MAX_MODELS:-300}
+  OWNER_MAX_PENDING: ${OWNER_MAX_PENDING:-4}
+  OWNER_DAILY_LIMIT: ${OWNER_DAILY_LIMIT:-200}
+  OWNER_FRESH_AUTH_SECONDS: ${OWNER_FRESH_AUTH_SECONDS:-600}
+  JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-60}
+  STUDY_MAX_PHOTOS: ${STUDY_MAX_PHOTOS:-200}
+  # Phase 6 aesthetic model: off until a validated checkpoint is installed and pinned.
+  AESTHETIC_SCORING_ENABLED: ${AESTHETIC_SCORING_ENABLED:-false}
+  AESTHETIC_MODEL_VERSION: ${AESTHETIC_MODEL_VERSION:-}
+  AESTHETIC_MANIFEST_SHA256: ${AESTHETIC_MANIFEST_SHA256:-}
+  OPENBLAS_NUM_THREADS: "1"
+  OMP_NUM_THREADS: "1"
 services:
   web:
     image: auvylen-web:${IMAGE_TAG:-local}
@@ -28,16 +65,9 @@ services:
     build:
       context: .
       dockerfile: services/api/Dockerfile
-    environment:
-      APP_ENV: ${APP_ENV:-production}
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL explicitly}
-      REDIS_URL: ${REDIS_URL:?Set REDIS_URL explicitly}
-      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS explicitly, e.g. []}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
-      REDEMPTION_CODE_PEPPER: ${REDEMPTION_CODE_PEPPER:?Set and securely back up REDEMPTION_CODE_PEPPER}
-      SESSION_COOKIE_SECURE: "true"
-      SESSION_LIFETIME_SECONDS: ${SESSION_LIFETIME_SECONDS:-86400}
+    environment: *app-environment
+    # Private uploads and models (UID 10001). Never mounted in web or proxy.
+    volumes: [auvylen_private:/var/lib/auvylen]
     restart: unless-stopped
     init: true
     cap_drop: [ALL]
@@ -47,6 +77,33 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
+  # Research jobs (personal model training/prediction, retention cleanup) run here, outside
+  # HTTP requests. Opt in with --profile research; it exits unless RESEARCH_MODE=true.
+  worker:
+    image: auvylen-api:${IMAGE_TAG:-local}
+    profiles: [research]
+    environment:
+      <<: *app-environment
+      WORKER_QUEUE: cpu
+    command: [python, -m, aevyra_api.research.worker]
+    volumes: [auvylen_private:/var/lib/auvylen]
+    healthcheck:
+      test: [CMD, python, -c, "import time; from pathlib import Path; p=Path('/tmp/auvylen-worker-heartbeat'); assert p.exists() and time.time()-p.stat().st_mtime < 30"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    restart: unless-stopped
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    networks: [data]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    mem_limit: 1g
+    cpus: 1.0
   postgres:
     image: postgres:18-alpine
     environment:
@@ -110,3 +167,5 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+  # Initialized from the API image, so a new volume starts owned by UID 10001.
+  auvylen_private:

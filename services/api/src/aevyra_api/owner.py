@@ -102,15 +102,27 @@ def rotate(
         )
 
 
+def private_terminal() -> bool:
+    """A Codespace terminal, or a deployment-host shell that opts in for this one command.
+
+    AUVYLEN_OWNER_TERMINAL is never set in Compose or env files; the operator passes it with
+    ``docker compose exec -e`` so routine container processes cannot manage the Owner.
+    """
+    if os.environ.get("CODESPACES") == "true" and os.environ.get("CODESPACE_NAME"):
+        return True
+    return os.environ.get("AUVYLEN_OWNER_TERMINAL") == "deployment"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["init", "rotate", "recover"], nargs="?", default="init")
     args = parser.parse_args()
     if not sys.stdin.isatty() or not sys.stderr.isatty() or not sys.stdout.isatty():
         raise SystemExit("Owner management requires an interactive private terminal, never a pipe")
-    if os.environ.get("CODESPACES") != "true" or not os.environ.get("CODESPACE_NAME"):
+    if not private_terminal():
         raise SystemExit(
-            "Use the private Codespace terminal with its existing database credentials"
+            "Use the private Codespace terminal, or on the deployment host run: docker compose "
+            "... exec -it -e AUVYLEN_OWNER_TERMINAL=deployment api python -m aevyra_api.owner"
         )
     checks = DependencyChecks(Settings())
     try:

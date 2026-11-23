@@ -28,7 +28,8 @@ services:
       MOCK_CHECKOUT_ENABLED: "false"
   api:
     environment: *cloud-environment
-    volumes:
+    # !override replaces the base auvylen_private mount: this layer keeps separate volumes.
+    volumes: !override
       - private_uploads:/var/lib/auvylen/uploads
       - private_models:/var/lib/auvylen/models:ro
     depends_on:
@@ -53,7 +54,7 @@ services:
       <<: *cloud-environment
       WORKER_QUEUE: cpu
     command: [python, -m, aevyra_api.research.worker]
-    volumes:
+    volumes: !override
       # Retention/deletion cleanup removes private derivatives.
       - private_uploads:/var/lib/auvylen/uploads
       - private_models:/var/lib/auvylen/models
@@ -63,14 +64,8 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 3
-    restart: unless-stopped
-    init: true
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    logging:
-      driver: json-file
-      options: {max-size: "10m", max-file: "3"}
-    networks: [data]
+    # cap_drop, security_opt, init, restart, logging and networks come from the base file;
+    # repeating list-valued keys here duplicates them on merge and Compose rejects that.
     depends_on:
       migrate: {condition: service_completed_successfully}
       postgres: {condition: service_healthy}

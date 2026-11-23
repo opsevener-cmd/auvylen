@@ -1,5 +1,9 @@
 # Auvylen deployment — Phase 2 foundation with Phase 3 accounts
 
+**Production VPS with research data:** restoring a Codespace backup, the private volume,
+the research worker, Owner password management, updates and daily encrypted backups are in
+[vps-restore.md](vps-restore.md).
+
 Image names are now auvylen-web and auvylen-api. Rebuild before using the updated Compose
 file. Compose project names and environment-variable names remain unchanged to reuse
 existing PostgreSQL/TLS volumes and env files. Never switch the project name merely to
