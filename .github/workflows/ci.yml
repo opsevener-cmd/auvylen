@@ -106,6 +106,7 @@ jobs:
       - run: uv run pytest --integration services/api/tests/test_codespaces_login_proxy.py
       - run: npm exec --workspace @auvylen/web -- playwright install --with-deps chromium
       - run: npm run test:e2e --workspace @auvylen/web
+      - run: npm exec --workspace @auvylen/web -- playwright test --config playwright.studies.config.ts
       # Phase 6: the aesthetic pipeline with a SYNTHETIC generated-data checkpoint (dev/test only).
       - run: uv run python scripts/create-test-aesthetic-checkpoint.py --model-root private-data/e2e-models >> "$GITHUB_ENV"
       - run: npm run test:e2e --workspace @auvylen/web -- aesthetic

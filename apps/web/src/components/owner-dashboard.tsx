@@ -107,7 +107,7 @@ export function OwnerDashboard() {
     <header className="rounded-2xl bg-[#253e34] p-6 text-white sm:p-8">
       <p className="text-xs tracking-[0.16em] text-[#c1d8c9]">{t(text.badge)}</p><h1 className="mt-3 text-3xl font-medium sm:text-4xl">{t(text.title)}</h1>
       <p className="mt-3 text-[#d4dfd8]">{t(text.subtitle)}</p><p className="mt-5 text-sm">{t(text.entitlement)}</p>
-      <div className="mt-5 flex flex-wrap gap-5 text-sm"><Link className="underline" href="/research/preferences">{t("Personal research")}</Link><Link className="underline" href="/research/native-preview">{t("Native Auvylen research preview")}</Link><Link className="underline" href="/account">{t("My account")}</Link></div>
+      <div className="mt-5 flex flex-wrap gap-5 text-sm"><Link className="underline" href="/research/preferences">{t("Personal research")}</Link><Link className="underline" href="/research/studies">{t("Human rating studies")}</Link><Link className="underline" href="/research/native-preview">{t("Native Auvylen research preview")}</Link><Link className="underline" href="/account">{t("My account")}</Link></div>
     </header>
     <details className={panel}><summary className="cursor-pointer font-medium">{t("Confirm fresh authentication")}</summary><p className="mt-3 text-sm">{t(text.fresh)}</p>
       <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={async event => {
