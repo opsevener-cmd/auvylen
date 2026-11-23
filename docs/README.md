@@ -33,8 +33,12 @@ prefer a current reference when they disagree.
     [dev-selection-study/](native-aesthetic/dev-selection-study/)
 - [ComboLoss feasibility assessment](comboloss-assessment.md) (provider remains unavailable)
 
+**Consented studies (Phase 7A)** (collection workflow, not a scoring model or release)
+- [Phase 7A consented portrait and independent rating studies](phase7a/README.md)
+
 **Operations**
 - [Deployment](deployment.md) · [Cloud backups and restoration](cloud-backups.md)
+- [VPS restore, Owner recovery, updates and encrypted backups](vps-restore.md)
 - [Cloud-first development](cloud-development.md)
 - [Private Codespaces preview](codespaces-private-preview.md) ·
   [Codespaces login Origin compatibility](codespaces-login-origin.md)
@@ -58,6 +62,7 @@ prefer a current reference when they disagree.
 | 2026-10-26/27 | [Phase 6 report](phase6-report.md) · [Phase 6 independent review](phase6-codex-review.md) ([benchmarks](phase6/)) |
 | 2026-10-27 | Visual refresh: [overview](visual-refresh/README.md) · [premium refinement](visual-refresh/premium-refinement.md) · [final review](visual-refresh/premium-review/README.md) |
 | 2026-11-01 | [Native model improvement audit](native-aesthetic/improvement-audit-2026-11-01.md) · [PR #13 independent review](native-aesthetic/pr13-independent-review.md) |
+| 2026-11-07 | [Phase 7A original verification](phase7a/verification.md) · [Phase 7A peer review (PR #16)](phase7a/peer-review.md) · [Scoring milestone and Phase 7A integration review](scoring-milestone-peer-review.md) |
 | 2026-11-11 | [Repository audit and clean-up](maintenance/2026-11-11-repository-audit.md) |
 
 Earlier evaluation outputs on generated data live in [evaluation/](evaluation/). They are
