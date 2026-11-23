@@ -9,7 +9,7 @@ import type {ResearchJob, ResearchStatus} from "@auvylen/contracts";
 import {accountRequest} from "@/lib/account-api";
 import {researchJobSchema, researchScoreSchema, researchStatusSchema} from "@/lib/research-api";
 
-export function ResearchPage() {
+export function ResearchPage({showAesthetic = false, showSynthetic = false}: {showAesthetic?: boolean; showSynthetic?: boolean}) {
   const {t} = useI18n();
   const [status, setStatus] = useState<ResearchStatus | null>(null);
   const [jobs, setJobs] = useState<ResearchJob[]>([]);
@@ -41,8 +41,8 @@ export function ResearchPage() {
   return <section className="max-w-2xl">
     <h1 className="text-3xl font-medium">{t("Research workspace")}</h1>
     <p className="mt-5">{t("Authorized, non-commercial testing. Research jobs do not deduct Credits.")}</p>
-    <p className="mt-6"><Link href="/research/preferences" className="button-primary">{t("Manage personal preference datasets")}</Link> <Link href="/research/aesthetic" className="button-secondary">{t("Aesthetic analysis")}</Link></p>
-    <p className="mt-3">{t("Use personal preference datasets to train numerical rating models and predict from new photographs. Synthetic / Development Analysis remains available separately.")}</p>
+    <p className="mt-6"><Link href="/research/preferences" className="button-primary">{t("Manage personal preference datasets")}</Link>{showAesthetic && <> <Link href="/research/aesthetic" className="button-secondary">{t("Aesthetic analysis")}</Link></>}</p>
+    <p className="mt-3">{showSynthetic ? t("Use personal preference datasets to train numerical rating models and predict from new photographs. Synthetic / Development Analysis remains available separately.") : t("Use personal preference datasets to train numerical rating models and predict from new photographs.")}</p>
     {error && <p role="alert" className="mt-5">{t(error)} <Link href="/login" className="underline">{t("Sign in")}</Link></p>}
     {status && !status.authorized && <p className="mt-5">{t("Research is disabled or operator authorization is required.")}</p>}
     {status?.synthetic_available && <button disabled={busy || !!job && ["QUEUED", "RUNNING"].includes(job.status)} className="mt-6 rounded-md bg-[#253e34] px-5 py-3 text-white disabled:opacity-50" onClick={async () => {

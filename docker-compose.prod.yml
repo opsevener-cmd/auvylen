@@ -41,6 +41,10 @@ x-app-environment: &app-environment
   AESTHETIC_MANIFEST_SHA256: ${AESTHETIC_MANIFEST_SHA256:-}
   OPENBLAS_NUM_THREADS: "1"
   OMP_NUM_THREADS: "1"
+  # Fewer glibc malloc arenas: threadpool request handlers otherwise fragment the heap.
+  MALLOC_ARENA_MAX: "2"
+# Memory budget for a 2 vCPU / 4 GB host (measured idle total ~0.4 GB). Every service has a
+# hard limit so one runaway process cannot starve the others; the sum stays below RAM.
 services:
   web:
     image: auvylen-web:${IMAGE_TAG:-local}
@@ -50,8 +54,13 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       API_URL: ${API_URL:-http://api:8000}
+      # Unfinished pages (aesthetic, native preview) stay hidden unless explicitly "true".
+      # Synthetic analysis and mock checkout are never shown in production.
+      PREVIEW_FEATURES_ENABLED: ${PREVIEW_FEATURES_ENABLED:-}
+      NODE_OPTIONS: --max-old-space-size=256
       NO_PROXY: localhost,127.0.0.1,::1,api
       no_proxy: localhost,127.0.0.1,::1,api
+    mem_limit: 384m
     restart: unless-stopped
     init: true
     cap_drop: [ALL]
@@ -68,6 +77,8 @@ services:
     environment: *app-environment
     # Private uploads and models (UID 10001). Never mounted in web or proxy.
     volumes: [auvylen_private:/var/lib/auvylen]
+    # Upload decoding happens here; the API never loads numpy/ONNX at startup.
+    mem_limit: 512m
     restart: unless-stopped
     init: true
     cap_drop: [ALL]
@@ -102,7 +113,8 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
-    mem_limit: 1g
+    # ONNX/MobileNet is loaded per job and released afterwards.
+    mem_limit: 512m
     cpus: 1.0
   postgres:
     image: postgres:18-alpine
@@ -110,7 +122,22 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-aevyra}
       POSTGRES_DB: ${POSTGRES_DB:-aevyra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong POSTGRES_PASSWORD}
+    # Sized for the 4 GB host. Pools: API and worker use SQLAlchemy defaults (5 + 10 overflow
+    # each) plus a few operator/migration CLIs, so 50 connections leave headroom.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - max_connections=50
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
     volumes: [postgres_data:/var/lib/postgresql]
+    mem_limit: 512m
     healthcheck:
       test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
@@ -124,6 +151,7 @@ services:
     image: redis:8-alpine
     # No business state or queue exists yet: intentionally disposable cache.
     command: [redis-server, --save, "", --appendonly, "no", --maxmemory, 128mb, --maxmemory-policy, allkeys-lru]
+    mem_limit: 256m
     healthcheck:
       test: [CMD, redis-cli, ping]
       interval: 5s
@@ -146,6 +174,7 @@ services:
       - ./infra/caddy/routes.caddy:/etc/caddy/routes.caddy:ro
       - caddy_data:/data
       - caddy_config:/config
+    mem_limit: 128m
     healthcheck:
       # BusyBox wget otherwise proxies even this container-local health request.
       test: [CMD, wget, -Y, "off", -q, -O, /dev/null, http://127.0.0.1:2019/config/]

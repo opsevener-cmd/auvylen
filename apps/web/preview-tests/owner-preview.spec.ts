@@ -103,7 +103,7 @@ c.close()
   await ordinaryPage.getByLabel("Username or email-like identifier").fill(username);
   await ordinaryPage.getByLabel("Password", {exact: true}).fill(password);
   await ordinaryPage.getByRole("button", {name: "Sign in", exact: true}).click();
-  await ordinaryPage.getByRole("link", {name: "Redeem Code", exact: true}).click();
+  // Sign-in lands on the Account page, whose Credits section holds the redemption form.
   await ordinaryPage.getByLabel("Redemption Code", {exact: true}).fill(exported.codes[0]);
   await ordinaryPage.getByRole("button", {name: "Redeem", exact: true}).click();
   await expect(ordinaryPage.getByText("10 Credits added", {exact: true})).toBeVisible();

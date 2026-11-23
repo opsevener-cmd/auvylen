@@ -3,11 +3,14 @@ import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {useState} from "react";
 import {useI18n} from "./i18n/provider";
-export function SiteShell({children, pilot}: {children: React.ReactNode; pilot: boolean}) {
+import type {Features} from "@/lib/features";
+export function SiteShell({children, pilot, features}: {children: React.ReactNode; pilot: boolean; features: Features}) {
   const {locale, setLocale, t} = useI18n();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const links = [["/", "Home"], ["/research/aesthetic", "Aesthetic analysis"], ["/research/preferences", "Personal research"], ["/research", "Research workspace"], ["/account", "Account"]];
+  // Credits and redemption live in the Account page; hidden features never appear here.
+  const links = [["/", "Home"], ...(features.aesthetic ? [["/research/aesthetic", "Aesthetic analysis"]] : []),
+    ["/research/preferences", "Personal research"], ["/research/studies", "Studies"], ["/research", "Research workspace"], ["/account", "Account"]];
   return <>
     <a href="#main" className="skip-link">{t("Skip to content")}</a>
     <header className="site-header"><div className="header-inner">
@@ -18,7 +21,7 @@ export function SiteShell({children, pilot}: {children: React.ReactNode; pilot: 
     </div></header>
     <div className="site-content">{pilot && <aside className="pilot-note">{t("Private pilot · Synthetic analysis is available for development testing only.")}</aside>}
       <main id="main" tabIndex={-1}>{children}</main>
-      <footer className="site-footer"><div><Link href="/" className="wordmark">Auvylen.</Link><p>{t("Your perspective. Your private space.")}</p></div><div><Link href="/status">{t("System status")}</Link><Link href="/history">{t("Analysis history")}</Link><Link href="/#guide">{t("Getting started")}</Link></div><p>{t("Personal preferences, never objective beauty.")}</p></footer>
+      <footer className="site-footer"><div><Link href="/" className="wordmark">Auvylen.</Link><p>{t("Your perspective. Your private space.")}</p></div><div><Link href="/status">{t("System status")}</Link>{features.syntheticAnalysis && <Link href="/history">{t("Analysis history")}</Link>}<Link href="/#guide">{t("Getting started")}</Link></div><p>{t("Personal preferences, never objective beauty.")}</p></footer>
     </div>
   </>;
 }

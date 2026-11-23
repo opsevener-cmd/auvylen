@@ -25,8 +25,9 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError, m
 from aevyra_inference.aesthetic import CALIBRATION_LEVEL, RATING_BINS, ScoringHead, analyze
 from aevyra_inference.engine import ScoringEngine
 from aevyra_inference.extractors import dimension, manifest
+from aevyra_inference.identifiers import AESTHETIC_SLUG
 
-SLUG = "auvylen-aesthetic"
+SLUG = AESTHETIC_SLUG
 FORMAT: Final = "auvylen-aesthetic-checkpoint-v1"
 IMPLEMENTATION: Final = "aesthetic-distribution-head-v1"
 WEIGHTS_FILE: Final = "head.f64"

@@ -1037,5 +1037,8 @@
   "The experimental input check measures feature distance, not face detection, adulthood, fairness or prediction accuracy. A passing check is not evidence that an image is suitable.": "实验性输入检查仅衡量特征距离，不检测人脸或成年状态，也不证明公平性或预测准确性。通过检查不代表照片适合评分。",
   "This checkpoint has no supported input check. New predictions are withheld; an older retained score may predate this safeguard.": "此模型版本没有受支持的输入检查。新的预测将不显示分数；历史分数可能产生于此保护措施实施之前。",
   "No supported input check is available for this checkpoint.": "此模型版本没有可用的受支持输入检查。",
-  "4 is the scale's average anchor, not necessarily the observed sample mean. The prediction estimates the original adult raters' response to a similar portrait.": "4 是量表的平均水平锚点，不一定是样本的实际均值。预测估计原成人评分群体对类似肖像的主观反应。"
+  "4 is the scale's average anchor, not necessarily the observed sample mean. The prediction estimates the original adult raters' response to a similar portrait.": "4 是量表的平均水平锚点，不一定是样本的实际均值。预测估计原成人评分群体对类似肖像的主观反应。",
+  "Personal research. Clearly explained.": "个人研究，清晰说明",
+  "Studies": "评分研究",
+  "Use personal preference datasets to train numerical rating models and predict from new photographs.": "使用个人偏好数据集训练数值评分模型，并预测新照片的评分。"
 }
