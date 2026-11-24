@@ -1,2 +1,9 @@
 import {ResearchPage} from "@/components/research-page";
-export default function Page() {return <ResearchPage />;}
+import {features} from "@/lib/features";
+
+export const dynamic = "force-dynamic";
+
+export default function Page() {
+  const {aesthetic, syntheticAnalysis} = features();
+  return <ResearchPage showAesthetic={aesthetic} showSynthetic={syntheticAnalysis} />;
+}

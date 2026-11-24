@@ -33,6 +33,7 @@ from aevyra_inference.aesthetic_checkpoint import (
     checkpoint_status,
     load_checkpoint,
     release_failures,
+    rights_failures,
     write_checkpoint,
 )
 from aevyra_inference.aesthetic_train import main as train_main
@@ -509,3 +510,67 @@ def test_real_mobilenet_aesthetic_training_checkpoint_and_cpu_path(pretrained_ro
     assert result["checkpoint_round_trip"] is True
     assert result["synthetic"] is True
     assert result["application_scoring_enabled"] is False
+
+
+LICENSED = {
+    **EVIDENCE,
+    "name": "Consented adult portrait ratings",
+    "license": "Commercial licence agreement AUV-2027-01",
+    "synthetic": False,
+    "commercial_use_permitted": True,
+    "subject_consent_reference": "consent-ledger-v1",
+    "adult_age_verification": "documented",
+}
+
+
+def test_rights_gate_accepts_only_documented_commercial_consented_adult_data():
+    assert rights_failures(DatasetEvidence.model_validate(LICENSED)) == []
+    # Synthetic fixtures have no subjects; they are blocked by synthetic_dataset instead.
+    assert rights_failures(DatasetEvidence.model_validate(EVIDENCE)) == []
+    legacy = DatasetEvidence.model_validate({**EVIDENCE, "synthetic": False})
+    assert set(rights_failures(legacy)) == {
+        "commercial_use_not_permitted",
+        "subject_consent_missing",
+        "adult_age_unverified",
+    }
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"name": "SCUT-FBP5500"},
+        {"name": "scut_fbp 5500 subset"},
+        {"terms_url": "https://github.com/HCIILAB/SCUT-FBP5500-Database-Release"},
+        {"name": "MEBeauty"},
+        {"name": "Chicago Face Database"},
+    ],
+)
+def test_rights_gate_excludes_restricted_datasets_even_with_full_evidence(changes):
+    item = DatasetEvidence.model_validate({**LICENSED, **changes})
+    assert "excluded_dataset" in rights_failures(item)
+
+
+@pytest.mark.parametrize(
+    "license",
+    ["Non-commercial research use", "CC BY-NC 4.0", "research only", "Academic use only"],
+)
+def test_rights_gate_rejects_restricted_licences(license):
+    item = DatasetEvidence.model_validate({**LICENSED, "license": license})
+    assert "restricted_license" in rights_failures(item)
+
+
+def test_release_gate_includes_rights_failures(tmp_path):
+    rng = np.random.default_rng(9)
+    x = rng.normal(0, 1, (90, 230))
+    votes = rng.multinomial(20, [0.2] * 5, size=90).astype(float)
+    head, metrics = fit_scoring_head(x, votes, [f"s{i // 3}" for i in range(90)], epochs=5)
+    item, _ = write_checkpoint(
+        tmp_path,
+        head,
+        model_version="scut",
+        extractor=BASELINE,
+        dataset=DatasetEvidence.model_validate({**LICENSED, "name": "SCUT-FBP5500"}),
+        training={},
+        metrics=metrics,
+    )
+    assert "excluded_dataset" in release_failures(item)

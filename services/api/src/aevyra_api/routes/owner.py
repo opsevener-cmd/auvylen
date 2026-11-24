@@ -17,7 +17,7 @@ from aevyra_contracts.owner import (
     UserStatusCommand,
 )
 from aevyra_inference.extractors import MOBILENET, availability
-from aevyra_inference.preference import EXTRACTOR
+from aevyra_inference.identifiers import BASELINE_EXTRACTOR as EXTRACTOR
 from aevyra_inference.providers import ProviderCatalog
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import JsonValue

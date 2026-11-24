@@ -9,12 +9,11 @@ from io import BytesIO
 from pathlib import Path
 from typing import Protocol
 
-import numpy as np
-from PIL import Image, ImageOps
-from PIL import __version__ as pillow_version
 from pydantic import JsonValue
 
-BASELINE = "rgb-grid-texture-v1"
+from aevyra_inference.identifiers import BASELINE_EXTRACTOR
+
+BASELINE = BASELINE_EXTRACTOR
 MOBILENET = "mobilenetv3-small-imagenet-onnx-v1"
 WEIGHT_FILE = "mobilenetv3-small-100-lamb-embedding-v1.onnx"
 WEIGHT_SHA256 = "164c481657afe9d36e08ff58693df24e511b5bf1a07de9b9389dfc468eedd2a6"
@@ -121,8 +120,11 @@ class MobileNetExtractor:
     identifier = MOBILENET
 
     def __init__(self, root: Path):
-        # Imports are worker-only: API availability checks never initialize an ML runtime.
+        # Imports are worker-only: API availability checks never initialize an ML runtime,
+        # and this module stays free of numpy/Pillow so the API can import it at startup.
+        import numpy as np
         import onnxruntime as ort  # type: ignore[import-untyped]  # Upstream has no typing marker.
+        from PIL import __version__ as pillow_version
 
         if ort.__version__ != "1.31.0" or pillow_version != "12.3.0" or np.__version__ != "2.5.4":
             raise ValueError("Extractor runtime version mismatch")
@@ -131,12 +133,18 @@ class MobileNetExtractor:
         options.intra_op_num_threads = 1
         options.inter_op_num_threads = 1
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        # Return activation buffers after each run instead of keeping a growing arena: the
+        # worker lives for days and handles one small batch at a time.
+        options.enable_cpu_mem_arena = False
         self.session = ort.InferenceSession(
             verified_weights(root), sess_options=options, providers=["CPUExecutionProvider"]
         )
         self.input_name = "images"
 
     def extract_batch(self, payloads: Sequence[bytes]) -> list[list[float]]:
+        import numpy as np
+        from PIL import Image, ImageOps
+
         if not 1 <= len(payloads) <= BATCH_SIZE:
             raise ValueError("Feature batch limit")
         prepared = []

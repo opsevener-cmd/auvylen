@@ -8,14 +8,14 @@ import subprocess
 import sys
 from datetime import timedelta
 from io import BytesIO
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from aevyra_contracts.aesthetic import AestheticUploadMetadata
 from aevyra_contracts.native_preview import NativePreviewResult
 from aevyra_contracts.research import ResearchJobView
 from aevyra_inference.extractors import availability
-from aevyra_inference.native_checkpoint import SLUG, Manifest, release_failures
-from aevyra_inference.native_preview import reviewed
+from aevyra_inference.identifiers import NATIVE_SLUG as SLUG
 from PIL import Image, ImageOps
 from pydantic import JsonValue
 from sqlalchemy import or_, select
@@ -33,6 +33,10 @@ from aevyra_api.research.jobs import JobLease, ResearchQueue
 from aevyra_api.research.lease import LeaseHeartbeat
 from aevyra_api.research.models import ResearchJob
 from aevyra_api.research.storage import PrivateArtifactStore
+
+if TYPE_CHECKING:
+    # numpy-backed; loaded only when the Owner preview is actually used.
+    from aevyra_inference.native_checkpoint import Manifest
 
 OPERATION = "native_research_preview"
 IMAGE_TTL = timedelta(hours=1)
@@ -121,6 +125,8 @@ class NativePreview:
         ):
             raise DomainError("Native research preview disabled", 503)
         try:
+            from aevyra_inference.native_preview import reviewed
+
             item = reviewed(s.native_preview_checkpoint, s.native_preview_manifest_sha256)
             if not availability(item.encoder, s.private_model_root / "pretrained")[0]:
                 raise ValueError("Encoder unavailable")
@@ -140,6 +146,8 @@ class NativePreview:
             item = self.ready()
         except DomainError:
             return {"available": False, "consumer_enabled": False, "native_scale": [1, 7]}
+        from aevyra_inference.native_checkpoint import release_failures
+
         return {
             "available": True,
             "consumer_enabled": False,

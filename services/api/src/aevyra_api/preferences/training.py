@@ -9,13 +9,9 @@ from aevyra_contracts.preferences import ReadinessReason, TrainingReadiness
 from aevyra_contracts.research import ResearchJobView
 from aevyra_contracts.training import ExtractorView, ModelView, PredictRequest, TrainRequest
 from aevyra_inference.extractors import MOBILENET, availability, manifest
-from aevyra_inference.preference import (
-    EXTRACTOR,
-    IMPLEMENTATION,
-    MIN_GROUPS,
-    MIN_RATED_IMAGES,
-    split_groups,
-)
+from aevyra_inference.identifiers import BASELINE_EXTRACTOR as EXTRACTOR
+from aevyra_inference.identifiers import MIN_GROUPS, MIN_RATED_IMAGES
+from aevyra_inference.identifiers import RATING_IMPLEMENTATION as IMPLEMENTATION
 from pydantic import BaseModel, ConfigDict, JsonValue
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -177,6 +173,8 @@ class ModelService:
             reasons.append("too_few_groups")
         if reasons:
             return reasons
+        from aevyra_inference.preference import split_groups
+
         try:
             training, _ = split_groups([e.group for e in examples], seed, fraction)
         except ValueError:

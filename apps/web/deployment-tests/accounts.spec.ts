@@ -41,10 +41,10 @@ test("HTTPS accounts protect sessions and support redemption with environment-ga
   await page.getByLabel("Redemption Code").fill(code);
   await page.getByRole("button", {name: "Redeem", exact: true}).click();
   await expect(page.getByText("10 Credits added", {exact: true})).toBeVisible();
-  await page.goto("/analyze");
   await expect(page.getByText("Balance: 10 Credits", {exact: true})).toBeVisible();
   if (process.env.AEVYRA_TEST_MODE === "production") {
-    await expect(page.getByText("Synthetic analysis is unavailable in production.")).toBeVisible();
+    // Synthetic analysis is hidden: the page is unreachable and the API refuses it.
+    expect((await page.goto("/analyze"))?.status()).toBe(404);
     const status = await page.evaluate(async () => {
       const csrf = await (await fetch("/api/v1/auth/csrf")).json();
       const response = await fetch("/api/v1/credit-analyses", {method: "POST",
@@ -56,6 +56,8 @@ test("HTTPS accounts protect sessions and support redemption with environment-ga
     await page.goto("/account");
     await expect(page.getByText("Balance: 10 Credits", {exact: true})).toBeVisible();
   } else {
+    await page.goto("/analyze");
+    await expect(page.getByText("Balance: 10 Credits", {exact: true})).toBeVisible();
     await page.getByRole("button", {name: "Run Analysis", exact: true}).click();
     await expect(page.getByText("Analysis status: COMPLETED", {exact: true})).toBeVisible();
     await page.goto("/account");

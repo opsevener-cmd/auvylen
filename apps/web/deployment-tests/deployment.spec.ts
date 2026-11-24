@@ -17,7 +17,15 @@ test("production disables mock commercial functionality", async ({page, request}
   test.skip(process.env.AEVYRA_TEST_MODE !== "production");
   await page.goto("/");
   await expect(page.getByRole("link", {name: /View development demo/})).toHaveCount(0);
-  await expect(page.getByText("Synthetic analysis is unavailable in production.")).toBeVisible();
+  await expect(page.getByText("Synthetic analysis is unavailable in production.")).toHaveCount(0);
+  // Unfinished areas are absent from navigation and answer 404 instead of "unavailable".
+  // The mobile menu is collapsed, so inspect links by attribute rather than accessible role.
+  await expect(page.locator('#main-nav a[href="/research/studies"]')).toHaveCount(1);
+  await expect(page.locator('a[href="/research/aesthetic"], a[href="/research/native-preview"], a[href="/history"], a[href="/analyze"]')).toHaveCount(0);
+  for (const path of ["/research/aesthetic", "/research/native-preview", "/analyze", "/history",
+    "/checkout/av_00000000000000000000000000000000", "/result/00000000-0000-0000-0000-000000000000"]) {
+    expect((await request.get(path, {maxRedirects: 0})).status(), path).toBe(404);
+  }
   expect((await request.get("/api/v1/products")).status()).toBe(404);
   expect((await request.post("/api/v1/orders", {data: {product_slug: "aevyra-test-analysis"}})).status()).toBe(404);
   expect((await request.post("/api/v1/dev/payments/00000000-0000-0000-0000-000000000000/simulate-success", {data: {}})).status()).toBe(404);
