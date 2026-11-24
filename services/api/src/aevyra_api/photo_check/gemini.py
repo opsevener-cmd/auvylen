@@ -8,6 +8,7 @@ text are never logged.
 
 import base64
 import json
+import re
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Sequence
@@ -23,6 +24,27 @@ ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:gene
 LANGUAGE_NAMES: dict[str, str] = {"en": "English", "zh-CN": "Simplified Chinese"}
 REFUSALS = ["no_person", "multiple_people", "not_a_photo", "appears_under_18", "explicit"]
 MAX_TIP_CHARS = 120
+# Gemini API keys are printable ASCII tokens: classic "AIza..." keys (39 characters) and the
+# newer "AQ." auth keys (dotted, ~53 characters). HTTP header values must be plain ASCII;
+# anything else (curly quotes, zero-width spaces, "…" from copy-paste) would raise
+# UnicodeEncodeError inside http.client, or be sent and rejected by Google.
+API_KEY_PATTERN = re.compile(r"[A-Za-z0-9._~+/=-]{20,256}")
+
+
+def api_key_problem(key: str) -> str | None:
+    """Fixed-vocabulary reason a key cannot be sent, safe to log; None when usable."""
+    if API_KEY_PATTERN.fullmatch(key):
+        return None
+    if any(ord(char) > 127 for char in key):
+        return "non_ascii_character"
+    if any(char.isspace() for char in key):
+        return "whitespace"
+    if any(char in "\"'`" for char in key):
+        return "quote_character"
+    if not 20 <= len(key) <= 256:
+        return "unexpected_length"
+    return "unexpected_character"
+
 
 SYSTEM_PROMPT = """You review profile photos for photographic technique only.
 Images are numbered from 0 in the order given. For each image return integers 1-10:
@@ -116,12 +138,14 @@ class Assessment:
     usage: Usage
 
 
-class PhotoQualityProvider(Protocol):
-    model: str
-
+class TokenBudget(Protocol):
     def max_output_tokens(self, photos: int) -> int: ...
 
     def estimated_input_tokens(self, photos: int) -> int: ...
+
+
+class PhotoQualityProvider(TokenBudget, Protocol):
+    model: str
 
     def assess(self, images: Sequence[bytes], language: Language) -> Assessment: ...
 
@@ -142,7 +166,21 @@ def urllib_transport(
         raise ProviderError("provider_unavailable") from None
 
 
-class GeminiPhotoQuality:
+class TokenEstimates:
+    """Request-size bounds used for cost reservations; needs no key."""
+
+    def max_output_tokens(self, photos: int) -> int:
+        return 200 + 220 * photos
+
+    def estimated_input_tokens(self, photos: int) -> int:
+        # Instructions and schema, plus 560 tokens per photo at medium resolution, rounded up.
+        return 900 + 700 * photos
+
+
+ESTIMATOR = TokenEstimates()
+
+
+class GeminiPhotoQuality(TokenEstimates):
     def __init__(
         self,
         api_key: str,
@@ -152,18 +190,14 @@ class GeminiPhotoQuality:
         timeout: float = 30.0,
         transport: Transport = urllib_transport,
     ) -> None:
+        problem = api_key_problem(api_key)
+        if problem is not None:
+            raise ValueError(f"Gemini API key rejected: {problem}")
         self._api_key = api_key
         self.model = model
         self._thinking_level = thinking_level
         self._timeout = timeout
         self._transport = transport
-
-    def max_output_tokens(self, photos: int) -> int:
-        return 200 + 220 * photos
-
-    def estimated_input_tokens(self, photos: int) -> int:
-        # Instructions and schema, plus 560 tokens per photo at medium resolution, rounded up.
-        return 900 + 700 * photos
 
     def request_body(self, images: Sequence[bytes], language: Language) -> dict[str, object]:
         parts: list[dict[str, object]] = [
