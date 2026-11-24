@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import secrets
+import threading
 from datetime import timedelta
 from typing import Protocol
 from uuid import UUID, uuid4
@@ -24,7 +25,37 @@ from aevyra_api.entitlements import OWNER_LOGIN
 
 COOKIE = "auvylen_session"
 CSRF_COOKIE = "auvylen_csrf"
-HASHER = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=1)
+# Each Argon2 call allocates memory_cost KiB (64 MiB). At most two run at once.
+ARGON2_CONCURRENCY = 2
+
+
+class BoundedHasher:
+    """Argon2 with a process-wide cap on concurrent calls.
+
+    Rate limits still admit bursts of logins/registrations, and the request threadpool would
+    otherwise run them all at once (64 MiB each), pushing the API past its container memory
+    limit. Callers wait for a slot instead; hashing parameters are unchanged.
+    """
+
+    def __init__(self, hasher: PasswordHasher, slots: int) -> None:
+        self._hasher = hasher
+        self._slots = threading.BoundedSemaphore(slots)
+
+    def hash(self, password: str) -> str:
+        with self._slots:
+            return self._hasher.hash(password)
+
+    def verify(self, hashed: str, password: str) -> bool:
+        with self._slots:
+            return self._hasher.verify(hashed, password)
+
+    def check_needs_rehash(self, hashed: str) -> bool:
+        return self._hasher.check_needs_rehash(hashed)
+
+
+HASHER = BoundedHasher(
+    PasswordHasher(time_cost=3, memory_cost=65536, parallelism=1), ARGON2_CONCURRENCY
+)
 # Equal work for an unknown identifier; never use a fast path to expose account existence.
 DUMMY_HASH = HASHER.hash(secrets.token_urlsafe(32))
 

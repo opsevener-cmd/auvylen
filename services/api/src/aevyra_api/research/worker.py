@@ -1,7 +1,10 @@
 """CPU worker now; a separately deployed worker can select the gpu queue later."""
 
+import ctypes
+import gc
 import logging
 import signal
+import sys
 import time
 
 from aevyra_inference.aesthetic_checkpoint import SLUG as AESTHETIC
@@ -22,6 +25,20 @@ from aevyra_api.research.native_preview import NativePreview
 from aevyra_api.studies.service import Studies
 
 logger = logging.getLogger("aevyra.worker")
+# glibc keeps freed heap pages (decoded images, ONNX buffers) mapped after a job finishes.
+_LIBC = ctypes.CDLL(None) if sys.platform == "linux" else None
+
+
+def release_memory() -> None:
+    """Drop per-job models and buffers so an idle worker returns to its baseline footprint.
+
+    Extractors and checkpoints are created per job and never cached, so after collection
+    nothing references them; malloc_trim then hands the freed pages back to the host.
+    """
+    gc.collect()
+    trim = getattr(_LIBC, "malloc_trim", None)
+    if trim is not None:
+        trim(0)
 
 
 def run_one(queue: ResearchQueue) -> bool:
@@ -63,6 +80,7 @@ def run_one(queue: ResearchQueue) -> bool:
     finally:
         if lease.provider == "auvylen-native":
             NativePreview(queue.sessions, queue.settings).purge()
+        release_memory()
     return True
 
 

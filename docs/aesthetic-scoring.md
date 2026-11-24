@@ -98,7 +98,16 @@ raw little-endian float64 (mean, scale, W, b). Loading never parses pickle or zi
 
 `release_failures()` must return nothing: a non-synthetic dataset; at least 10 test
 subjects and 30 test images; better than both baselines on MAE and distribution loss;
-Spearman ≥ 0.3; a calibrated range whose test coverage is within 10 points of 90%. Status
+Spearman ≥ 0.3; a calibrated range whose test coverage is within 10 points of 90%.
+
+Rights evidence (`rights_failures()`), required for every real dataset:
+`commercial_use_permitted=true`; a licence without non-commercial, research-only or NC
+terms; a `subject_consent_reference` to per-subject consent records; and
+`adult_age_verification="documented"` (age from documentation, never from appearance).
+SCUT-FBP5500, MEBeauty and the Chicago Face Database are refused by name whatever the
+manifest says (`excluded_dataset`): their licences are non-commercial, they lack subject
+consent, and SCUT-FBP5500 includes 15–17-year-olds. Older manifests without these fields
+still load but cannot pass. Status
 reasons are a fixed vocabulary: `disabled`, `checkpoint_not_configured`,
 `checkpoint_missing`, `checkpoint_integrity_failure`, `validation_gate_failed`,
 `extractor_unavailable`, `ready`.

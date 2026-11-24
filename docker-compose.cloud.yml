@@ -40,6 +40,7 @@ services:
       <<: *cloud-environment
       APPLY_MIGRATIONS: ${APPLY_MIGRATIONS:-false}
     command: [python, -m, aevyra_api.migrate]
+    mem_limit: 512m
     healthcheck: {disable: true}
     restart: "no"
     cap_drop: [ALL]
@@ -75,6 +76,8 @@ services:
   redis:
     image: redis:8-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
     command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, 256mb, --maxmemory-policy, noeviction]
+    # maxmemory 256mb plus AOF rewrite headroom.
+    mem_limit: 512m
     volumes: [redis_data:/data]
 volumes:
   private_uploads:

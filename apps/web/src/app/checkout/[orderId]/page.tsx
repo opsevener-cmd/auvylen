@@ -4,12 +4,15 @@ import {SubmitButton} from "@/components/submit-button";
 import {ServiceError} from "@/components/service-error";
 import {apiRequest, formatMoney, orderSchema, unavailable} from "@/lib/commercial-api";
 import {simulatePayment} from "../../actions";
+import {notFound} from "next/navigation";
+import {features} from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
 export default async function Checkout({params, searchParams}: {
   params: Promise<{orderId: string}>; searchParams: Promise<{error?: string}>;
 }) {
+  if (!features().mockCheckout) notFound();
   const {orderId} = await params;
   const query = await searchParams;
   const order = await apiRequest(`/orders/${encodeURIComponent(orderId)}`, orderSchema).catch(unavailable);
