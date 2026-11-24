@@ -7,10 +7,13 @@ import {apiRequest, formatMoney, productSchema, unavailable} from "@/lib/commerc
 import {createOrder} from "../actions";
 import {isPublicPilot} from "@/lib/environment";
 import Link from "next/link";
+import {notFound} from "next/navigation";
+import {features} from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
 export default async function Analyze({searchParams}: {searchParams: Promise<{error?: string}>}) {
+  if (!features().syntheticAnalysis) notFound();
   const params = await searchParams;
   if (isPublicPilot() || process.env.MOCK_CHECKOUT_ENABLED === "false") return <AccountAnalyze><section><h1 className="text-3xl"><Text>{"Auvylen Analysis"}</Text></h1><p className="mt-5"><Text>{"Sign in to use Credits for a Synthetic / Development Analysis."}</Text></p><Link className="mt-5 inline-block underline" href="/login"><Text>{"Sign in"}</Text></Link><p className="mt-4"><Link href="/register" className="underline"><Text>{"Create account"}</Text></Link></p></section></AccountAnalyze>;
   const products = await apiRequest("/products", z.array(productSchema)).catch(unavailable);

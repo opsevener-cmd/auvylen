@@ -57,9 +57,9 @@ function useAccount() {
   return {account, setAccount, error, loaded};
 }
 
-export function AccountPage({historyOnly = false}: {historyOnly?: boolean}) {
+export function AccountPage({historyOnly = false, showAnalyses = false}: {historyOnly?: boolean; showAnalyses?: boolean}) {
   const {t} = useI18n();
-  const {account, error, loaded} = useAccount();
+  const {account, setAccount, error, loaded} = useAccount();
   const router = useRouter();
   const [logoutError, setLogoutError] = useState("");
   if (!loaded) return <p>{t("Loading account…")}</p>;
@@ -68,17 +68,24 @@ export function AccountPage({historyOnly = false}: {historyOnly?: boolean}) {
     <h1 className="text-3xl font-medium">{historyOnly ? t("Analysis history") : t("Your account")}</h1>
     {!historyOnly && <>
       <p className="mt-5">{account.user.login_identifier}{account.user.role === "owner" ? t(" · OWNER") : ""}</p>
-      <p className="mt-6 text-2xl">{account.user.role === "owner" ? t("Owner access · No Credit charge") : t("Balance: {value0} Credits", {value0: account.wallet.balance})}</p>
-      <div className="mt-5 flex gap-5">{account.user.role === "owner" ? <Link href="/owner" className="underline">{t("Owner dashboard")}</Link> : <Link href="/redeem" className="underline">{t("Redeem Code")}</Link>}<Link href="/analyze" className="underline">{t("Run Analysis")}</Link><Link href="/research/studies" className="underline">{t("Human rating studies")}</Link></div>
-      <h2 className="mt-10 text-xl">{t("Recent credit transactions")}</h2>
-      <ul className="mt-4 divide-y divide-black/10">{account.wallet.transactions.map(entry => <li key={entry.id} className="py-3">
-        {entry.amount > 0 ? "+" : ""}{entry.amount} · {t(entry.transaction_type)} {t("· Balance")} {entry.balance_after}
-      </li>)}</ul>
-      {!account.wallet.transactions.length && <p className="mt-3">{t("No credit transactions yet.")}</p>}
+      <div className="mt-5 flex gap-5">{account.user.role === "owner" && <Link href="/owner" className="underline">{t("Owner dashboard")}</Link>}{showAnalyses && <Link href="/analyze" className="underline">{t("Run Analysis")}</Link>}<Link href="/research/studies" className="underline">{t("Human rating studies")}</Link></div>
+      {/* Credits and redemption live here rather than in the main navigation. */}
+      <section id="credits" aria-labelledby="credits-title" className="mt-10 scroll-mt-24">
+        <h2 id="credits-title" className="text-xl">{t("Credits")}</h2>
+        <p className="mt-4 text-2xl">{account.user.role === "owner" ? t("Owner access · No Credit charge") : t("Balance: {value0} Credits", {value0: account.wallet.balance})}</p>
+        <RedeemForm onRedeemed={balance => setAccount({...account, wallet: {...account.wallet, balance}})}/>
+        <h3 className="mt-8 text-lg">{t("Recent credit transactions")}</h3>
+        <ul className="mt-4 divide-y divide-black/10">{account.wallet.transactions.map(entry => <li key={entry.id} className="py-3">
+          {entry.amount > 0 ? "+" : ""}{entry.amount} · {t(entry.transaction_type)} {t("· Balance")} {entry.balance_after}
+        </li>)}</ul>
+        {!account.wallet.transactions.length && <p className="mt-3">{t("No credit transactions yet.")}</p>}
+      </section>
     </>}
-    <h2 className="mt-10 text-xl">{t("Recent analyses")}</h2>
-    <ul className="mt-4 space-y-3">{account.analyses.map(analysis => <li key={analysis.id}><Link href={`/result/${analysis.id}?funding=credits`} className="underline">{t("Synthetic analysis ·")} {t(analysis.status)}</Link></li>)}</ul>
-    {!account.analyses.length && <p className="mt-3">{t("No analyses yet.")}</p>}
+    {showAnalyses && <>
+      <h2 className="mt-10 text-xl">{t("Recent analyses")}</h2>
+      <ul className="mt-4 space-y-3">{account.analyses.map(analysis => <li key={analysis.id}><Link href={`/result/${analysis.id}?funding=credits`} className="underline">{t("Synthetic analysis ·")} {t(analysis.status)}</Link></li>)}</ul>
+      {!account.analyses.length && <p className="mt-3">{t("No analyses yet.")}</p>}
+    </>}
     {!historyOnly && <button className={buttonClass} onClick={async () => {
       try {await accountRequest("/auth/logout", z.object({logged_out: z.boolean()}), {}); router.push("/login"); router.refresh();}
       catch (error) {setLogoutError(message(error));}
@@ -87,32 +94,39 @@ export function AccountPage({historyOnly = false}: {historyOnly?: boolean}) {
   </section>;
 }
 
-export function RedeemPage() {
+function RedeemForm({onRedeemed}: {onRedeemed: (balance: number) => void}) {
   const {t} = useI18n();
-  const {account, setAccount, error, loaded} = useAccount();
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
-  if (!loaded) return <p>{t("Loading account…")}</p>;
-  if (!account) return <p>{t(error)} <Link href="/login" className="underline">{t("Sign in")}</Link></p>;
-  return <section className="max-w-md">
-    <h1 className="text-3xl font-medium">{t("Redeem Code")}</h1>
-    <p className="mt-5">{t("Enter the code you received after purchase.")}</p>
-    <p className="mt-5">{t("Balance:")} {account.wallet.balance} {t("Credits")}</p>
-    <form className="mt-6" onSubmit={async event => {
+  return <>
+    <form className="mt-6 max-w-md" onSubmit={async event => {
       event.preventDefault(); const formElement = event.currentTarget;
       const code = String(new FormData(formElement).get("code"));
       setBusy(true); setFeedback("");
       try {
         const result = await accountRequest("/redeem", redemptionSchema, {code});
-        setAccount({...account, wallet: {...account.wallet, balance: result.balance}});
+        onRedeemed(result.balance);
         setFeedback(String(result.credits_added)); formElement.reset();
       } catch (error) {setFeedback(message(error));} finally {setBusy(false);}
     }}>
-      <label>{t("Redemption Code")}<input name="code" required maxLength={40} autoComplete="off" spellCheck={false} className={inputClass}/></label>
+      <p>{t("Enter the code you received after purchase.")}</p>
+      <label className="mt-4 block">{t("Redemption Code")}<input name="code" required maxLength={40} autoComplete="off" spellCheck={false} className={inputClass}/></label>
       <button disabled={busy} className={buttonClass}>{t("Redeem")}</button>
     </form>
     {feedback && <p role="status" className="mt-5">{/^\d+$/.test(feedback) ? t("{count} Credits added", {count: feedback}) : t(feedback)}</p>}
-    <Link href="/analyze" className="mt-6 inline-block underline">{t("Run Analysis")}</Link>
+  </>;
+}
+
+/** Standalone page kept for reuse; /redeem now redirects to the Account page's Credits section. */
+export function RedeemPage() {
+  const {t} = useI18n();
+  const {account, setAccount, error, loaded} = useAccount();
+  if (!loaded) return <p>{t("Loading account…")}</p>;
+  if (!account) return <p>{t(error)} <Link href="/login" className="underline">{t("Sign in")}</Link></p>;
+  return <section className="max-w-md">
+    <h1 className="text-3xl font-medium">{t("Redeem Code")}</h1>
+    <p className="mt-5">{t("Balance:")} {account.wallet.balance} {t("Credits")}</p>
+    <RedeemForm onRedeemed={balance => setAccount({...account, wallet: {...account.wallet, balance}})}/>
   </section>;
 }
 
@@ -146,6 +160,6 @@ export function AccountAnalyze({children}: {children: React.ReactNode}) {
       }}>{t("Run Analysis")}</button>}
     </>}
     {error && <p role="alert" className="mt-5">{t(error)}</p>}
-    {account.user.role === "owner" ? <Link href="/owner" className="mt-8 inline-block underline">{t("Owner dashboard")}</Link> : <Link href="/redeem" className="mt-8 inline-block underline">{t("Redeem Code")}</Link>}
+    {account.user.role === "owner" ? <Link href="/owner" className="mt-8 inline-block underline">{t("Owner dashboard")}</Link> : <Link href="/account#credits" className="mt-8 inline-block underline">{t("Redeem Code")}</Link>}
   </section>;
 }

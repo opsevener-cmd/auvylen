@@ -42,6 +42,16 @@ back to Windows/WSL or local Docker. No cloud environment or paid server is assu
   user approves pinning it. Never train on distributions derived from mean scores, never
   infer adulthood from appearance, and never enable synthetic checkpoints outside
   development/test.
+- Never use SCUT-FBP5500, MEBeauty, the Chicago Face Database or any other dataset that is
+  non-commercial, lacks subject consent or may include minors in any production or
+  user-facing path, including the free photo-quality hook. The release gate refuses them
+  (`rights_failures` in `aesthetic_checkpoint.py`). The local scoring pipeline stays
+  disabled until a licensed, consented adult dataset passes that gate.
+- The free hook and paid report judge photo technique and styling only (lighting,
+  sharpness, framing, expression, eye contact, background, styling). No attractiveness,
+  jawline, skin or symmetry scores and no percentile or population comparisons. Their VLM
+  calls use the Gemini API Standard paid tier only, never the free or Contributor tier.
+  See docs/free-hook-design.md.
 - Every future execution must use the registry policy gate; new engines require explicit
   provenance and licensing review. A commercial flag is not a substitute for evidence.
 

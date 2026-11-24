@@ -27,6 +27,7 @@ from aevyra_api.routes import (
     health,
     native_preview,
     owner,
+    photo_check,
     preferences,
     research,
     scoring,
@@ -185,6 +186,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(aesthetic.router)
     application.include_router(native_preview.router)
     application.include_router(studies.router)
+    application.include_router(photo_check.router)
     return application
 
 

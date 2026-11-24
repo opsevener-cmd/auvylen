@@ -203,8 +203,16 @@ before Owner-only actions.
 
 ## Update procedure
 
+The live VPS runs from `/opt/auvylen-b` under the Compose project name `auvylen-b`.
+`docker-compose.prod.yml` declares `name: aevyra-prod`, so **always** select the project
+explicitly; `COMPOSE_PROJECT_NAME` also makes `scripts/backup-prod.sh` target it. Without
+it, Compose would address an empty `aevyra-prod` project instead of the running stack.
+
 ```bash
-cd /opt/auvylen
+export APP_DIR=/opt/auvylen-b
+export COMPOSE_PROJECT_NAME=auvylen-b
+cd "$APP_DIR"
+dc() { docker compose --env-file .env.production -p auvylen-b -f docker-compose.prod.yml --profile research "$@"; }
 # 1. Encrypted backup first (see below).
 BACKUP_PASSPHRASE_FILE=/root/.auvylen-backup-passphrase scripts/backup-prod.sh
 # 2. New reviewed release.
@@ -219,6 +227,20 @@ dc run --rm --no-deps api alembic -c services/api/alembic.ini check
 dc up -d --wait
 curl -fsS https://auvylen.duckdns.org/ready && echo
 ```
+
+Every service has a `mem_limit` (web 384m, api 512m, worker 512m, postgres 512m, redis 256m,
+proxy 128m; about 2.3 GB in total on the 4 GB host; see [memory-budget.md](memory-budget.md)) and PostgreSQL starts with
+`shared_buffers=128MB`, `effective_cache_size=1GB` and `max_connections=50`. Changing
+these settings recreates the containers on `dc up`, including a short PostgreSQL restart;
+the data volume is kept. Check memory after an update:
+
+```bash
+docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.CPUPerc}}'; free -h
+dc exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SHOW shared_buffers; SHOW max_connections"'
+```
+
+If a container shows `OOMKilled` (`docker inspect --format '{{.State.OOMKilled}}' auvylen-b-worker-1`),
+raise that service's `mem_limit` in a reviewed change rather than removing it.
 
 If a step fails, leave traffic stopped. Roll back by checking out the previous commit,
 restoring its `IMAGE_TAG` and running `dc up -d --wait --no-build`. That is safe only when
@@ -273,6 +295,14 @@ included `env` (its pepper and database password).
 | Mock checkout / development payment routes | Off |
 | API documentation (`/docs`) | Hidden |
 | Phase 6 aesthetic scoring | Off until a validated, pinned checkpoint passes its release gate |
+
+The web app also hides unfinished pages in production. They are absent from navigation and
+links and answer **404** (not an "unavailable" page): `/research/aesthetic`,
+`/research/native-preview`, `/analyze`, `/history`, `/result/…` and `/checkout/…`.
+`/redeem` redirects to the Account page, whose **Credits** section holds the balance,
+redemption form and credit history. Set `PREVIEW_FEATURES_ENABLED=true` in
+`.env.production` to show the two research previews again (their API gates still apply);
+synthetic analysis and mock checkout can never be shown in production.
 
 Personal preference research (datasets, ratings, MobileNet/handcrafted models, prediction),
 Owner administration, accounts, Credits and redemption all work in production with

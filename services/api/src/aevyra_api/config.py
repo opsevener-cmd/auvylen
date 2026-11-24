@@ -1,5 +1,6 @@
 import ipaddress
 import re
+from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -67,11 +68,39 @@ class Settings(BaseSettings):
     native_preview_checkpoint: Path | None = None
     native_preview_manifest_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     native_preview_review_reference: str | None = Field(default=None, min_length=1, max_length=200)
+    # Free photo-quality check (docs/photo-check.md). Gemini API Standard paid tier only:
+    # the operator sets FREE_HOOK_PAID_TIER_CONFIRMED after checking AI Studio billing.
+    free_hook_enabled: bool = False
+    gemini_api_key: SecretStr | None = None
+    free_hook_model: str = Field(
+        default="gemini-3.5-flash-lite", pattern=r"^[a-z0-9][a-z0-9.-]{0,63}$"
+    )
+    free_hook_paid_tier_confirmed: bool = False
+    free_hook_user_daily_limit: int = Field(default=30, ge=1, le=1000)
+    free_hook_daily_budget_usd: Decimal = Field(default=Decimal("3.00"), ge=0, le=1000)
+    # USD per 1M tokens; output includes thinking tokens.
+    free_hook_price_input_per_m: Decimal = Field(default=Decimal("0.30"), gt=0, le=100)
+    free_hook_price_output_per_m: Decimal = Field(default=Decimal("2.50"), gt=0, le=1000)
+    free_hook_thinking_level: Literal["", "minimal", "low"] = "minimal"
+    free_hook_timeout_seconds: int = Field(default=30, ge=5, le=120)
 
-    @field_validator("aesthetic_model_version", "aesthetic_manifest_sha256", mode="before")
+    @field_validator(
+        "aesthetic_model_version", "aesthetic_manifest_sha256", "gemini_api_key", mode="before"
+    )
     @classmethod
     def blank_is_unset(cls, value: object) -> object:
         return None if value == "" else value  # Compose passes unset variables as "".
+
+    @field_validator("gemini_api_key", mode="before")
+    @classmethod
+    def trim_api_key(cls, value: object) -> object:
+        # Surrounding whitespace (including CRLF and non-breaking spaces) is never part
+        # of a key; anything else malformed is reported by the photo check instead of
+        # crashing startup.
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
 
     @model_validator(mode="after")
     def production_defaults(self) -> "Settings":

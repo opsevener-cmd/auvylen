@@ -4,6 +4,7 @@ import {cookies} from "next/headers";
 import {OwnerDashboard} from "@/components/owner-dashboard";
 import {getApiUrl} from "@/lib/environment";
 import {sessionSchema} from "@/lib/account-api";
+import {features} from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 export default async function OwnerPage() {
@@ -20,6 +21,6 @@ export default async function OwnerPage() {
     unavailable = true;
   }
   if (unavailable) return <p><Text>{"Account verification is temporarily unavailable. Reload to retry."}</Text></p>;
-  if (allowed) return <OwnerDashboard/>;
+  if (allowed) return <OwnerDashboard showNativePreview={features().nativePreview}/>;
   return <p><Text>{"Owner access required."}</Text> <Link href="/account" className="underline"><Text>{"Return to account"}</Text></Link></p>;
 }

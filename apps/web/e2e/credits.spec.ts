@@ -21,7 +21,7 @@ test("register, redeem ten Credits, spend one, view history and sign in again", 
   await page.getByLabel("Password", {exact: true}).fill(password);
   await page.getByRole("button", {name: "Create account", exact: true}).click();
   await expect(page.getByText("Balance: 0 Credits", {exact: true})).toBeVisible();
-  await page.getByRole("link", {name: "Redeem Code", exact: true}).click();
+  // Redemption lives in the Account page's Credits section.
   await page.getByLabel("Redemption Code").fill(code);
   await page.getByRole("button", {name: "Redeem", exact: true}).click();
   await expect(page.getByText("10 Credits added", {exact: true})).toBeVisible();

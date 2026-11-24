@@ -13,11 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from aevyra_inference.engine import ScoringEngine
 from aevyra_inference.extractors import create_extractor, dimension, manifest
+from aevyra_inference.identifiers import NATIVE_SLUG
 from aevyra_inference.native import NativeHead
 from aevyra_inference.native_data import Collection
 from aevyra_inference.providers import ProviderStatus
 
-SLUG = "auvylen-native"
+SLUG = NATIVE_SLUG
 
 
 class Manifest(BaseModel):

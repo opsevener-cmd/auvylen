@@ -8,9 +8,9 @@ touched. The private image is removed once its job is final, or after IMAGE_RETE
 import logging
 from datetime import timedelta
 from io import BytesIO
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-import numpy as np
 from aevyra_contracts.aesthetic import (
     AestheticAnalysisView,
     AestheticModelCard,
@@ -18,8 +18,8 @@ from aevyra_contracts.aesthetic import (
     AestheticStatus,
     AestheticUploadMetadata,
 )
-from aevyra_inference.aesthetic_checkpoint import SLUG, CheckpointStatus, checkpoint_status
 from aevyra_inference.extractors import availability
+from aevyra_inference.identifiers import AESTHETIC_SLUG as SLUG
 from PIL import Image
 from pydantic import JsonValue, ValidationError
 from sqlalchemy import or_, select
@@ -34,6 +34,10 @@ from aevyra_api.preferences.images import DecodedImage
 from aevyra_api.research.jobs import ResearchQueue, authorized
 from aevyra_api.research.models import ResearchJob
 from aevyra_api.research.storage import PrivateArtifactStore
+
+if TYPE_CHECKING:
+    # numpy-backed; imported where a checkpoint is actually inspected, not at API startup.
+    from aevyra_inference.aesthetic_checkpoint import CheckpointStatus
 
 logger = logging.getLogger("aevyra.aesthetic")
 CONSENT_VERSION = "adult-single-subject-authorized-v1"
@@ -76,6 +80,8 @@ def suitability(decoded: DecodedImage) -> None:
         raise DomainError("Use a photograph at least 224 pixels on its shorter side", 422)
     if max(decoded.width, decoded.height) / min(decoded.width, decoded.height) > MAX_ASPECT:
         raise DomainError("Use a portrait or square photograph (aspect ratio up to 3:1)", 422)
+    import numpy as np
+
     with Image.open(BytesIO(decoded.thumbnail)) as thumbnail:
         luminance = np.asarray(thumbnail.convert("L"), dtype=np.float64)
     if float(luminance.std()) < MIN_LUMINANCE_STD:
@@ -91,6 +97,8 @@ class AestheticService:
         self.queue = ResearchQueue(sessions, settings)
 
     def checkpoint(self) -> CheckpointStatus:
+        from aevyra_inference.aesthetic_checkpoint import CheckpointStatus, checkpoint_status
+
         settings = self.settings
         status = checkpoint_status(
             settings.private_model_root,
@@ -114,6 +122,8 @@ class AestheticService:
             raise DomainError("Research access required", 403)
 
     def status(self, user: UUID) -> AestheticStatus:
+        from aevyra_inference.aesthetic_checkpoint import CheckpointStatus
+
         with self.sessions() as session:
             allowed = self.settings.research_mode and authorized(session, user)
         status = self.checkpoint()
