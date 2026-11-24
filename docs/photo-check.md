@@ -80,14 +80,20 @@ git checkout --detach REVIEWED_COMMIT
 sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$(git rev-parse --short=12 HEAD)/" .env.production
 
 # 3. Settings. The key is typed at a hidden prompt and never echoed or put in history.
+#    Paste the key itself: AI Studio issues "AQ." auth keys (dotted, ~53 characters);
+#    older "AIza" keys also work. No quotes around it.
 read -rs -p "Gemini API key (paid tier): " GEMINI_KEY_INPUT && echo && export GEMINI_KEY_INPUT
 python3 - .env.production <<'PY'
 import os, re, sys
 from pathlib import Path
 env = Path(sys.argv[1]); text = env.read_text()
-values = {"FREE_HOOK_ENABLED": "true", "FREE_HOOK_PAID_TIER_CONFIRMED": "true",
-          "GEMINI_API_KEY": os.environ["GEMINI_KEY_INPUT"].strip()}
-assert re.fullmatch(r"[A-Za-z0-9_-]{20,200}", values["GEMINI_API_KEY"]), "unexpected key format"
+key = os.environ["GEMINI_KEY_INPUT"].strip()
+# Same rule as the API (photo_check/gemini.py): printable ASCII only. Pasted curly quotes,
+# zero-width spaces or "…" would break the HTTP header. The key itself is never printed.
+if not re.fullmatch(r"[A-Za-z0-9._~+/=-]{20,256}", key):
+    odd = sorted({f"U+{ord(c):04X}" for c in key if ord(c) > 127 or c.isspace() or c in "\"'`"})
+    sys.exit(f"Key rejected: length {len(key)}, unexpected characters {odd or 'none'}. Copy it again from AI Studio.")
+values = {"FREE_HOOK_ENABLED": "true", "FREE_HOOK_PAID_TIER_CONFIRMED": "true", "GEMINI_API_KEY": key}
 for name, value in values.items():
     line = f"{name}={value}"
     text, n = re.subn(rf"(?m)^{name}=.*$", lambda _: line, text)
@@ -122,6 +128,18 @@ dc exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELE
 dc exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT status, failure_reason, count(*) FROM photo_check_analyses GROUP BY 1, 2"'
 dc logs --since 1h api | grep -E "photo_check_(provider_failed|paused|internal_error)"
 ```
+
+If the page says the check is not available and the API log shows
+`photo_check_api_key_invalid`, the stored key is malformed. Its `error_type` says how:
+`non_ascii_character` (curly quotes, zero-width space or "…" pasted with the key),
+`quote_character`, `whitespace` or `unexpected_length`. Check the configured key without
+printing it, then enter it again with step 3:
+
+```bash
+dc exec -T api python -c "import os; k=os.environ.get('GEMINI_API_KEY',''); print('length', len(k), '| starts AQ.:', k.startswith('AQ.'), '| starts AIza:', k.startswith('AIza'), '| unusual characters:', sorted({f'U+{ord(c):04X} at {i}' for i,c in enumerate(k) if ord(c)>127 or c.isspace() or c in chr(34)+chr(39)}) or 'none')"
+```
+
+After fixing `.env.production`, run `dc up -d api` so the container picks it up.
 
 If the first real check fails with `photo_check_provider_failed`, look at the logged
 `status_code`. A 400 usually means the model ID or `thinkingConfig` is not accepted:

@@ -91,6 +91,17 @@ class Settings(BaseSettings):
     def blank_is_unset(cls, value: object) -> object:
         return None if value == "" else value  # Compose passes unset variables as "".
 
+    @field_validator("gemini_api_key", mode="before")
+    @classmethod
+    def trim_api_key(cls, value: object) -> object:
+        # Surrounding whitespace (including CRLF and non-breaking spaces) is never part
+        # of a key; anything else malformed is reported by the photo check instead of
+        # crashing startup.
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
     @model_validator(mode="after")
     def production_defaults(self) -> "Settings":
         if self.study_collection_enabled and (not self.research_mode or self.public_pilot):

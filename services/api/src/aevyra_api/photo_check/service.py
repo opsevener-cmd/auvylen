@@ -38,13 +38,16 @@ from aevyra_api.commercial.state import DomainError
 from aevyra_api.config import Settings
 from aevyra_api.photo_check.gemini import (
     ENGINE,
+    ESTIMATOR,
     MAX_TIP_CHARS,
     PROMPT_VERSION,
     GeminiPhotoQuality,
     ModelPhoto,
     PhotoQualityProvider,
     ProviderError,
+    TokenBudget,
     Usage,
+    api_key_problem,
 )
 from aevyra_api.photo_check.models import (
     PhotoCheckAnalysis,
@@ -54,6 +57,7 @@ from aevyra_api.photo_check.models import (
 from aevyra_api.preferences.images import decode_image_bytes
 
 logger = logging.getLogger("aevyra.photo_check")
+_reported_key_problems: set[str] = set()
 RESULT_RETENTION = timedelta(days=30)
 STALE_RESERVATION = timedelta(minutes=10)
 PROVIDER_LONG_EDGE = 1024
@@ -163,6 +167,13 @@ class PhotoCheckService:
             return "disabled"
         if s.gemini_api_key is None:
             return "not_configured"
+        problem = api_key_problem(s.gemini_api_key.get_secret_value())
+        if problem is not None:
+            # Tell the operator once per process; never log the key or any part of it.
+            if problem not in _reported_key_problems:
+                _reported_key_problems.add(problem)
+                logger.error("photo_check_api_key_invalid", extra={"error_type": problem})
+            return "not_configured"
         if not s.free_hook_paid_tier_confirmed:
             return "paid_tier_unconfirmed"
         try:
@@ -176,7 +187,7 @@ class PhotoCheckService:
     def budget_micro_usd(self) -> int:
         return micro_usd(1_000_000, self.settings.free_hook_daily_budget_usd)
 
-    def reservation(self, provider: PhotoQualityProvider, photos: int) -> int:
+    def reservation(self, provider: TokenBudget, photos: int) -> int:
         s = self.settings
         return micro_usd(
             provider.estimated_input_tokens(photos), s.free_hook_price_input_per_m
@@ -184,7 +195,7 @@ class PhotoCheckService:
 
     def worst_case_reservation(self) -> int:
         # Pause before the budget cannot cover a full-size request.
-        return self.reservation(GeminiPhotoQuality("", self.settings.free_hook_model), MAX_PHOTOS)
+        return self.reservation(ESTIMATOR, MAX_PHOTOS)
 
     @staticmethod
     def today() -> date:

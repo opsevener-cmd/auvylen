@@ -10,7 +10,9 @@ from aevyra_api.photo_check.gemini import (
     ENDPOINT,
     GeminiPhotoQuality,
     ProviderError,
+    api_key_problem,
     parse_response,
+    urllib_transport,
 )
 from aevyra_api.photo_check.models import PhotoCheckAnalysis, PhotoCheckBudgetDay
 from aevyra_api.photo_check.service import PhotoCheckService, micro_usd, ranked_photos
@@ -22,6 +24,8 @@ from test_credits import credits as credits
 from test_credits import csrf_headers, register
 
 BASE = "/api/v1/photo-check"
+# Dummy key in the current "AQ." format (dotted, 53 characters). Never a real key.
+TEST_KEY = "AQ.Ab8RN6-test-only-dummy-key-not-real.0123456789abcd"
 CONSENT = {"consent_version": CONSENT_VERSION, "adult_confirmed": True, "processing_accepted": True}
 
 
@@ -78,12 +82,12 @@ class FakeTransport:
 def configure(fixture, transport, **overrides):
     settings = fixture.client.app.state.settings
     settings.free_hook_enabled = True
-    settings.gemini_api_key = SecretStr("test-only-key")
+    settings.gemini_api_key = SecretStr(TEST_KEY)
     settings.free_hook_paid_tier_confirmed = True
     for name, value in overrides.items():
         setattr(settings, name, value)
     fixture.client.app.state.photo_check_provider = lambda s: GeminiPhotoQuality(
-        "test-only-key", s.free_hook_model, transport=transport
+        TEST_KEY, s.free_hook_model, transport=transport
     )
     return settings
 
@@ -112,7 +116,7 @@ def test_unavailable_until_enabled_keyed_and_paid_tier_confirmed(credits):
     settings = credits.client.app.state.settings
     settings.free_hook_enabled = True
     assert credits.client.get(BASE + "/status").json()["reason"] == "not_configured"
-    settings.gemini_api_key = SecretStr("test-only-key")
+    settings.gemini_api_key = SecretStr(TEST_KEY)
     assert credits.client.get(BASE + "/status").json()["reason"] == "paid_tier_unconfirmed"
     accept(credits)
     assert submit(credits).json()["detail"] == "photo_check_unavailable"
@@ -163,7 +167,7 @@ def test_ranks_photos_records_cost_and_sends_a_strict_request(credits):
     assert result["used_today"] == 1 and result["engine"] == "gemini-photo-quality"
     url, headers, body = transport.calls[0]
     assert url == ENDPOINT.format(model="gemini-3.5-flash-lite")
-    assert headers["x-goog-api-key"] == "test-only-key"
+    assert headers["x-goog-api-key"] == TEST_KEY
     config = body["generationConfig"]
     assert config["responseMimeType"] == "application/json" and config["temperature"] == 0
     assert config["thinkingConfig"] == {"thinkingLevel": "minimal"}
@@ -315,10 +319,155 @@ def test_costs_round_up_in_integer_micro_usd():
 def test_production_policy_gate_requires_paid_tier_confirmation(credits):
     settings = credits.client.app.state.settings
     settings.free_hook_enabled = True
-    settings.gemini_api_key = SecretStr("test-only-key")
+    settings.gemini_api_key = SecretStr(TEST_KEY)
     settings.api_environment = "production"
     service = PhotoCheckService(credits.sessions, settings)
     assert service.configuration() == "paid_tier_unconfirmed"
     settings.free_hook_paid_tier_confirmed = True
     assert service.configuration() == "ready"
     assert service.metadata().commercial_allowed is True
+
+
+# --- API key format (regression: UnicodeEncodeError on the first real check) -------------
+
+
+def test_aq_auth_keys_are_sent_intact_in_the_header_by_the_real_http_client():
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    assert len(TEST_KEY) == 53 and "." in TEST_KEY and api_key_problem(TEST_KEY) is None
+    assert api_key_problem("AIza" + "B" * 35) is None  # Classic keys still work.
+    seen = {}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen["path"] = self.path
+            seen["key"] = self.headers.get("x-goog-api-key")
+            seen["authorization"] = self.headers.get("authorization")
+            self.rfile.read(int(self.headers["Content-Length"]))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(gemini_reply([photo_json(0)]))
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        local = f"http://127.0.0.1:{server.server_port}"
+
+        def transport(url, headers, body, timeout):
+            # Same client and headers; only the host is swapped for the local server.
+            assert url.startswith("https://generativelanguage.googleapis.com/v1beta/models/")
+            return urllib_transport(local + url.split(".com", 1)[1], headers, body, timeout)
+
+        provider = GeminiPhotoQuality(TEST_KEY, "gemini-3.5-flash-lite", transport=transport)
+        assessment = provider.assess([b"jpeg"], "en")
+    finally:
+        server.shutdown()
+    assert seen == {
+        "path": "/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "key": TEST_KEY,
+        "authorization": None,
+    }
+    assert assessment.photos[0].lighting == 6
+
+
+MALFORMED_KEYS = {
+    "non_ascii_character": [
+        "\u201c" + TEST_KEY + "\u201d",  # Curly quotes, e.g. pasted from a document.
+        TEST_KEY + "\u200b",  # Zero-width space.
+        TEST_KEY[:30] + "\u2026",  # Truncated display copy ending in an ellipsis.
+        TEST_KEY + "\u00a0",  # Non-breaking space: sent, then rejected by Google.
+    ],
+    "quote_character": ['"' + TEST_KEY + '"' + "x"],
+    "whitespace": ["AQ.first-half-of-key " + "second-half-of-key"],
+    "unexpected_length": ["AQ.short"],
+}
+
+
+@pytest.mark.parametrize(
+    ("problem", "key"), [(p, k) for p, keys in MALFORMED_KEYS.items() for k in keys]
+)
+def test_malformed_keys_are_reported_and_never_reach_the_http_client(problem, key):
+    assert api_key_problem(key) == problem
+    with pytest.raises(ValueError, match=problem):
+        GeminiPhotoQuality(key, "gemini-3.5-flash-lite")
+
+
+def test_the_real_http_client_cannot_send_non_ascii_keys():
+    # Documents the root cause: http.client encodes header values as Latin-1.
+    with pytest.raises(UnicodeEncodeError):
+        urllib_transport("http://127.0.0.1:9/", {"x-goog-api-key": TEST_KEY + "\u200b"}, b"{}", 1)
+
+
+def test_a_malformed_configured_key_disables_the_check_instead_of_crashing(credits, caplog):
+    register(credits.client)
+    transport = FakeTransport([])
+    configure(credits, transport)
+    credits.client.app.state.settings.gemini_api_key = SecretStr("\u201c" + TEST_KEY + "\u201d")
+    status = credits.client.get(BASE + "/status").json()
+    assert status["available"] is False and status["reason"] == "not_configured"
+    accept_response = credits.client.post(
+        BASE + "/consent", json=CONSENT, headers=csrf_headers(credits.client)
+    )
+    assert accept_response.status_code == 200
+    response = submit(credits)
+    assert response.status_code == 503 and response.json()["detail"] == "photo_check_unavailable"
+    assert transport.calls == []
+    events = [r for r in caplog.records if r.getMessage() == "photo_check_api_key_invalid"]
+    assert events and events[0].error_type == "non_ascii_character"
+    assert TEST_KEY not in caplog.text and TEST_KEY[3:20] not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "raw", [TEST_KEY + "\r", "  " + TEST_KEY + "\n", TEST_KEY + "\r\n", TEST_KEY + "\u00a0"]
+)
+def test_settings_trim_surrounding_whitespace_and_crlf(raw):
+    from aevyra_api.config import Settings
+
+    settings = Settings(api_environment="test", gemini_api_key=raw, _env_file=None)
+    assert settings.gemini_api_key is not None
+    assert settings.gemini_api_key.get_secret_value() == TEST_KEY
+    assert (
+        Settings(api_environment="test", gemini_api_key=" \r\n", _env_file=None).gemini_api_key
+        is None
+    )
+
+
+def test_deploy_doc_snippet_accepts_aq_keys_and_rejects_pasted_artefacts(tmp_path):
+    import os
+    import re as regex
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    doc = (Path(__file__).resolve().parents[3] / "docs" / "photo-check.md").read_text()
+    snippet = regex.search(r"python3 - \.env\.production <<'PY'\n(.*?)\nPY", doc, regex.S).group(1)
+    script = tmp_path / "snippet.py"
+    script.write_text(snippet)
+
+    def run(key):
+        env_file = tmp_path / "env"
+        env_file.write_text("FREE_HOOK_ENABLED=false\nGEMINI_API_KEY=\n")
+        result = subprocess.run(
+            [sys.executable, "-I", str(script), str(env_file)],
+            env={**os.environ, "GEMINI_KEY_INPUT": key},
+            capture_output=True,
+            text=True,
+        )
+        return result, env_file.read_text()
+
+    result, written = run(TEST_KEY + "\n")
+    assert result.returncode == 0, result.stderr
+    assert f"GEMINI_API_KEY={TEST_KEY}\n" in written and "FREE_HOOK_ENABLED=true" in written
+    assert TEST_KEY not in result.stdout + result.stderr
+    # Surrounding whitespace, even a non-breaking space, is trimmed: the clean key is kept.
+    result, written = run(TEST_KEY + "\u00a0")
+    assert result.returncode == 0 and f"GEMINI_API_KEY={TEST_KEY}\n" in written
+    inner = [k for k in MALFORMED_KEYS["non_ascii_character"] if not k.endswith("\u00a0")]
+    for bad in inner + MALFORMED_KEYS["whitespace"]:
+        result, written = run(bad)
+        assert result.returncode != 0 and f"GEMINI_API_KEY={bad}" not in written
+        assert bad not in result.stdout + result.stderr

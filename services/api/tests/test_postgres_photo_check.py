@@ -17,6 +17,8 @@ from sqlalchemy import func, select
 from test_postgres_commercial import postgres_services
 
 pytestmark = pytest.mark.integration
+# Dummy key in the current "AQ." format (dotted, 53 characters). Never a real key.
+TEST_KEY = "AQ.Ab8RN6-test-only-dummy-key-not-real.0123456789abcd"
 
 
 class SlowProvider:
@@ -49,7 +51,7 @@ def test_concurrent_checks_never_exceed_the_daily_budget():
         settings = Settings(
             api_environment="test",
             free_hook_enabled=True,
-            gemini_api_key=SecretStr("test-only-key"),
+            gemini_api_key=SecretStr(TEST_KEY),
             free_hook_paid_tier_confirmed=True,
             free_hook_user_daily_limit=100,
             # Room for about four full-size reservations (4570 micro-USD each).
