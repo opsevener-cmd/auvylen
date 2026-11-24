@@ -9,6 +9,14 @@ prefer a current reference when they disagree.
 ## Current reference
 
 **System and boundaries**
+- [Engineering rules (AGENTS.md)](../AGENTS.md#boundaries), including the two product rules
+  every change must follow:
+  - restricted datasets (SCUT-FBP5500, MEBeauty, the Chicago Face Database, or any data that
+    is non-commercial, unconsented or may include minors) never enter a production or
+    user-facing path;
+  - the free photo check and the paid report judge photo technique and styling only: no
+    attractiveness, jawline, skin or symmetry scores, no percentiles, and Gemini Standard
+    paid tier only.
 - [Architecture](architecture.md): service boundaries (Phase 4A baseline, still in force)
 - [Production and research security boundary](production-security.md)
 - [Brand rename compatibility](brand-rename.md): identifiers that must not be renamed
@@ -23,8 +31,15 @@ prefer a current reference when they disagree.
 - [Pretrained representation and licences](pretrained-representation.md) ([licence files](licenses/))
 - [Research wizard UX](research-wizard-ux.md) and its [release checklist](release/research-wizard-release.md)
 
+**Free photo check** (in production, off until enabled with a paid-tier Gemini key)
+- [Free photo check](photo-check.md): behaviour, settings, spend cap and deployment on the VPS
+- [Free photo-quality hook design](free-hook-design.md) (approved 2026-11-24, now implemented)
+
 **Population aesthetic models** (all consumer scoring disabled)
 - [Phase 6 rating-distribution model](aesthetic-scoring.md)
+  - [Release gate and dataset rights rules](aesthetic-scoring.md#release-gate-minimum-engineering-checks-not-scientific-approval):
+    commercial use, subject consent and documented adult age required; restricted datasets
+    refused by name (`rights_failures`)
 - [Native 1–7 model overview](native-aesthetic/README.md)
   - [Scoring milestone, model research and release roadmap](native-aesthetic/scoring-milestone/README.md) (latest)
   - [Independent evaluation plan and Owner preview](native-aesthetic/independent-cohort/README.md)
@@ -39,6 +54,7 @@ prefer a current reference when they disagree.
 **Operations**
 - [Deployment](deployment.md) · [Cloud backups and restoration](cloud-backups.md)
 - [VPS restore, Owner recovery, updates and encrypted backups](vps-restore.md)
+- [Production memory budget](memory-budget.md): per-service limits and before/after measurements
 - [Cloud-first development](cloud-development.md)
 - [Private Codespaces preview](codespaces-private-preview.md) ·
   [Codespaces login Origin compatibility](codespaces-login-origin.md)
