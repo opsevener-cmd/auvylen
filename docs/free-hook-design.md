@@ -1,8 +1,10 @@
-# Free photo-quality hook — design (proposed, not implemented)
+# Free photo-quality hook — design
 
-Status: **awaiting approval**. Nothing here is built yet. The items marked **Approval needed**
-include a database schema change and a new outbound service, which AGENTS.md says need
-explicit sign-off.
+Status: **implemented** as the free photo check; see [photo-check.md](photo-check.md) for
+the shipped behaviour, settings and deployment. This page records the approved design.
+Approved by the user on 2026-11-24: the additive schema change, the Gemini call from the
+API (Gemini 3.5 Flash-Lite, Standard paid tier), the consent wording, and up to 5 photos
+per check.
 
 ## What it does
 
@@ -104,7 +106,7 @@ grooming and setting. It has the same prohibitions: no attractiveness, jawline, 
 symmetry scores and no percentiles. You will add the payment method. It costs about
 $0.005 per report (~1,500 output tokens).
 
-## Approval needed before implementation
+## Approvals (granted 2026-11-24)
 
 1. **New tables (Alembic migration):** consent records for the hook, daily spend ledger
    rows (append-only, one per call), and per-user daily counters.

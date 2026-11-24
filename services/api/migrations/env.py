@@ -5,6 +5,7 @@ from aevyra_api.config import Settings
 from aevyra_api.credits import models as credit_models
 from aevyra_api.database import Base, build_engine
 from aevyra_api.models import FoundationRecord
+from aevyra_api.photo_check import models as photo_check_models
 from aevyra_api.preferences import models as preference_models
 from aevyra_api.preferences import training_models
 from aevyra_api.research import models as research_models
@@ -21,6 +22,7 @@ assert preference_models.PreferenceDataset.__table__.metadata is target_metadata
 assert training_models.CustomModel.__table__.metadata is target_metadata
 assert aesthetic_models.AestheticAnalysis.__table__.metadata is target_metadata
 assert study_models.Study.__table__.metadata is target_metadata
+assert photo_check_models.PhotoCheckAnalysis.__table__.metadata is target_metadata
 
 
 def run_migrations() -> None:

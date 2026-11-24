@@ -151,3 +151,22 @@ export interface StudyAssignment {id: string; expires_at: string; not_before: st
 export interface StudyExport {id: string; status: string; sha256: string; images: number; subjects: number; expires_at: string}
 
 export interface StudyExportRequest {idempotency_key: string; include_adjusted?: boolean}
+
+/** Free photo-quality check: photo technique only, never attractiveness or physical traits. */
+export type PhotoCheckAvailability = "ready" | "disabled" | "not_configured" | "paid_tier_unconfirmed" | "paused";
+export type PhotoCheckRefusal = "no_person" | "multiple_people" | "not_a_photo" | "appears_under_18" | "explicit";
+export interface PhotoCheckStatus {
+  available: boolean; reason: PhotoCheckAvailability; consent_version: string; consent_required: boolean;
+  used_today: number; daily_limit: number; max_photos: number;
+}
+export interface PhotoCheckConsentRequest {consent_version: "gemini-paid-v1"; adult_confirmed: true; processing_accepted: true}
+export interface PhotoCheckRequest {photos: string[]; language: "en" | "zh-CN"}
+export interface PhotoScores {lighting: number; sharpness: number; framing: number; expression: number; eye_contact: number; background: number}
+export interface PhotoCheckPhoto {
+  index: number; rank: number | null; usable: boolean; refusal_reason: PhotoCheckRefusal | null;
+  scores: PhotoScores | null; raw_score: number | null; display_score: number | null; tips: string[];
+}
+export interface PhotoCheckResult {
+  id: string; photos: PhotoCheckPhoto[]; engine: string; model: string; prompt_version: string;
+  created_at: string; used_today: number; daily_limit: number;
+}
