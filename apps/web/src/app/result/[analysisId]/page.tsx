@@ -1,6 +1,8 @@
 import {Text} from "@/components/i18n/provider";
 import {ServiceError} from "@/components/service-error";
 import {cookies} from "next/headers";
+import {notFound} from "next/navigation";
+import {features} from "@/lib/features";
 import {getApiUrl} from "@/lib/environment";
 import {z} from "zod";
 import {analysisSchema, apiRequest, resultSchema, unavailable} from "@/lib/commercial-api";
@@ -8,6 +10,7 @@ import {analysisSchema, apiRequest, resultSchema, unavailable} from "@/lib/comme
 export const dynamic = "force-dynamic";
 
 export default async function Result({params, searchParams}: {params: Promise<{analysisId: string}>, searchParams: Promise<{funding?: string}>}) {
+  if (!features().syntheticAnalysis) notFound();
   const {analysisId} = await params;
   const creditFunded = (await searchParams).funding === "credits";
   const path = `/${creditFunded ? "credit-analyses" : "analyses"}/${encodeURIComponent(analysisId)}`;

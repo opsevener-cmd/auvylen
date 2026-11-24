@@ -25,8 +25,9 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError, m
 from aevyra_inference.aesthetic import CALIBRATION_LEVEL, RATING_BINS, ScoringHead, analyze
 from aevyra_inference.engine import ScoringEngine
 from aevyra_inference.extractors import dimension, manifest
+from aevyra_inference.identifiers import AESTHETIC_SLUG
 
-SLUG = "auvylen-aesthetic"
+SLUG = AESTHETIC_SLUG
 FORMAT: Final = "auvylen-aesthetic-checkpoint-v1"
 IMPLEMENTATION: Final = "aesthetic-distribution-head-v1"
 WEIGHTS_FILE: Final = "head.f64"
@@ -42,6 +43,14 @@ GATE_MIN_SPEARMAN = 0.3
 GATE_COVERAGE_TOLERANCE = 0.1
 
 Text = Annotated[str, Field(min_length=1, max_length=500)]
+# Never releasable, whatever the manifest says: non-commercial licences, no subject consent
+# and/or possible minors (SCUT-FBP5500 includes 15-17-year-olds). See AGENTS.md.
+EXCLUDED_DATASETS = re.compile(r"scut[\s_-]*fbp|mebeauty|chicago[\s_-]*face|\bcfd\b", re.IGNORECASE)
+RESTRICTED_LICENSE = re.compile(
+    r"non[\s_-]*commercial|research[\s_-]*(?:use[\s_-]*)?only|academic[\s_-]*(?:use[\s_-]*)?only"
+    r"|\bnc\b|-nc\b|by-nc|not\s+for\s+commercial",
+    re.IGNORECASE,
+)
 
 
 class DatasetEvidence(BaseModel):
@@ -58,6 +67,29 @@ class DatasetEvidence(BaseModel):
     rating_scale: Literal["five ordered categories, 1 (lowest) to 5 (highest)"]
     commercial_use_permitted: bool = False
     synthetic: bool = False
+    # Release evidence for real data. Optional only so older manifests still parse; the
+    # release gate refuses a real dataset without them.
+    subject_consent_reference: Text | None = None
+    adult_age_verification: Literal["documented"] | None = None
+
+
+def rights_failures(item: DatasetEvidence) -> list[str]:
+    """Licence, consent and age evidence a real dataset needs before user-facing release."""
+    if item.synthetic:
+        return []
+    failures = []
+    if EXCLUDED_DATASETS.search(" ".join((item.name, item.license, item.terms_url))):
+        failures.append("excluded_dataset")
+    if not item.commercial_use_permitted:
+        failures.append("commercial_use_not_permitted")
+    if RESTRICTED_LICENSE.search(item.license):
+        failures.append("restricted_license")
+    if item.subject_consent_reference is None:
+        failures.append("subject_consent_missing")
+    # Age is documented per subject; never inferred from appearance.
+    if item.adult_age_verification != "documented":
+        failures.append("adult_age_unverified")
+    return failures
 
 
 class Calibration(BaseModel):
@@ -140,6 +172,7 @@ def release_failures(item: AestheticManifest, *, allow_synthetic: bool = False) 
     metrics = item.metrics
     if item.dataset.synthetic and not allow_synthetic:
         failures.append("synthetic_dataset")
+    failures.extend(rights_failures(item.dataset))
 
     def number(key: str) -> float | None:
         value = metrics.get(key)

@@ -12,8 +12,6 @@ from uuid import UUID, uuid4
 from zipfile import ZIP_STORED, ZipFile
 
 from aevyra_contracts.studies import ExportView
-from aevyra_inference.native_data import Collection, Rights
-from aevyra_inference.rating_quality import fit_rater_model, reliability
 from pydantic import JsonValue
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -217,6 +215,10 @@ class Exports:
         *,
         include_adjusted: bool = False,
     ) -> tuple[bytes, int]:
+        # numpy-backed; imported only when an export is built.
+        from aevyra_inference.native_data import Collection, Rights
+        from aevyra_inference.rating_quality import fit_rater_model, reliability
+
         output = BytesIO()
         means, annotations = StringIO(), StringIO()
         mw, aw = csv.writer(means), csv.writer(annotations)

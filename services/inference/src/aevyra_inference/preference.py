@@ -15,12 +15,16 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, model
 
 from aevyra_inference.engine import ScoringEngine
 from aevyra_inference.extractors import MOBILENET, create_extractor, dimension, manifest
+from aevyra_inference.identifiers import (
+    BASELINE_EXTRACTOR,
+    MIN_GROUPS,
+    MIN_RATED_IMAGES,
+    RATING_IMPLEMENTATION,
+)
 
-EXTRACTOR = "rgb-grid-texture-v1"
-IMPLEMENTATION = "rating-ridge-v1"
+EXTRACTOR = BASELINE_EXTRACTOR
+IMPLEMENTATION = RATING_IMPLEMENTATION
 DIMENSION = 230
-MIN_RATED_IMAGES = 8
-MIN_GROUPS = 5
 Finite = Annotated[float, Field(allow_inf_nan=False)]
 Vector = Annotated[list[Finite], Field(min_length=DIMENSION, max_length=DIMENSION)]
 

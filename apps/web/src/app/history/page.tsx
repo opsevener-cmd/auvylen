@@ -1,2 +1,10 @@
+import {notFound} from "next/navigation";
 import {AccountPage} from "@/components/account-pages";
-export default function History() {return <AccountPage historyOnly/>;}
+import {features} from "@/lib/features";
+
+export const dynamic = "force-dynamic";
+
+export default function History() {
+  if (!features().syntheticAnalysis) notFound();
+  return <AccountPage historyOnly showAnalyses/>;
+}
