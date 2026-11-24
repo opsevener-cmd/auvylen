@@ -1,9 +1,9 @@
 encode zstd gzip
-@preference_upload path /api/v1/research/preferences/datasets/*/images
+@preference_upload path /api/v1/research/preferences/datasets/*/images /api/v1/photo-check/analyses
 request_body @preference_upload {
 	max_size 6MB
 }
-@other_requests not path /api/v1/research/preferences/datasets/*/images
+@other_requests not path /api/v1/research/preferences/datasets/*/images /api/v1/photo-check/analyses
 request_body @other_requests {
 	max_size 1MB
 }

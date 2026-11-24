@@ -40,3 +40,35 @@ def test_private_volume_reaches_only_api_and_worker():
         "proxy": False,
     }
     assert "profiles: [research]" in COMPOSE
+
+
+def test_free_hook_compose_defaults_match_application_defaults():
+    from decimal import Decimal
+
+    block = COMPOSE.split("x-app-environment: &app-environment", 1)[1].split("\nservices:", 1)[0]
+    defaults = dict(re.findall(r"(FREE_HOOK_[A-Z_]+): \$\{\1:-([^}]*)\}", block))
+    fields = Settings.model_fields
+    assert set(defaults) == {
+        "FREE_HOOK_ENABLED",
+        "FREE_HOOK_PAID_TIER_CONFIRMED",
+        "FREE_HOOK_MODEL",
+        "FREE_HOOK_USER_DAILY_LIMIT",
+        "FREE_HOOK_DAILY_BUDGET_USD",
+        "FREE_HOOK_PRICE_INPUT_PER_M",
+        "FREE_HOOK_PRICE_OUTPUT_PER_M",
+        "FREE_HOOK_THINKING_LEVEL",
+    }
+    for name, value in defaults.items():
+        default = fields[name.lower()].default
+        parsed = {bool: lambda v: v == "true", int: int, Decimal: Decimal, str: str}[type(default)]
+        assert parsed(value) == default, name
+    # Never enabled, keyed or paid-tier-confirmed by default.
+    assert "GEMINI_API_KEY: ${GEMINI_API_KEY:-}" in block
+    assert defaults["FREE_HOOK_ENABLED"] == defaults["FREE_HOOK_PAID_TIER_CONFIRMED"] == "false"
+
+
+def test_caddy_allows_photo_check_uploads():
+    routes = (ROOT / "infra/caddy/routes.caddy").read_text()
+    upload = routes.split("@preference_upload path", 1)[1].split("\n", 1)[0]
+    other = routes.split("@other_requests not path", 1)[1].split("\n", 1)[0]
+    assert "/api/v1/photo-check/analyses" in upload and "/api/v1/photo-check/analyses" in other
