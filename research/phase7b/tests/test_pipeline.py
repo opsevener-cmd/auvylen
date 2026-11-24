@@ -100,3 +100,79 @@ def test_store_writes_atomically_inside_its_root(tmp_path):
     assert not list(tmp_path.rglob("*.tmp"))
     with pytest.raises(ValueError):
         store.path("..", "escape.json")
+
+
+# --- Dataset rights: the release gate's own rules --------------------------------------------
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def test_london_is_admitted_for_research_but_can_never_pass_the_release_gate():
+    from aevyra_inference.aesthetic_checkpoint import rights_failures
+
+    data.admit(data.LONDON_RIGHTS)
+    assert rights_failures(data.LONDON_RIGHTS) == ["commercial_use_not_permitted"]
+    assert data.LONDON_RIGHTS.adult_age_verification == "documented"
+    assert "CC BY 4.0" in data.LONDON_RIGHTS.license
+    assert "signed consent" in (data.LONDON_RIGHTS.subject_consent_reference or "")
+
+
+@pytest.mark.parametrize(
+    ("changes", "failure"),
+    [
+        ({"name": "SCUT-FBP5500"}, "excluded_dataset"),
+        (
+            {"terms_url": "https://github.com/HCIILAB/SCUT-FBP5500-Database-Release"},
+            "excluded_dataset",
+        ),
+        ({"name": "MEBeauty"}, "excluded_dataset"),
+        ({"name": "Chicago Face Database"}, "excluded_dataset"),
+        ({"license": "Non-commercial research use only"}, "restricted_license"),
+        ({"license": "CC BY-NC 4.0"}, "restricted_license"),
+        ({"subject_consent_reference": None}, "subject_consent_missing"),
+        ({"adult_age_verification": None}, "adult_age_unverified"),
+    ],
+)
+def test_restricted_or_undocumented_sources_are_refused(changes, failure):
+    from dataclasses import replace
+
+    with pytest.raises(ValueError, match=failure):
+        data.admit(replace(data.LONDON_RIGHTS, **changes))
+
+
+def test_a_refused_source_is_never_fetched(monkeypatch, tmp_path):
+    from dataclasses import replace
+
+    def no_network(*args, **kwargs):
+        raise AssertionError("nothing may be cloned or read before admission")
+
+    monkeypatch.setattr(data, "LONDON_RIGHTS", replace(data.LONDON_RIGHTS, name="SCUT-FBP5500"))
+    monkeypatch.setattr(data.subprocess, "run", no_network)
+    with pytest.raises(ValueError, match="excluded_dataset"):
+        data.london(tmp_path)
+    assert not (tmp_path / "london").exists() and not (tmp_path / "clones").exists()
+
+
+def test_cli_offers_only_london_and_generated_data():
+    source = (ROOT / "research/phase7b/auvylen7b/__main__.py").read_text()
+    assert 'choices=["synthetic", "london"]' in source
+
+
+def test_research_code_and_dependencies_stay_out_of_production_images():
+    import tomllib
+
+    for dockerfile in ("services/api/Dockerfile", "apps/web/Dockerfile"):
+        text = (ROOT / dockerfile).read_text()
+        assert "research" not in text, dockerfile
+    for compose in ROOT.glob("docker-compose*.yml"):
+        assert "research/" not in compose.read_text(), compose.name
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    members = project["tool"]["uv"]["workspace"]["members"]
+    assert not any(member.startswith("research") for member in members)
+    runtime = " ".join(project["project"].get("dependencies", []))
+    for heavy in ("torch", "timm", "transformers", "open_clip"):
+        assert heavy not in runtime
+    # Heavy encoders are imported only inside functions, never at module import.
+    import sys as system
+
+    assert not any(name in system.modules for name in ("torch", "timm"))

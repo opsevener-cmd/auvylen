@@ -24,6 +24,21 @@ No model is promoted, enabled or deployed by this directory. Checkpoints stay re
 
 This is an engineering reading of the licences, not legal advice.
 
+**Dataset admission (enforced in code).** `auvylen7b.data.admit` runs the release gate's own
+`rights_failures` (`aevyra_inference.aesthetic_checkpoint`) before any source is fetched.
+SCUT-FBP5500, MEBeauty and the Chicago Face Database are refused by name. Non-commercial or
+research-only licences, missing subject consent and undocumented adult age are refused too.
+London passes: CC BY 4.0 portraits, authors' signed-consent statement, and subject ages from
+author metadata (18–120) checked against the fixed adult registry. Commercial-use permission
+is the only gate check not required for research. It stays `False` for London, so nothing
+built from this data can pass the release gate. The CLI offers only `london` and generated
+`synthetic` data.
+
+**Production isolation.** Nothing here is copied into the API, worker or web images, and no
+dependency is added to the workspace. `torch` and `timm` are imported only inside encoder
+functions and come with the Colab runtime. Compose files and the memory budget are
+unchanged. `tests/test_pipeline.py` checks all of this.
+
 ## 2. Encoder licences, accessibility and CPU deployment (public weights, generated input)
 
 Measured on a 4-vCPU box with ONNX Runtime 1.20, opset 17. Revisions are pinned.

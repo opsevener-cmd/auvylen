@@ -7,6 +7,13 @@ development records only. Raw portraits and ratings are never written to the sto
 
 ``synthetic`` returns generated pictures and generated ratings for pipeline smoke tests.
 It is flagged ``synthetic=True`` everywhere and must never be compared with real results.
+
+Every real source passes the release gate's own rights checks (``rights_failures`` in
+``aevyra_inference.aesthetic_checkpoint``) before anything is fetched: restricted datasets
+(SCUT-FBP5500, MEBeauty, the Chicago Face Database), non-commercial or research-only
+licences, missing subject consent and undocumented adult age are refused. The only check
+not required here is commercial-use permission. That is a release question, and London's
+stays False so nothing built from it can pass the release gate.
 """
 
 from __future__ import annotations
@@ -28,6 +35,47 @@ SOURCES = {
     "images": "https://github.com/debruine/webmorphR.stim",
     "ratings": "https://github.com/debruine/demopsydata",
 }
+# Release-gate rights checks that research admission does not require (see module docstring).
+RESEARCH_NOT_REQUIRED = frozenset({"commercial_use_not_permitted"})
+
+
+@dataclass(frozen=True)
+class SourceRights:
+    """Operator-recorded rights evidence for a real source; nothing is inferred from images."""
+
+    name: str
+    license: str
+    terms_url: str
+    subject_consent_reference: str | None
+    # "documented" only when every subject's age comes from source metadata (never appearance).
+    adult_age_verification: str | None
+    commercial_use_permitted: bool = False
+    synthetic: bool = False
+
+
+LONDON_RIGHTS = SourceRights(
+    name="Face Research Lab London Set, neutral frontal (development subjects)",
+    license="Portraits CC BY 4.0 (DeBruine & Jones 2017); ratings MIT + LICENCE (demopsydata)",
+    terms_url=f"{SOURCES['images']}/blob/{IMAGES_COMMIT}/LICENSE.md",
+    subject_consent_reference=(
+        f"webmorphR.stim@{IMAGES_COMMIT[:8]} README: signed consent for lab- and web-based "
+        "studies; research/phase7b/README.md section 1"
+    ),
+    # native_london.prepare keeps only subjects whose author-reported face_age is 18-120 and
+    # checks the fixed adult subject registry hash.
+    adult_age_verification="documented",
+    # Consumer-service and publicity rights are not established: research only.
+    commercial_use_permitted=False,
+)
+
+
+def admit(rights: SourceRights) -> None:
+    """Refuse a source that fails the release gate's rights rules (research subset)."""
+    from aevyra_inference.aesthetic_checkpoint import rights_failures
+
+    failures = [f for f in rights_failures(rights) if f not in RESEARCH_NOT_REQUIRED]
+    if failures:
+        raise ValueError(f"Dataset refused by the release-gate rights rules: {failures}")
 
 
 @dataclass(frozen=True)
@@ -66,6 +114,7 @@ def _git_file(repo: Path, commit: str, path: str, destination: Path) -> None:
 
 
 def london(workdir: Path) -> Dataset:
+    admit(LONDON_RIGHTS)  # Before anything is cloned or read.
     from aevyra_inference.native_dev_study import HOLDOUT_SEED, development_table
     from aevyra_inference.native_london import prepare
 
@@ -163,7 +212,8 @@ def london(workdir: Path) -> Dataset:
             "ratings_commit": RATINGS_COMMIT,
             "inventory_sha256": prepared.get("selected_image_inventory_sha256"),
             **sizes,
-            "licences": "portraits CC BY 4.0 (DeBruine & Jones 2017); ratings MIT (demopsydata)",
+            "licences": LONDON_RIGHTS.license,
+            "rights_checks": "release-gate rights_failures; commercial use not permitted",
         },
     )
 

@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any, Final, Literal
+from typing import Annotated, Any, Final, Literal, Protocol
 
 import numpy as np
 from aevyra_contracts import EngineMetadata
@@ -73,7 +73,27 @@ class DatasetEvidence(BaseModel):
     adult_age_verification: Literal["documented"] | None = None
 
 
-def rights_failures(item: DatasetEvidence) -> list[str]:
+class RightsEvidence(Protocol):
+    """The fields the rights checks read. ``DatasetEvidence`` satisfies it, and so do the
+    research pipelines' source records, so every path applies one set of rules."""
+
+    @property
+    def name(self) -> str: ...
+    @property
+    def license(self) -> str: ...
+    @property
+    def terms_url(self) -> str: ...
+    @property
+    def synthetic(self) -> bool: ...
+    @property
+    def commercial_use_permitted(self) -> bool: ...
+    @property
+    def subject_consent_reference(self) -> str | None: ...
+    @property
+    def adult_age_verification(self) -> str | None: ...
+
+
+def rights_failures(item: RightsEvidence) -> list[str]:
     """Licence, consent and age evidence a real dataset needs before user-facing release."""
     if item.synthetic:
         return []
