@@ -76,7 +76,11 @@ class Settings(BaseSettings):
         default="gemini-3.5-flash-lite", pattern=r"^[a-z0-9][a-z0-9.-]{0,63}$"
     )
     free_hook_paid_tier_confirmed: bool = False
-    free_hook_user_daily_limit: int = Field(default=30, ge=1, le=1000)
+    # Photo check quota (owner decision 2026-11-25): lifetime free checks per account, then
+    # free checks per ISO week (Monday 00:00 UTC), then Credits per check.
+    photo_check_free_signup: int = Field(default=3, ge=0, le=100)
+    photo_check_free_weekly: int = Field(default=1, ge=0, le=10)
+    photo_check_credit_cost: int = Field(default=1, ge=1, le=1000)
     free_hook_daily_budget_usd: Decimal = Field(default=Decimal("3.00"), ge=0, le=1000)
     # USD per 1M tokens; output includes thinking tokens.
     free_hook_price_input_per_m: Decimal = Field(default=Decimal("0.30"), gt=0, le=100)

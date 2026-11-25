@@ -67,6 +67,11 @@ class PhotoCheckAnalysis(Base):
             "status IN ('RESERVED','COMPLETED','FAILED')", name="ck_photo_check_status"
         ),
         CheckConstraint("photo_count BETWEEN 1 AND 5", name="ck_photo_check_count"),
+        CheckConstraint(
+            "funding IS NULL OR funding IN ('free_signup','free_weekly','credits','owner')",
+            name="ck_photo_check_funding",
+        ),
+        CheckConstraint("credits_charged >= 0", name="ck_photo_check_credits"),
         Index("ix_photo_check_user_day", "user_id", "day"),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -86,3 +91,8 @@ class PhotoCheckAnalysis(Base):
     result: Mapped[dict[str, object] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # NULL for checks made before quotas existed; those never count towards a quota.
+    funding: Mapped[str | None] = mapped_column(String(16))
+    # Credits debited when reserved; refunded by a compensating ledger entry on failure.
+    credits_charged: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    roast: Mapped[str] = mapped_column(String(8), default="off", server_default="off")

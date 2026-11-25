@@ -70,9 +70,12 @@ async def analyze(request: Request, user: CurrentUser) -> PhotoCheckResult:
             payload.extend(chunk)
         try:
             body = PhotoCheckRequest.model_validate_json(payload)
-        except ValidationError:
+        except ValidationError as error:
+            # Own face and 18+ are confirmed on every upload; say so specifically.
+            if any(issue["loc"][:1] == ("self_and_adult_confirmed",) for issue in error.errors()):
+                raise DomainError("photo_check_confirmation_required", 422) from None
             raise DomainError("photo_check_invalid_photos", 422) from None
         photos = await run_in_threadpool(decode_photos, body)
-        return await run_in_threadpool(data.analyze, user.id, photos, body.language)
+        return await run_in_threadpool(data.analyze, user.id, photos, body.language, body.roast)
     finally:
         provider_slots.release()

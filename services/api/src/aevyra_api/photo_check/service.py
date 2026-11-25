@@ -1,4 +1,12 @@
-"""Free photo-quality check: consent, per-user limit, global spend cap, ranked result.
+"""Photo check: consent, free quota then Credits, global spend cap, ranked result with
+photo technique, constructive appearance feedback, an AI impression band and an optional
+photo-only roast (AGENTS.md, owner decision 2026-11-25).
+
+Quota: PHOTO_CHECK_FREE_SIGNUP lifetime free checks, then PHOTO_CHECK_FREE_WEEKLY per ISO
+week (Monday 00:00 UTC), then PHOTO_CHECK_CREDIT_COST Credits. Free checks count only when
+they are reserved or completed, so a failed check never uses one. Credits are debited when
+the check is reserved and refunded with a compensating ledger entry if it fails, so the net
+charge applies only to a successful result and concurrent requests cannot overspend.
 
 Spend is tracked in integer micro-USD. Each call first reserves a worst-case cost under a
 row lock on the day's budget row, so concurrent requests cannot exceed the cap. The
@@ -12,7 +20,7 @@ from collections.abc import Callable, Sequence
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from aevyra_contracts import EngineMetadata
 from aevyra_contracts.photo_check import (
@@ -20,12 +28,17 @@ from aevyra_contracts.photo_check import (
     CRITERIA,
     MAX_PHOTOS,
     Availability,
+    Funding,
     Language,
+    PhotoAppearance,
     PhotoCheckConsentRequest,
     PhotoCheckPhoto,
     PhotoCheckResult,
     PhotoCheckStatus,
+    PhotoRoast,
     PhotoScores,
+    RefusalReason,
+    RoastLevel,
 )
 from aevyra_inference.engine import EnginePolicyError, EngineRegistry
 from PIL import Image
@@ -36,6 +49,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from aevyra_api.commercial.models import now
 from aevyra_api.commercial.state import DomainError
 from aevyra_api.config import Settings
+from aevyra_api.credits.ledger import append_credit, lock_wallet
+from aevyra_api.credits.models import User, Wallet
+from aevyra_api.entitlements import is_owner
 from aevyra_api.photo_check.gemini import (
     ENGINE,
     ESTIMATOR,
@@ -54,6 +70,7 @@ from aevyra_api.photo_check.models import (
     PhotoCheckBudgetDay,
     PhotoCheckConsent,
 )
+from aevyra_api.photo_check.safety import appearance_lines, roast_lines
 from aevyra_api.preferences.images import decode_image_bytes
 
 logger = logging.getLogger("aevyra.photo_check")
@@ -62,6 +79,20 @@ RESULT_RETENTION = timedelta(days=30)
 STALE_RESERVATION = timedelta(minutes=10)
 PROVIDER_LONG_EDGE = 1024
 ProviderFactory = Callable[[Settings], PhotoQualityProvider]
+# Model refusals are reported neutrally: one message for more than one person, a possible
+# minor or explicit content, so the reason is never spelled out to the user.
+PUBLIC_REFUSAL: dict[str, RefusalReason] = {
+    "no_person": "no_person",
+    "not_a_photo": "not_a_photo",
+    "multiple_people": "cannot_analyse",
+    "appears_under_18": "cannot_analyse",
+    "explicit": "cannot_analyse",
+}
+ACTIVE = ("RESERVED", "COMPLETED")
+
+
+def week_start(day: date) -> date:
+    return day - timedelta(days=day.weekday())
 
 
 def gemini_provider(settings: Settings) -> PhotoQualityProvider:
@@ -89,7 +120,7 @@ def prepare_photo(payload: bytes) -> bytes:
     return output.getvalue()
 
 
-def ranked_photos(photos: Sequence[ModelPhoto]) -> list[PhotoCheckPhoto]:
+def ranked_photos(photos: Sequence[ModelPhoto], roast: RoastLevel = "off") -> list[PhotoCheckPhoto]:
     views = []
     for photo in photos:
         if photo.refusal_reason is not None:
@@ -98,7 +129,7 @@ def ranked_photos(photos: Sequence[ModelPhoto]) -> list[PhotoCheckPhoto]:
                     index=photo.index,
                     rank=None,
                     usable=False,
-                    refusal_reason=photo.refusal_reason,
+                    refusal_reason=PUBLIC_REFUSAL[photo.refusal_reason],
                     scores=None,
                     raw_score=None,
                     display_score=None,
@@ -110,6 +141,18 @@ def ranked_photos(photos: Sequence[ModelPhoto]) -> list[PhotoCheckPhoto]:
         # The model's own overall opinion is not trusted: the score is the plain mean.
         raw = sum(getattr(scores, name) for name in CRITERIA) / len(CRITERIA)
         tips = [tip.strip()[:MAX_TIP_CHARS] for tip in photo.tips if tip.strip()][:2]
+        assert photo.band is not None  # ModelPhoto guarantees a band for usable photos.
+        appearance = PhotoAppearance(
+            strengths=appearance_lines(photo.appearance_strengths),
+            flattering=appearance_lines(photo.appearance_flattering),
+            tips=appearance_lines(photo.appearance_tips),
+            band=photo.band,  # type: ignore[arg-type]  # Validated 1-4 by ModelPhoto.
+        )
+        joke = (
+            None
+            if roast == "off"
+            else PhotoRoast(lines=roast_lines(photo.roast_lines), vibe=photo.vibe)  # type: ignore[arg-type]  # Validated against ARCHETYPES.
+        )
         views.append(
             PhotoCheckPhoto(
                 index=photo.index,
@@ -120,6 +163,8 @@ def ranked_photos(photos: Sequence[ModelPhoto]) -> list[PhotoCheckPhoto]:
                 raw_score=raw,
                 display_score=round(raw, 1),
                 tips=tips,
+                appearance=appearance,
+                roast=joke,
             )
         )
     usable = sorted(
@@ -147,7 +192,7 @@ class PhotoCheckService:
         s = self.settings
         return EngineMetadata(
             slug=ENGINE,
-            display_name="Gemini photo-quality check",
+            display_name="Gemini photo check (technique and appearance)",
             version=f"{s.free_hook_model}/{PROMPT_VERSION}",
             licensing_status=(
                 "Gemini API Standard paid tier under the Gemini API Additional Terms; "
@@ -201,18 +246,48 @@ class PhotoCheckService:
     def today() -> date:
         return now().date()
 
-    def used_today(self, session: Session, user: UUID, day: date) -> int:
+    def _active(self, session: Session, user: UUID, *conditions: object) -> int:
         return int(
             session.scalar(
                 select(func.count())
                 .select_from(PhotoCheckAnalysis)
                 .where(
                     PhotoCheckAnalysis.user_id == user,
-                    PhotoCheckAnalysis.day == day,
-                    PhotoCheckAnalysis.status.in_(("RESERVED", "COMPLETED")),
+                    PhotoCheckAnalysis.status.in_(ACTIVE),
+                    *conditions,  # type: ignore[arg-type]
                 )
             )
             or 0
+        )
+
+    def free_remaining(self, session: Session, user: UUID, day: date) -> tuple[int, int]:
+        """(signup checks left, weekly checks left this ISO week)."""
+        s = self.settings
+        signup = self._active(session, user, PhotoCheckAnalysis.funding == "free_signup")
+        weekly = self._active(
+            session,
+            user,
+            PhotoCheckAnalysis.funding == "free_weekly",
+            PhotoCheckAnalysis.day >= week_start(day),
+        )
+        return max(0, s.photo_check_free_signup - signup), max(
+            0, s.photo_check_free_weekly - weekly
+        )
+
+    def next_free_on(self, signup: int, weekly: int, day: date) -> date | None:
+        if signup or weekly or not self.settings.photo_check_free_weekly:
+            return None
+        return week_start(day) + timedelta(days=7)
+
+    def roast_available(self, session: Session, user: UUID) -> bool:
+        # The first check stays friendly: roast mode unlocks after one completed check.
+        return (
+            session.scalar(
+                select(PhotoCheckAnalysis.id)
+                .where(PhotoCheckAnalysis.user_id == user, PhotoCheckAnalysis.status == "COMPLETED")
+                .limit(1)
+            )
+            is not None
         )
 
     def consented(self, session: Session, user: UUID) -> bool:
@@ -237,13 +312,21 @@ class PhotoCheckService:
         with self.sessions() as session:
             if reason == "ready" and self.paused(session, day):
                 reason = "paused"
+            signup, weekly = self.free_remaining(session, user, day)
+            account = session.get(User, user)
+            owner = is_owner(account)
+            wallet = session.scalar(select(Wallet).where(Wallet.user_id == user))
             return PhotoCheckStatus(
                 available=reason == "ready",
                 reason=reason,
                 consent_version=CONSENT_VERSION,
                 consent_required=not self.consented(session, user),
-                used_today=self.used_today(session, user, day),
-                daily_limit=self.settings.free_hook_user_daily_limit,
+                free_checks_now=signup + weekly,
+                free_signup_remaining=signup,
+                next_free_on=None if owner else self.next_free_on(signup, weekly, day),
+                credit_cost=0 if owner else self.settings.photo_check_credit_cost,
+                credit_balance=wallet.cached_balance if wallet else 0,
+                roast_available=self.roast_available(session, user),
                 max_photos=MAX_PHOTOS,
             )
 
@@ -305,6 +388,7 @@ class PhotoCheckService:
             budget.spent_micro_usd += row.reserved_micro_usd
             row.status, row.failure_reason = "FAILED", "abandoned"
             row.cost_micro_usd, row.completed_at = row.reserved_micro_usd, now()
+            self._refund(session, row)
         session.execute(
             update(PhotoCheckAnalysis)
             .where(
@@ -316,9 +400,48 @@ class PhotoCheckService:
             .execution_options(synchronize_session=False)
         )
 
+    def _refund(self, session: Session, row: PhotoCheckAnalysis) -> None:
+        """Compensating entry for a check that produced no result. Idempotent by key."""
+        if row.funding != "credits" or not row.credits_charged:
+            return
+        append_credit(
+            session,
+            lock_wallet(session, row.user_id),
+            amount=row.credits_charged,
+            kind="PHOTO_CHECK_REFUND",
+            reference_type="photo_check",
+            reference_id=str(row.id),
+            key=f"photo-check-refund:{row.id}",
+        )
+
+    def _funding(self, session: Session, user: UUID, day: date) -> Funding:
+        if is_owner(session.get(User, user)):
+            return "owner"
+        signup, weekly = self.free_remaining(session, user, day)
+        if signup:
+            return "free_signup"
+        if weekly:
+            return "free_weekly"
+        return "credits"
+
+    def record_spend(self, usage: Usage) -> int:
+        """Add spend made outside a user check (the consistency script) to today's budget."""
+        s = self.settings
+        cost = micro_usd(usage.input_tokens, s.free_hook_price_input_per_m) + micro_usd(
+            usage.output_tokens, s.free_hook_price_output_per_m
+        )
+        with self.sessions.begin() as session:
+            self._budget_row(session, self.today()).spent_micro_usd += cost
+        return cost
+
     def _reserve(
-        self, user: UUID, provider: PhotoQualityProvider, photos: int, language: Language
-    ) -> tuple[UUID, int, date]:
+        self,
+        user: UUID,
+        provider: PhotoQualityProvider,
+        photos: int,
+        language: Language,
+        roast: RoastLevel,
+    ) -> tuple[UUID, date, Funding, int, RoastLevel]:
         amount = self.reservation(provider, photos)
         day = self.today()
         analysis_id: UUID | None = None
@@ -327,8 +450,14 @@ class PhotoCheckService:
             self._sweep(session)
             if not self.consented(session, user):
                 raise DomainError("photo_check_consent_required", 403)
-            if self.used_today(session, user, day) >= self.settings.free_hook_user_daily_limit:
-                raise DomainError("photo_check_daily_limit", 429)
+            if roast != "off" and not self.roast_available(session, user):
+                roast = "off"  # The first check stays friendly.
+            funding = self._funding(session, user, day)
+            cost = self.settings.photo_check_credit_cost if funding == "credits" else 0
+            if cost:
+                wallet = lock_wallet(session, user)
+                if wallet.cached_balance < cost:
+                    raise DomainError("photo_check_insufficient_credits", 409)
             committed = budget.spent_micro_usd + budget.reserved_micro_usd
             # Same rule as status(): pause once a full-size request no longer fits.
             if committed + max(amount, self.worst_case_reservation()) > self.budget_micro_usd():
@@ -339,6 +468,7 @@ class PhotoCheckService:
             else:
                 budget.reserved_micro_usd += amount
                 row = PhotoCheckAnalysis(
+                    id=uuid4(),
                     user_id=user,
                     day=day,
                     status="RESERVED",
@@ -348,13 +478,27 @@ class PhotoCheckService:
                     prompt_version=PROMPT_VERSION,
                     consent_version=CONSENT_VERSION,
                     reserved_micro_usd=amount,
+                    funding=funding,
+                    credits_charged=cost,
+                    roast=roast,
                 )
                 session.add(row)
                 session.flush()
+                if cost:
+                    # Debit now, refund on failure: the net charge applies only to a result.
+                    append_credit(
+                        session,
+                        wallet,
+                        amount=-cost,
+                        kind="PHOTO_CHECK",
+                        reference_type="photo_check",
+                        reference_id=str(row.id),
+                        key=f"photo-check:{row.id}",
+                    )
                 analysis_id = row.id
         if analysis_id is None:
             raise DomainError("photo_check_paused", 503)
-        return analysis_id, amount, day
+        return analysis_id, day, funding, cost, roast
 
     def _settle(
         self,
@@ -384,6 +528,8 @@ class PhotoCheckService:
                 budget.spent_micro_usd = max(
                     0, budget.spent_micro_usd - (row.cost_micro_usd or 0) + cost
                 )
+            if failure and row.status == "RESERVED":
+                self._refund(session, row)
             row.status = "FAILED" if failure else "COMPLETED"
             row.failure_reason = failure
             row.cost_micro_usd = cost
@@ -392,15 +538,23 @@ class PhotoCheckService:
             row.result = result
             row.completed_at = now()
 
-    def analyze(self, user: UUID, images: Sequence[bytes], language: Language) -> PhotoCheckResult:
+    def analyze(
+        self,
+        user: UUID,
+        images: Sequence[bytes],
+        language: Language,
+        roast: RoastLevel = "off",
+    ) -> PhotoCheckResult:
         if not 1 <= len(images) <= MAX_PHOTOS:
             raise DomainError("photo_check_invalid_photos", 422)
         if self.configuration() != "ready":
             raise DomainError("photo_check_unavailable", 503)
         provider = self.provider_factory(self.settings)
-        analysis_id, _, day = self._reserve(user, provider, len(images), language)
+        analysis_id, day, funding, cost, roast = self._reserve(
+            user, provider, len(images), language, roast
+        )
         try:
-            assessment = provider.assess(images, language)
+            assessment = provider.assess(images, language, roast)
         except ProviderError as error:
             self._settle(analysis_id, day, error.usage, None, error.reason)
             logger.error(
@@ -421,13 +575,13 @@ class PhotoCheckService:
                 extra={"analysis_id": str(analysis_id), "error_type": type(error).__name__},
             )
             raise
-        photos = ranked_photos(assessment.photos)
+        photos = ranked_photos(assessment.photos, roast)
         created = now()
         result: dict[str, object] = {"photos": [photo.model_dump(mode="json") for photo in photos]}
         self._settle(analysis_id, day, assessment.usage, result, None)
         logger.info("photo_check_completed", extra={"analysis_id": str(analysis_id)})
         with self.sessions() as session:
-            used = self.used_today(session, user, day)
+            signup, weekly = self.free_remaining(session, user, day)
         return PhotoCheckResult(
             id=analysis_id,
             photos=photos,
@@ -435,6 +589,8 @@ class PhotoCheckService:
             model=provider.model,
             prompt_version=PROMPT_VERSION,
             created_at=created,
-            used_today=used,
-            daily_limit=self.settings.free_hook_user_daily_limit,
+            funding=funding,
+            credits_charged=cost,
+            free_checks_now=signup + weekly,
+            next_free_on=None if funding == "owner" else self.next_free_on(signup, weekly, day),
         )

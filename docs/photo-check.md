@@ -1,50 +1,98 @@
-# Free photo check
+# Photo check
 
-A signed-in user uploads 1–5 photos at `/photo-check` and gets them ranked on **photo
-technique**: lighting, sharpness, framing, expression, eye contact and background. Each
-criterion is scored 1–10, with up to two short tips per photo. It never rates
-attractiveness and has no face-shape, jawline, skin or symmetry scores. It makes no
-percentile or population claims; the ranking only compares the user's own photos. No
-SCUT-FBP5500 or other restricted dataset is involved anywhere (see AGENTS.md).
+A signed-in user uploads 1–5 photos of themselves at `/photo-check`. They get:
+- the photos **ranked on photo technique**: lighting, sharpness, framing, expression, eye
+  contact and background, each 1–10, with up to two tips per photo;
+- **"What suits you"**: constructive appearance feedback (what's working, what flatters
+  them in photos, and tips on styling, hair, grooming and posing);
+- an **AI impression** in one of four bands, hidden until they press "Show my AI
+  impression" and always labelled "AI impression for fun, not an objective rating";
+- from their second check, an optional **"Roast me 🔥"** (Gentle or Spicy): one or two
+  jokes about the photo and a vibe.
+
+The rules come from the owner's decision of 2026-11-25 (AGENTS.md). No SCUT-FBP5500 or other
+restricted dataset is involved anywhere.
+
+## What it will and won't say
+
+| Area | Rule | Enforced by |
+| --- | --- | --- |
+| Appearance | Strengths and practical tips only. Never "flaws". No surgery, fillers, medical or diet advice. No comments on race, ethnicity, body weight or age | Prompt, plus `photo_check/safety.py`, which drops any line that still touches these topics |
+| AI impression | One of four bands: What🫣🤣 · Average🧐 · Attractive🥹 · Striking😘🤩 (Chinese: 这张没拍出你的状态🫣🤣 · 挺耐看🧐 · 很有魅力🥹 · 让人眼前一亮😘🤩). No decimals, no percentiles, never "颜值打分" | Integer 1–4 validated by the API; labels live in the UI |
+| Whose photo | Own face only. "This is me and I'm 18+" is ticked on **every** upload, and the API refuses requests without it | `self_and_adult_confirmed` in the request |
+| Refusals | More than one person, a person who may be under 18, or explicit content all get the same neutral "We can't analyse this photo", with no score or band. Adulthood comes from the user's statement; the model's judgement can only refuse | `cannot_analyse` in the API response |
+| Roast | Jokes about the photo and situation only: lighting, angle, blur, background, timing, styling choices. Never the body, skin, acne, weight, facial features, age, race, gender, disability or health. Spicy means sharper wit, not meaner targets. If no joke fits, there is no joke | Prompt, plus `safety.py` (a stricter list, including look-alike phrases) |
+| Vibe | Always one of 12 fixed styles ("90s Hong Kong film lead", "Indie band frontman", …). Never a real person, and never a claim to identify anyone | JSON-schema enum; anything else is rejected as an invalid response |
+
+Example lines and whether they are shown are listed in `services/api/tests/test_photo_check.py`
+(`ROAST_EXAMPLES`, `APPEARANCE_EXAMPLES`).
+
+## Free checks and Credits
+
+1. Each account gets `PHOTO_CHECK_FREE_SIGNUP` (3) free checks for life.
+2. After those, `PHOTO_CHECK_FREE_WEEKLY` (1) free check per week. Weeks start Monday 00:00 UTC.
+3. After that, each check costs `PHOTO_CHECK_CREDIT_COST` (1) Credits from the existing
+   ledger.
+   - The `PHOTO_CHECK` debit is taken when the check starts.
+   - If Gemini fails, a compensating `PHOTO_CHECK_REFUND` entry returns it, so the net charge
+     applies only to a successful result.
+   - A failed check never uses a free check either.
+4. The Owner is never charged.
+
+The page shows how many free checks are left, the date of the next free check, and the
+Credit cost and balance. The old 30-per-day limit is gone. The global daily spend cap stays.
 
 ## How it works
 
 | Step | Where |
 | --- | --- |
-| Consent (once per version `gemini-paid-v1`): user confirms they are 18+ and agrees to processing | `POST /api/v1/photo-check/consent` |
+| Consent (once per version, now `gemini-paid-v2`): 18+ and processing for photo technique **and** appearance. Anyone who accepted v1 is asked again | `POST /api/v1/photo-check/consent` |
 | The browser shrinks photos to 1024 px JPEG; the server re-decodes them under the normal upload limits, strips metadata and re-encodes | `apps/web/src/lib/photo-check-api.ts`, `photo_check/service.py` |
-| Per-user limit (default 30 per UTC day) and global spend cap (default $3 per UTC day) | `photo_check/service.py` |
-| One Gemini 3.5 Flash-Lite call (Standard paid tier): strict JSON schema, temperature 0, minimal thinking, medium image resolution | `photo_check/gemini.py` |
-| The server validates the JSON, computes each photo's score as the mean of the six criteria, and ranks | `photo_check/service.py` |
+| Free check or Credits chosen and the cost reserved against the $3/day cap, all in one locked transaction | `photo_check/service.py` |
+| One Gemini 3.5 Flash-Lite call (Standard paid tier): strict JSON schema, temperature 0, fixed seed, minimal thinking, medium image resolution | `photo_check/gemini.py` |
+| The server validates the JSON, filters every appearance and roast line, computes the technique score as the mean of the six criteria, and ranks | `photo_check/service.py`, `photo_check/safety.py` |
 | Photos are discarded in memory as soon as the result is ready and are never written to disk | — |
 
-**Data kept** (PostgreSQL, migration `0012_photo_check`):
+**Data kept** (PostgreSQL, migrations `0012_photo_check` and `0013_photo_check_quota`):
 
 | Table | Contents |
 | --- | --- |
 | `photo_check_consents` | Who agreed, to which consent version, and when |
-| `photo_check_analyses` | One row per call (the spend ledger): model, prompt version, tokens, cost in integer micro-USD, status. The result (scores and tips) is cleared after 30 days |
+| `photo_check_analyses` | One row per call (the spend ledger): model, prompt version, tokens, cost in integer micro-USD, status. Also `funding` (`free_signup`, `free_weekly`, `credits` or `owner`), `credits_charged` and `roast`. The result is cleared after 30 days. Rows from before 0013 have `funding` NULL and never count towards a quota |
 | `photo_check_budget_days` | Spent and reserved micro-USD per UTC day |
+| `credit_transactions` | `PHOTO_CHECK` debits and `PHOTO_CHECK_REFUND` entries, with durable idempotency keys |
 
 **Spend cap.** Before each call the API reserves a worst-case cost while holding a row
 lock on the day's budget row:
-- the reservation for a 5-photo request is 4,400 input plus 1,300 output tokens, about $0.0046;
-- after the call, the real cost from Gemini's reported token counts replaces the reservation;
-- once the remaining budget cannot cover a full 5-photo reservation, the check pauses
-  until the next UTC day: the page says so and the API returns `photo_check_paused`;
-- a call that failed at Google costs the user nothing towards their daily limit;
-- a reservation left behind by a crash is charged in full after 10 minutes.
+- a 5-photo reservation is 4,900 input and 2,550 output tokens, about $0.008;
+- after the call, the real cost from Gemini's token counts replaces the reservation;
+- once the remaining budget can't cover a full 5-photo reservation, checks pause until the
+  next UTC day;
+- a reservation left behind by a crash is charged in full after 10 minutes, and any Credits
+  it took are refunded.
 
-A PostgreSQL test runs 24 concurrent requests and confirms the cap holds.
+A PostgreSQL test runs concurrent requests and confirms the cap holds.
 
-**Expected cost** (Standard paid tier: $0.30 per 1M input tokens, $2.50 per 1M output
-tokens including thinking; verified 2026-11-24): about $0.001 for one photo and about
-$0.003 for five. $3 a day covers roughly 1,000 five-photo checks.
+**Expected cost** ($0.30 per 1M input, $2.50 per 1M output including thinking): about $0.002
+for one photo and about $0.005 for five, since the appearance and roast text roughly doubles
+the output. $3 a day covers roughly 600 five-photo checks.
 
 **Policy gate.** Every call passes `EngineRegistry.check_policy` with provider metadata.
 It is refused unless `FREE_HOOK_PAID_TIER_CONFIRMED=true`. That flag is the operator's
 statement that billing is linked and the Standard paid tier is in use; the API cannot
 check it. Never use a free-tier or Contributor-tier key.
+
+## Consistency check (run after deploy, with your own photo)
+
+The same photo is sent five times. The script reports each run's band and technique scores,
+how many runs agreed on the band, and the spread of each score. It prints numbers only.
+The photo is piped in and never saved. It costs about $0.01, which is added to today's
+budget.
+
+```bash
+dc exec -T api python -m aevyra_api.photo_check.consistency --runs 5 < ~/my-photo.jpg
+# Chinese tips: add --language zh-CN
+```
 
 ## Settings (`.env.production`)
 
@@ -54,12 +102,42 @@ check it. Never use a free-tier or Contributor-tier key.
 | `GEMINI_API_KEY` | empty | Secret. Never commit or paste it into chat |
 | `FREE_HOOK_PAID_TIER_CONFIRMED` | `false` | Set `true` only after checking AI Studio billing |
 | `FREE_HOOK_MODEL` | `gemini-3.5-flash-lite` | |
-| `FREE_HOOK_USER_DAILY_LIMIT` | `30` | Anti-abuse limit per user per UTC day |
-| `FREE_HOOK_DAILY_BUDGET_USD` | `3.00` | Global cap; the check pauses when it is reached |
+| `PHOTO_CHECK_FREE_SIGNUP` | `3` | Free checks per account, for life |
+| `PHOTO_CHECK_FREE_WEEKLY` | `1` | Free checks per week (Monday 00:00 UTC reset); `0` turns them off |
+| `PHOTO_CHECK_CREDIT_COST` | `1` | Credits per check after the free ones |
+| `FREE_HOOK_DAILY_BUDGET_USD` | `3.00` | Global cap; checks pause when it is reached |
 | `FREE_HOOK_PRICE_INPUT_PER_M` / `FREE_HOOK_PRICE_OUTPUT_PER_M` | `0.30` / `2.50` | Update these if Google changes prices |
 | `FREE_HOOK_THINKING_LEVEL` | `minimal` | Set it to empty if the model rejects `thinkingConfig` |
 
-## Deploy on `/opt/auvylen-b`
+`FREE_HOOK_USER_DAILY_LIMIT` no longer exists. An old value left in `.env.production` is
+ignored.
+
+## Deploy this release (appearance, quota, roast) on `/opt/auvylen-b`
+
+This adds one migration (`0013_photo_check_quota`, three columns), so back up first. No
+`.env.production` change is needed; the quota defaults apply.
+
+```bash
+export APP_DIR=/opt/auvylen-b COMPOSE_PROJECT_NAME=auvylen-b
+cd "$APP_DIR"
+dc() { docker compose --env-file .env.production -p auvylen-b -f docker-compose.prod.yml --profile research "$@"; }
+BACKUP_PASSPHRASE_FILE=/root/.auvylen-backup-passphrase scripts/backup-prod.sh
+git fetch origin && git checkout --detach REVIEWED_COMMIT
+sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$(git rev-parse --short=12 HEAD)/" .env.production
+dc config --quiet && dc build --pull
+dc stop proxy web api worker
+dc run --rm --no-deps api alembic -c services/api/alembic.ini upgrade head
+dc run --rm --no-deps api alembic -c services/api/alembic.ini current   # expect 0013_photo_check_quota (head)
+dc run --rm --no-deps api alembic -c services/api/alembic.ini check
+dc up -d --wait
+curl -fsS https://auvylen.duckdns.org/ready && echo
+```
+
+Then open `/photo-check`. You'll be asked to accept the new terms. Check one photo of
+yourself, then run the consistency check above. If a check fails, send the
+`photo_check_…` line from `dc logs --since 1h api`.
+
+## First-time setup on `/opt/auvylen-b`
 
 This adds three tables, so take a backup first. The API container needs outbound HTTPS
 to `generativelanguage.googleapis.com`; it is on the Compose `app` network, which has
@@ -109,7 +187,7 @@ chmod 600 .env.production
 dc config --quiet && dc build --pull
 dc stop proxy web api worker
 dc run --rm --no-deps api alembic -c services/api/alembic.ini upgrade head
-dc run --rm --no-deps api alembic -c services/api/alembic.ini current   # expect 0012_photo_check (head)
+dc run --rm --no-deps api alembic -c services/api/alembic.ini current   # expect the latest revision (head)
 dc run --rm --no-deps api alembic -c services/api/alembic.ini check
 dc up -d --wait
 curl -fsS https://auvylen.duckdns.org/ready && echo
@@ -155,4 +233,9 @@ run `dc up -d api`.
   environment, and every test uses a fake transport.
 - These details follow Google's documentation and should be confirmed by the first real
   check after deployment: the request format (`responseSchema`, `mediaResolution`,
-  `thinkingConfig`) and the reported token fields.
+  `thinkingConfig`, `seed`) and the reported token fields.
+- How stable the band is for one real photo. Temperature 0 and a fixed seed make repeat
+  runs as close as the provider allows, but Google doesn't promise identical output. Run
+  the consistency check to measure it.
+- How often the model writes a line the safety filter drops. Dropped lines are never shown
+  or logged. If roasts often come back empty, the prompt needs tuning.
