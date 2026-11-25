@@ -159,7 +159,7 @@ function Results({result, selected, onAgain}: {result: PhotoCheckResult; selecte
   return <div className="mt-6 space-y-4">
     <h2 ref={heading} tabIndex={-1} className="text-2xl outline-none">{t("Your results")}</h2>
     {paid && <p className="text-sm text-[#63706a]">{paid}</p>}
-    {ordered.map(photo => <ResultCard key={photo.index} photo={photo} url={selected[photo.index]?.url}/>)}
+    {ordered.map(photo => <ResultCard key={photo.index} photo={photo} url={selected[photo.index]?.url} onAgain={onAgain}/>)}
     <button className="button-secondary" onClick={onAgain}>{t("Check other photos")}</button>
   </div>;
 }
@@ -170,7 +170,7 @@ function List({title, items}: {title: string; items: string[]}) {
   return <div className="mt-3"><h4 className="text-sm font-medium">{t(title)}</h4><ul className="mt-1 list-disc space-y-1 pl-5 text-sm">{items.map(item => <li key={item}>{item}</li>)}</ul></div>;
 }
 
-function ResultCard({photo, url}: {photo: PhotoCheckPhoto; url?: string}) {
+function ResultCard({photo, url, onAgain}: {photo: PhotoCheckPhoto; url?: string; onAgain: () => void}) {
   const {t} = useI18n();
   const [showImpression, setShowImpression] = useState(false);
   return <article className={`${box} flex flex-col gap-4 sm:flex-row`}>
@@ -182,7 +182,13 @@ function ResultCard({photo, url}: {photo: PhotoCheckPhoto; url?: string}) {
         <p className="mt-1 text-3xl">{photo.display_score?.toFixed(1)} <span className="text-base text-[#63706a]">{t("/ 10 photo quality")}</span></p>
         <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">{criteria.map(name => <div key={name} className="flex justify-between gap-2"><dt>{t(criterionLabels[name])}</dt><dd>{photo.scores?.[name]}</dd></div>)}</dl>
         <List title="Photo tips" items={photo.tips}/>
-        {photo.appearance && <section className="mt-5 border-t border-black/10 pt-4" aria-label={t("What suits you")}>
+        {/* Stage 2 (appearance, AI impression, roast) only for photos good enough to judge. */}
+        {!photo.quality_passed && <div className="mt-5 border-t border-black/10 pt-4">
+          <p>{t("Photo quality {score}/10. Retake it with the tips above, then check your look.", {score: photo.display_score?.toFixed(1) ?? "–"})}</p>
+          <button className="button-secondary mt-3" onClick={onAgain}>{t("Try another photo")}</button>
+        </div>}
+        {photo.quality_passed && <p className="mt-4 text-sm text-[#537462]">{t("Quality OK ✓")}</p>}
+        {photo.quality_passed && photo.appearance && <section className="mt-5 border-t border-black/10 pt-4" aria-label={t("What suits you")}>
           <h3 className="text-lg">{t("What suits you")}</h3>
           <List title="What's working" items={photo.appearance.strengths}/>
           <List title="What flatters you in photos" items={photo.appearance.flattering}/>
@@ -194,7 +200,7 @@ function ResultCard({photo, url}: {photo: PhotoCheckPhoto; url?: string}) {
             <p className="mt-1 text-xs text-[#63706a]">{t("AI impression for fun, not an objective rating")}</p>
           </div>
         </section>}
-        {photo.roast && (photo.roast.lines.length > 0 || photo.roast.vibe) && <section className="mt-5 border-t border-black/10 pt-4" aria-label={t("Roast 🔥")}>
+        {photo.quality_passed && photo.roast && (photo.roast.lines.length > 0 || photo.roast.vibe) && <section className="mt-5 border-t border-black/10 pt-4" aria-label={t("Roast 🔥")}>
           <h3 className="text-lg">{t("Roast 🔥")}</h3>
           {photo.roast.lines.map(line => <p key={line} className="mt-2">{line}</p>)}
           {photo.roast.vibe && <p className="mt-2 text-sm">{t("Vibe: {vibe}", {vibe: t(archetypeLabels[photo.roast.vibe])})}</p>}

@@ -36,7 +36,7 @@ export const photoCheckResultSchema: z.ZodType<PhotoCheckResult> = z.object({
     index: count, rank: count.nullable(), usable: z.boolean(), refusal_reason: refusal.nullable(),
     scores: z.object({lighting: score, sharpness: score, framing: score, expression: score, eye_contact: score, background: score}).nullable(),
     raw_score: z.number().min(1).max(10).nullable(), display_score: z.number().min(1).max(10).nullable(),
-    tips: lines(2),
+    tips: lines(2), quality_passed: z.boolean(),
     appearance: z.object({strengths: lines(3), flattering: lines(3), tips: lines(3),
       band: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])}).nullable(),
     roast: z.object({lines: lines(2), vibe: z.enum(archetypes).nullable()}).nullable(),

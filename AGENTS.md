@@ -50,6 +50,10 @@ back to Windows/WSL or local Docker. No cloud environment or paid server is assu
 - Photo check (owner decision, 2026-11-25; see docs/photo-check.md). It gives photo-technique
   feedback plus appearance feedback, using Gemini 3.5 Flash-Lite on the Gemini API Standard
   paid tier only (never the free or Contributor tier).
+  - Two stages, one call. Stage 1 is photo technique and is always shown. Only a photo whose
+    technique score (mean of the six criteria, 1-10) is at least `QUALITY_GATE` (6.0) gets
+    stage 2: appearance feedback, the AI impression band and roast. Below the gate, stage 2
+    output is discarded and never returned or stored; the user is asked to retake the photo.
   - Appearance feedback is constructive: strengths, what flatters the person in photos, and
     practical tips. Never "flaws". No cosmetic surgery, filler, medical or diet advice, and no
     comments on race, ethnicity, body weight or age.

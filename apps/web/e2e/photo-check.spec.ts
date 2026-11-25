@@ -36,10 +36,11 @@ test("photo check: consent, own-face confirmation, quota, appearance, hidden AI 
     return route.fulfill({json: {id: "6b0b2f1e-4b5c-4d3e-9f10-2a3b4c5d6e7f", engine: "gemini-photo-check", model: "gemini-3.5-flash-lite",
       prompt_version: "photo-appearance-v1", created_at: new Date().toISOString(), funding: "free_signup", credits_charged: 0,
       free_checks_now: 4 - checks, next_free_on: null, photos: [
-        {index: 0, rank: 2, usable: true, refusal_reason: null, scores: scores(5), raw_score: 5, display_score: 5, tips: ["Face a window for softer light"], appearance: appearance(2), roast: null},
-        {index: 1, rank: 1, usable: true, refusal_reason: null, scores: scores(8), raw_score: 8, display_score: 8, tips: [], appearance: appearance(4),
+        // Below the 6.0 quality gate: technique feedback only, no appearance, band or roast.
+        {index: 0, rank: 2, usable: true, refusal_reason: null, scores: scores(5), raw_score: 5, display_score: 5, tips: ["Face a window for softer light"], quality_passed: false, appearance: null, roast: null},
+        {index: 1, rank: 1, usable: true, refusal_reason: null, scores: scores(8), raw_score: 8, display_score: 8, tips: [], quality_passed: true, appearance: appearance(4),
           roast: roasted ? {lines: ["That ceiling light is auditioning for a crime drama."], vibe: "hk_film_lead_90s"} : null},
-        {index: 2, rank: null, usable: false, refusal_reason: "cannot_analyse", scores: null, raw_score: null, display_score: null, tips: [], appearance: null, roast: null},
+        {index: 2, rank: null, usable: false, refusal_reason: "cannot_analyse", scores: null, raw_score: null, display_score: null, tips: [], quality_passed: false, appearance: null, roast: null},
       ]}});
   });
   await page.reload();
@@ -63,6 +64,16 @@ test("photo check: consent, own-face confirmation, quota, appearance, hidden AI 
   await expect(page.getByText("We can't analyse this photo.")).toBeVisible();
   await expect(page.locator("article").first()).toContainText("Best photo");
   await expect(page.getByRole("heading", {name: "What suits you"}).first()).toBeVisible();
+  // Two stages: the good photo passes the quality gate; the weak one only gets photo tips.
+  const best = page.locator("article").first();
+  const weak = page.locator("article").nth(1);
+  await expect(best.getByText("Quality OK ✓")).toBeVisible();
+  await expect(weak.getByText("Photo quality 5.0/10. Retake it with the tips above, then check your look.")).toBeVisible();
+  await expect(weak.getByText("Face a window for softer light")).toBeVisible();
+  await expect(weak.getByRole("heading", {name: "What suits you"})).toHaveCount(0);
+  await expect(weak.getByRole("button", {name: "Show my AI impression"})).toHaveCount(0);
+  await expect(weak.getByRole("button", {name: "Try another photo"})).toBeVisible();
+  await expect(page.getByRole("button", {name: "Show my AI impression"})).toHaveCount(1);
   // The AI impression stays hidden until asked for, with its label always visible.
   await expect(page.getByText("Striking😘🤩")).toHaveCount(0);
   await expect(page.getByText("AI impression for fun, not an objective rating").first()).toBeVisible();
@@ -88,4 +99,8 @@ test("photo check: consent, own-face confirmation, quota, appearance, hidden AI 
   await page.getByRole("button", {name: "中文"}).click();
   await expect(page.getByRole("heading", {name: "你的哪张照片效果最好？"})).toBeVisible();
   await expect(page.getByText("氛围感：90 年代港片主角")).toBeVisible();
+  await expect(page.getByText("照片质量 5.0/10，按上面的建议重拍一张，再来看颜值评价。")).toBeVisible();
+  // "Try another photo" goes straight back to choosing photos.
+  await page.getByRole("button", {name: "换一张试试"}).click();
+  await expect(page.getByText("选择照片", {exact: true})).toBeVisible();
 });

@@ -30,10 +30,11 @@ from aevyra_api.photo_check.safety import appearance_lines, roast_lines
 from aevyra_api.photo_check.service import (
     PhotoCheckService,
     micro_usd,
+    passes_quality_gate,
     ranked_photos,
     week_start,
 )
-from aevyra_contracts.photo_check import CONSENT_VERSION
+from aevyra_contracts.photo_check import CONSENT_VERSION, QUALITY_GATE, PhotoCheckPhoto
 from PIL import Image
 from pydantic import SecretStr
 from sqlalchemy import select
@@ -53,10 +54,14 @@ def jpeg(size=(400, 500)):
     return base64.b64encode(output.getvalue()).decode()
 
 
-def photo_json(index, refusal=None, base=6, band=3, roast=(), vibe=None, **appearance):
-    scores = {
-        name: None if refusal else min(base + offset, 10) for offset, name in enumerate(CRITERIA)
-    }
+def photo_json(index, refusal=None, base=6, band=3, roast=(), vibe=None, scores=None, **appearance):
+    if scores is not None:  # Exact six technique scores, in CRITERIA order.
+        scores = dict(zip(CRITERIA, scores, strict=True))
+    else:
+        scores = {
+            name: None if refusal else min(base + offset, 10)
+            for offset, name in enumerate(CRITERIA)
+        }
     return {
         "index": index,
         "refusal_reason": refusal,
@@ -606,18 +611,28 @@ def test_weeks_start_on_monday_utc():
     assert week_start(date(2026, 11, 29)) == date(2026, 11, 23)  # Sunday stays in the week.
 
 
-def test_consistency_report_counts_band_agreement():
+def test_consistency_report_counts_gate_and_band_agreement():
     runs = [
         {"band": 3, **{name: 7 for name in CRITERIA}},
         {"band": 3, **{name: 8 for name in CRITERIA}},
         {"band": 2, **{name: 7 for name in CRITERIA}},
-        {"band": 3, **{name: 7 for name in CRITERIA}},
+        {"band": 4, **dict(zip(CRITERIA, (5, 6, 6, 6, 6, 6), strict=True))},  # 5.8: below.
         {"refusal": "multiple_people"},
     ]
     report = summarize(runs)
-    assert "band agreement: 3/5 runs gave band 3 (60%)" in report
-    assert "lighting: min 7, max 8, spread 1" in report
-    assert report[4] == "run 5: no result (multiple_people)"
+    assert report[0].startswith("run 1: quality 7.0 gate=passed band=3 ")
+    assert report[3].startswith("run 4: quality 5.8 gate=failed band=- ")
+    assert report[4] == "run 5: no result (multiple_people), gate=failed"
+    assert "quality gate agreement: 3/5 runs passed (60%; gate is 6.0/10)" in report
+    # Only runs that passed count towards band agreement: the failed run's band 4 is ignored.
+    assert "band agreement (runs that passed the gate): 2/3 gave band 3 (67%)" in report
+    assert "lighting: min 5, max 8, spread 3" in report
+
+
+def test_consistency_report_when_no_run_passes_the_gate():
+    report = summarize([{"band": 3, **{name: 5 for name in CRITERIA}}] * 2)
+    assert "quality gate agreement: 2/2 runs failed (100%; gate is 6.0/10)" in report
+    assert "band agreement: no run passed the quality gate, so no band is shown" in report
 
 
 def test_production_policy_gate_requires_paid_tier_confirmation(credits):
@@ -775,3 +790,65 @@ def test_deploy_doc_snippet_accepts_aq_keys_and_rejects_pasted_artefacts(tmp_pat
         result, written = run(bad)
         assert result.returncode != 0 and f"GEMINI_API_KEY={bad}" not in written
         assert bad not in result.stdout + result.stderr
+
+
+# --- Two stages: appearance only for photos that pass the quality gate ------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw_score", "passed"), [(5.9, False), (5.99, False), (6.0, True), (8.5, True), (None, False)]
+)
+def test_quality_gate_threshold(raw_score, passed):
+    assert QUALITY_GATE == 6.0
+    assert passes_quality_gate(raw_score) is passed
+
+
+def test_photos_below_the_gate_keep_technique_feedback_but_lose_stage_two():
+    photos = parse_response(
+        gemini_reply(
+            [
+                photo_json(0, scores=(6, 6, 6, 6, 6, 5), band=4, roast=["Nice light"]),  # 5.83
+                photo_json(1, scores=(6, 6, 6, 6, 6, 6), band=2, roast=["Nice light"]),  # 6.0
+                photo_json(2, "no_person"),
+            ]
+        ),
+        3,
+    ).photos
+    below, exactly, nobody = ranked_photos(photos, "gentle")
+    assert below.usable and below.quality_passed is False
+    assert below.raw_score == pytest.approx(35 / 6) and below.scores is not None
+    assert below.tips == ["Face the window"]  # Stage 1 feedback is always shown.
+    assert below.appearance is None and below.roast is None  # No band, no roast.
+    assert exactly.quality_passed is True and exactly.raw_score == 6.0
+    assert exactly.appearance is not None and exactly.appearance.band == 2
+    assert exactly.roast is not None and exactly.roast.lines == ["Nice light"]
+    assert nobody.quality_passed is False and nobody.appearance is None
+    # Ranking stays by technique score, gate or not.
+    assert (exactly.rank, below.rank, nobody.rank) == (1, 2, None)
+
+
+def test_contract_requires_quality_passed():
+    fields = PhotoCheckPhoto.model_fields
+    assert fields["quality_passed"].is_required() and fields["quality_passed"].annotation is bool
+
+
+def test_api_never_returns_or_stores_stage_two_for_a_photo_below_the_gate(credits):
+    register(credits.client)
+    low = photo_json(0, scores=(5, 6, 6, 6, 6, 6), band=4, roast=["Moody lighting"])
+    transport = FakeTransport([ok(), (200, gemini_reply([low, photo_json(1)]))])
+    configure(credits, transport)
+    accept(credits)
+    assert submit(credits).status_code == 200  # Unlocks roast for the next check.
+    result = submit(credits, 2, roast="spicy").json()
+    by_index = {photo["index"]: photo for photo in result["photos"]}
+    assert by_index[0]["quality_passed"] is False
+    assert by_index[0]["appearance"] is None and by_index[0]["roast"] is None
+    assert by_index[0]["display_score"] == 5.8 and by_index[0]["rank"] == 2
+    assert by_index[1]["quality_passed"] is True and by_index[1]["appearance"]["band"] == 3
+    with credits.sessions() as session:
+        stored = session.scalars(
+            select(PhotoCheckAnalysis).order_by(PhotoCheckAnalysis.created_at.desc())
+        ).first()
+    low_stored = next(photo for photo in stored.result["photos"] if photo["index"] == 0)
+    assert low_stored["appearance"] is None and low_stored["roast"] is None
+    assert "band" not in json.dumps(low_stored)
