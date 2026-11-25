@@ -175,6 +175,8 @@ export interface PhotoRoast {lines: string[]; vibe: PhotoCheckArchetype | null}
 export interface PhotoCheckPhoto {
   index: number; rank: number | null; usable: boolean; refusal_reason: PhotoCheckRefusal | null;
   scores: PhotoScores | null; raw_score: number | null; display_score: number | null; tips: string[];
+  /** Stage 1 gate: true when usable and raw_score >= 6.0. Only then are appearance and roast present. */
+  quality_passed: boolean;
   appearance: PhotoAppearance | null; roast: PhotoRoast | null;
 }
 export interface PhotoCheckResult {

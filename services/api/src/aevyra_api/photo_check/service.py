@@ -27,6 +27,7 @@ from aevyra_contracts.photo_check import (
     CONSENT_VERSION,
     CRITERIA,
     MAX_PHOTOS,
+    QUALITY_GATE,
     Availability,
     Funding,
     Language,
@@ -120,6 +121,11 @@ def prepare_photo(payload: bytes) -> bytes:
     return output.getvalue()
 
 
+def passes_quality_gate(raw_score: float | None) -> bool:
+    """Stage 1 gate: stage 2 (appearance, AI impression, roast) needs a good enough photo."""
+    return raw_score is not None and raw_score >= QUALITY_GATE
+
+
 def ranked_photos(photos: Sequence[ModelPhoto], roast: RoastLevel = "off") -> list[PhotoCheckPhoto]:
     views = []
     for photo in photos:
@@ -134,6 +140,7 @@ def ranked_photos(photos: Sequence[ModelPhoto], roast: RoastLevel = "off") -> li
                     raw_score=None,
                     display_score=None,
                     tips=[],
+                    quality_passed=False,
                 )
             )
             continue
@@ -142,15 +149,22 @@ def ranked_photos(photos: Sequence[ModelPhoto], roast: RoastLevel = "off") -> li
         raw = sum(getattr(scores, name) for name in CRITERIA) / len(CRITERIA)
         tips = [tip.strip()[:MAX_TIP_CHARS] for tip in photo.tips if tip.strip()][:2]
         assert photo.band is not None  # ModelPhoto guarantees a band for usable photos.
-        appearance = PhotoAppearance(
-            strengths=appearance_lines(photo.appearance_strengths),
-            flattering=appearance_lines(photo.appearance_flattering),
-            tips=appearance_lines(photo.appearance_tips),
-            band=photo.band,  # type: ignore[arg-type]  # Validated 1-4 by ModelPhoto.
+        passed = passes_quality_gate(raw)
+        # Below the gate, the appearance, band and roast from the same call are discarded
+        # here: they are never returned or stored.
+        appearance = (
+            PhotoAppearance(
+                strengths=appearance_lines(photo.appearance_strengths),
+                flattering=appearance_lines(photo.appearance_flattering),
+                tips=appearance_lines(photo.appearance_tips),
+                band=photo.band,  # type: ignore[arg-type]  # Validated 1-4 by ModelPhoto.
+            )
+            if passed
+            else None
         )
         joke = (
             None
-            if roast == "off"
+            if roast == "off" or not passed
             else PhotoRoast(lines=roast_lines(photo.roast_lines), vibe=photo.vibe)  # type: ignore[arg-type]  # Validated against ARCHETYPES.
         )
         views.append(
@@ -163,6 +177,7 @@ def ranked_photos(photos: Sequence[ModelPhoto], roast: RoastLevel = "off") -> li
                 raw_score=raw,
                 display_score=round(raw, 1),
                 tips=tips,
+                quality_passed=passed,
                 appearance=appearance,
                 roast=joke,
             )

@@ -10,6 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field
 # v2 covers appearance analysis; everyone who accepted v1 must accept again.
 CONSENT_VERSION = "gemini-paid-v2"
 MAX_PHOTOS = 5
+# Stage 1 is photo technique. Only a photo whose technique score (mean of the six criteria,
+# 1-10) reaches this goes on to stage 2: appearance feedback, AI impression and roast.
+QUALITY_GATE = 6.0
 CRITERIA = ("lighting", "sharpness", "framing", "expression", "eye_contact", "background")
 # The model may only choose one of these; the UI renders each in plain EN/ZH copy. A fixed
 # list means a vibe line can never name or claim to identify a real person.
@@ -123,6 +126,8 @@ class PhotoCheckPhoto(BaseModel):
     raw_score: float | None
     display_score: float | None
     tips: list[str]
+    # True when usable and raw_score >= QUALITY_GATE; only then are appearance/roast present.
+    quality_passed: bool
     appearance: PhotoAppearance | None = None
     roast: PhotoRoast | None = None
 

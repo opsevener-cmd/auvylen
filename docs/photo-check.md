@@ -1,6 +1,17 @@
 # Photo check
 
-A signed-in user uploads 1–5 photos of themselves at `/photo-check`. They get:
+A signed-in user uploads 1–5 photos of themselves at `/photo-check`. The check has two stages,
+from a single Gemini call:
+
+1. **Photo technique**, always shown.
+2. **Appearance**: the "What suits you" section, the AI impression and the roast. Shown only
+   when the photo's technique score (the mean of the six criteria, 1–10) is at least
+   `QUALITY_GATE` = **6.0**. Below that, the page shows "Photo quality X/10. Retake it with
+   the tips above, then check your look." with a "Try another photo" button. Stage 2 output
+   for that photo is thrown away in `ranked_photos()` and is never returned or stored. Each
+   photo carries `quality_passed` in the API response. Ranking is still by technique score.
+
+In detail, they get:
 - the photos **ranked on photo technique**: lighting, sharpness, framing, expression, eye
   contact and background, each 1–10, with up to two tips per photo;
 - **"What suits you"**: constructive appearance feedback (what's working, what flatters
@@ -85,8 +96,10 @@ check it. Never use a free-tier or Contributor-tier key.
 ## Consistency check (run after deploy, with your own photo)
 
 The same photo is sent five times. The script reports each run's band and technique scores,
-how many runs agreed on the band, and the spread of each score. It prints numbers only.
-The photo is piped in and never saved. It costs about $0.01, which is added to today's
+how many runs agreed on the band, and the spread of each score. It prints numbers only, including
+whether each run passed the quality gate and how many runs agree on that. Band agreement
+counts only runs that passed, since only those ever show a band. The photo is piped in and
+never saved. It costs about $0.01, which is added to today's
 budget.
 
 ```bash

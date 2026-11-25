@@ -1143,5 +1143,8 @@
   "Please confirm that this is you and you're 18 or older.": "请确认照片里是你本人，并且你已满 18 岁。",
   "You've used your free checks. Add Credits on your Account page to keep going.": "免费次数已用完。可以在账户页面充值积分后继续。",
   "The photo check didn't finish. You weren't charged. Please try again.": "检测没有完成，没有扣费。请再试一次。",
-  "We can't analyse these photos. Use clear photos of just you.": "这些照片无法分析。请使用只有你本人的清晰照片。"
+  "We can't analyse these photos. Use clear photos of just you.": "这些照片无法分析。请使用只有你本人的清晰照片。",
+  "Photo quality {score}/10. Retake it with the tips above, then check your look.": "照片质量 {score}/10，按上面的建议重拍一张，再来看颜值评价。",
+  "Try another photo": "换一张试试",
+  "Quality OK ✓": "照片质量合格 ✓"
 }
