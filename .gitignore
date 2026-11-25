@@ -195,3 +195,8 @@ appendonlydir/
 !/docs/phase7a/study-withdrawal-en-mobile.webp
 !/docs/phase7a/study-withdrawal-zh-mobile.webp
 !/docs/phase7a/study-withdrawal-en-desktop.webp
+
+# Editor and notebook working files.
+.ipynb_checkpoints/
+*.swp
+*.swo

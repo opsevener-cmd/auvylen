@@ -17,6 +17,11 @@ distribution, an expected 1–10 score, subject-independent validation and calib
 It is **disabled until an authorized human-rated dataset trains a checkpoint that passes the
 release gate**; no simulated score is ever substituted. See the [Phase 6 report](docs/phase6-report.md).
 
+The native 1–7 model has an Owner-only research preview (`/research/native-preview`), disabled
+by default and allowed only in development/test. Consumer scoring remains disabled. See the
+[native model overview](docs/native-aesthetic/README.md) and the
+[scoring milestone and release roadmap](docs/native-aesthetic/scoring-milestone/README.md).
+
 Personal research is a guided four-step wizard with a server-checked training completion screen and
 prediction from newly uploaded, prediction-only photographs. See [research wizard UX](docs/research-wizard-ux.md);
 the optional ComboLoss provider remains unavailable ([assessment](docs/comboloss-assessment.md)).
@@ -47,7 +52,8 @@ services/api/         FastAPI; accounts, immutable credits, redemption, payment 
 services/inference/   Installable Python scoring package; abstract engine and mock
 packages/contracts/   Shared Python response models and TypeScript wire types
 infra/                Infrastructure notes; local Compose lives at repository root
-docs/                 Architecture and verification notes
+scripts/              Operator, benchmark, verification and research scripts
+docs/                 Documentation; start at docs/README.md
 ```
 
 Inference remains an isolated package, not a running network service. This avoids
