@@ -44,14 +44,29 @@ back to Windows/WSL or local Docker. No cloud environment or paid server is assu
   development/test.
 - Never use SCUT-FBP5500, MEBeauty, the Chicago Face Database or any other dataset that is
   non-commercial, lacks subject consent or may include minors in any production or
-  user-facing path, including the free photo-quality hook. The release gate refuses them
+  user-facing path, including the photo check. The release gate refuses them
   (`rights_failures` in `aesthetic_checkpoint.py`). The local scoring pipeline stays
   disabled until a licensed, consented adult dataset passes that gate.
-- The free hook and paid report judge photo technique and styling only (lighting,
-  sharpness, framing, expression, eye contact, background, styling). No attractiveness,
-  jawline, skin or symmetry scores and no percentile or population comparisons. Their VLM
-  calls use the Gemini API Standard paid tier only, never the free or Contributor tier.
-  See docs/free-hook-design.md.
+- Photo check (owner decision, 2026-11-25; see docs/photo-check.md). It gives photo-technique
+  feedback plus appearance feedback, using Gemini 3.5 Flash-Lite on the Gemini API Standard
+  paid tier only (never the free or Contributor tier).
+  - Appearance feedback is constructive: strengths, what flatters the person in photos, and
+    practical tips. Never "flaws". No cosmetic surgery, filler, medical or diet advice, and no
+    comments on race, ethnicity, body weight or age.
+  - The AI impression is one of four bands, with no decimals or percentiles. It stays hidden
+    until the user asks to see it and is labelled "for fun, not an objective rating".
+  - Users may analyse only their own face. They confirm "this is me and I'm 18+" on every
+    upload. Photos with more than one person, or where the person may be under 18, get a
+    neutral "can't analyse this photo" message and no score. Adulthood comes from the user's
+    statement and is never inferred from appearance; the model's judgement can only refuse.
+  - Optional roast mode (off by default, never on a user's first check) jokes only about the
+    photo and situation: lighting, angle, blur, background, timing, styling choices. Never
+    the body, skin, weight, facial features, age, race, gender, disability or health. Vibe
+    comparisons are archetypes chosen from a fixed list, never named real people, and never
+    claim to identify anyone. If a joke cannot meet these limits, it is skipped.
+  - Quota: free checks at signup and weekly, then Credits from the existing ledger. Charge
+    only for a successful result (a debit, then a compensating refund if the provider fails).
+    A global daily spend cap stays in force.
 - Every future execution must use the registry policy gate; new engines require explicit
   provenance and licensing review. A commercial flag is not a substitute for evidence.
 

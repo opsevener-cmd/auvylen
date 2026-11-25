@@ -9,7 +9,7 @@ export function SiteShell({children, pilot, features}: {children: React.ReactNod
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   // Credits and redemption live in the Account page; hidden features never appear here.
-  const links = [["/", "Home"], ["/photo-check", "Free photo check"], ...(features.aesthetic ? [["/research/aesthetic", "Aesthetic analysis"]] : []),
+  const links = [["/", "Home"], ["/photo-check", "Photo check"], ...(features.aesthetic ? [["/research/aesthetic", "Aesthetic analysis"]] : []),
     ["/research/preferences", "Personal research"], ["/research/studies", "Studies"], ["/research", "Research workspace"], ["/account", "Account"]];
   return <>
     <a href="#main" className="skip-link">{t("Skip to content")}</a>

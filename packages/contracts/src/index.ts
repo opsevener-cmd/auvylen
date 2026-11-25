@@ -152,21 +152,32 @@ export interface StudyExport {id: string; status: string; sha256: string; images
 
 export interface StudyExportRequest {idempotency_key: string; include_adjusted?: boolean}
 
-/** Free photo-quality check: photo technique only, never attractiveness or physical traits. */
+/** Photo check: photo technique plus constructive appearance feedback (owner decision 2026-11-25). */
 export type PhotoCheckAvailability = "ready" | "disabled" | "not_configured" | "paid_tier_unconfirmed" | "paused";
-export type PhotoCheckRefusal = "no_person" | "multiple_people" | "not_a_photo" | "appears_under_18" | "explicit";
+/** Neutral on purpose: "cannot_analyse" covers more than one person, a possible minor and explicit content. */
+export type PhotoCheckRefusal = "no_person" | "not_a_photo" | "cannot_analyse";
+export type PhotoCheckRoastLevel = "off" | "gentle" | "spicy";
+export type PhotoCheckFunding = "free_signup" | "free_weekly" | "credits" | "owner";
+export type PhotoCheckBand = 1 | 2 | 3 | 4;
+export type PhotoCheckArchetype = "hk_film_lead_90s" | "indie_band_frontman" | "old_money_weekend" | "city_pop_album_cover" |
+  "film_camera_diary" | "campus_drama_lead" | "street_style_snap" | "art_house_poster" | "sunday_brunch_regular" |
+  "startup_keynote" | "travel_vlogger" | "late_night_jazz_bar";
 export interface PhotoCheckStatus {
   available: boolean; reason: PhotoCheckAvailability; consent_version: string; consent_required: boolean;
-  used_today: number; daily_limit: number; max_photos: number;
+  free_checks_now: number; free_signup_remaining: number; next_free_on: string | null;
+  credit_cost: number; credit_balance: number; roast_available: boolean; max_photos: number;
 }
-export interface PhotoCheckConsentRequest {consent_version: "gemini-paid-v1"; adult_confirmed: true; processing_accepted: true}
-export interface PhotoCheckRequest {photos: string[]; language: "en" | "zh-CN"}
+export interface PhotoCheckConsentRequest {consent_version: "gemini-paid-v2"; adult_confirmed: true; processing_accepted: true}
+export interface PhotoCheckRequest {photos: string[]; language: "en" | "zh-CN"; self_and_adult_confirmed: true; roast: PhotoCheckRoastLevel}
 export interface PhotoScores {lighting: number; sharpness: number; framing: number; expression: number; eye_contact: number; background: number}
+export interface PhotoAppearance {strengths: string[]; flattering: string[]; tips: string[]; band: PhotoCheckBand}
+export interface PhotoRoast {lines: string[]; vibe: PhotoCheckArchetype | null}
 export interface PhotoCheckPhoto {
   index: number; rank: number | null; usable: boolean; refusal_reason: PhotoCheckRefusal | null;
   scores: PhotoScores | null; raw_score: number | null; display_score: number | null; tips: string[];
+  appearance: PhotoAppearance | null; roast: PhotoRoast | null;
 }
 export interface PhotoCheckResult {
   id: string; photos: PhotoCheckPhoto[]; engine: string; model: string; prompt_version: string;
-  created_at: string; used_today: number; daily_limit: number;
+  created_at: string; funding: PhotoCheckFunding; credits_charged: number; free_checks_now: number; next_free_on: string | null;
 }

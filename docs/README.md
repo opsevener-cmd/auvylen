@@ -14,9 +14,10 @@ prefer a current reference when they disagree.
   - restricted datasets (SCUT-FBP5500, MEBeauty, the Chicago Face Database, or any data that
     is non-commercial, unconsented or may include minors) never enter a production or
     user-facing path;
-  - the free photo check and the paid report judge photo technique and styling only: no
-    attractiveness, jawline, skin or symmetry scores, no percentiles, and Gemini Standard
-    paid tier only.
+  - the photo check gives photo-technique and constructive appearance feedback: no
+    "flaws", no surgery, medical or diet advice, no race, ethnicity, weight or age comments;
+    a four-band AI impression hidden by default; own face and 18+ only; roasts only about
+    the photo, never the body or a named person; Gemini Standard paid tier only.
 - [Architecture](architecture.md): service boundaries (Phase 4A baseline, still in force)
 - [Production and research security boundary](production-security.md)
 - [Brand rename compatibility](brand-rename.md): identifiers that must not be renamed
@@ -31,9 +32,11 @@ prefer a current reference when they disagree.
 - [Pretrained representation and licences](pretrained-representation.md) ([licence files](licenses/))
 - [Research wizard UX](research-wizard-ux.md) and its [release checklist](release/research-wizard-release.md)
 
-**Free photo check** (in production, off until enabled with a paid-tier Gemini key)
-- [Free photo check](photo-check.md): behaviour, settings, spend cap and deployment on the VPS
-- [Free photo-quality hook design](free-hook-design.md) (approved 2026-11-24, now implemented)
+**Photo check** (in production, off until enabled with a paid-tier Gemini key)
+- [Photo check](photo-check.md): technique and appearance feedback, AI impression, roast,
+  free checks and Credits, settings, consistency check and deployment on the VPS
+- [Free photo-quality hook design](free-hook-design.md) (approved 2026-11-24; its
+  technique-only scope was replaced by the owner decision of 2026-11-25)
 
 **Population aesthetic models** (all consumer scoring disabled)
 - [Phase 6 rating-distribution model](aesthetic-scoring.md)

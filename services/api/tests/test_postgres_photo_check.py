@@ -25,12 +25,12 @@ class SlowProvider:
     model = "fake-model"
 
     def max_output_tokens(self, photos: int) -> int:
-        return 200 + 220 * photos
+        return 300 + 450 * photos
 
     def estimated_input_tokens(self, photos: int) -> int:
-        return 900 + 700 * photos
+        return 1400 + 700 * photos
 
-    def assess(self, images, language):
+    def assess(self, images, language, roast="off"):
         time.sleep(0.2)  # Keep reservations in flight concurrently.
         photo = ModelPhoto(
             index=0,
@@ -42,6 +42,7 @@ class SlowProvider:
             eye_contact=7,
             background=7,
             tips=[],
+            band=3,
         )
         return Assessment([photo], Usage(1600, 400))
 
@@ -53,8 +54,8 @@ def test_concurrent_checks_never_exceed_the_daily_budget():
             free_hook_enabled=True,
             gemini_api_key=SecretStr(TEST_KEY),
             free_hook_paid_tier_confirmed=True,
-            free_hook_user_daily_limit=100,
-            # Room for about four full-size reservations (4570 micro-USD each).
+            photo_check_free_signup=100,
+            # Room for about two full-size reservations (7845 micro-USD each).
             free_hook_daily_budget_usd=Decimal("0.02"),
             _env_file=None,
         )
@@ -94,3 +95,65 @@ def test_concurrent_checks_never_exceed_the_daily_budget():
         assert budget.reserved_micro_usd == 0
         assert budget.spent_micro_usd <= 20_000
         assert completed == outcomes.count("ok")
+
+
+def test_concurrent_checks_never_grant_extra_free_checks_or_overspend_credits():
+    from aevyra_api.credits.ledger import append_credit, lock_wallet
+    from aevyra_api.credits.models import CreditTransaction, Wallet
+
+    with postgres_services() as (sessions, *_):
+        settings = Settings(
+            api_environment="test",
+            free_hook_enabled=True,
+            gemini_api_key=SecretStr(TEST_KEY),
+            free_hook_paid_tier_confirmed=True,
+            free_hook_daily_budget_usd=Decimal("100"),
+            photo_check_free_signup=2,
+            photo_check_free_weekly=1,
+            photo_check_credit_cost=1,
+            _env_file=None,
+        )
+        service = PhotoCheckService(sessions, settings, lambda s: SlowProvider())
+        user, _ = AccountService(sessions, settings).register(
+            "photo-quota-race", "test-photo-cap-password"
+        )
+        service.accept_consent(
+            user.id,
+            PhotoCheckConsentRequest(
+                consent_version=CONSENT_VERSION, adult_confirmed=True, processing_accepted=True
+            ),
+        )
+        with sessions.begin() as session:
+            append_credit(
+                session,
+                lock_wallet(session, user.id),
+                amount=2,
+                kind="TEST_GRANT",
+                reference_type="test",
+                reference_id="grant",
+                key="test-grant",
+            )
+
+        def attempt(_: int) -> str:
+            try:
+                return service.analyze(user.id, [b"photo"], "en").funding
+            except DomainError as error:
+                return error.detail
+
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            outcomes = list(pool.map(attempt, range(10)))
+        # Exactly 2 signup + 1 weekly free checks, then 2 paid ones; the rest are refused.
+        assert sorted(outcomes) == sorted(
+            ["free_signup"] * 2
+            + ["free_weekly"]
+            + ["credits"] * 2
+            + ["photo_check_insufficient_credits"] * 5
+        )
+        with sessions() as session:
+            balance = session.scalar(select(Wallet.cached_balance).where(Wallet.user_id == user.id))
+            debits = session.scalar(
+                select(func.count())
+                .select_from(CreditTransaction)
+                .where(CreditTransaction.transaction_type == "PHOTO_CHECK")
+            )
+        assert balance == 0 and debits == 2

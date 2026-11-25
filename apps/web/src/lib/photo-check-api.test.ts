@@ -1,29 +1,42 @@
 import {describe, expect, it} from "vitest";
 import {allowedApiPath, requestBodyLimit} from "./api-proxy-policy";
-import {photoCheckError, photoCheckErrors, photoCheckResultSchema, photoCheckStatusSchema} from "./photo-check-api";
+import {archetypeLabels, archetypes, bandLabels, photoCheckError, photoCheckErrors, photoCheckResultSchema, photoCheckStatusSchema} from "./photo-check-api";
 import zh from "./i18n/zh-CN.json";
 
 const photo = {index: 0, rank: 1, usable: true, refusal_reason: null, raw_score: 7.5, display_score: 7.5, tips: ["Face the window"],
-  scores: {lighting: 7, sharpness: 8, framing: 7, expression: 8, eye_contact: 7, background: 8}};
-const result = {id: "6b0b2f1e-4b5c-4d3e-9f10-2a3b4c5d6e7f", engine: "gemini-photo-quality", model: "gemini-3.5-flash-lite",
-  prompt_version: "photo-quality-v1", created_at: "2026-11-24T09:00:00Z", used_today: 1, daily_limit: 30, photos: [photo]};
+  scores: {lighting: 7, sharpness: 8, framing: 7, expression: 8, eye_contact: 7, background: 8},
+  appearance: {strengths: ["Warm smile"], flattering: ["Soft side light"], tips: ["Try navy"], band: 3},
+  roast: {lines: ["That ceiling light is auditioning for a crime drama."], vibe: "hk_film_lead_90s"}};
+const result = {id: "6b0b2f1e-4b5c-4d3e-9f10-2a3b4c5d6e7f", engine: "gemini-photo-check", model: "gemini-3.5-flash-lite",
+  prompt_version: "photo-appearance-v1", created_at: "2026-11-25T09:00:00Z", funding: "free_signup", credits_charged: 0,
+  free_checks_now: 3, next_free_on: null, photos: [photo]};
+const status = {available: false, reason: "paused", consent_version: "gemini-paid-v2", consent_required: false,
+  free_checks_now: 0, free_signup_remaining: 0, next_free_on: "2026-11-30", credit_cost: 1, credit_balance: 0,
+  roast_available: true, max_photos: 5};
 
-describe("free photo check client", () => {
+describe("photo check client", () => {
   it("accepts only well-formed results", () => {
-    expect(photoCheckResultSchema.parse(result).photos[0].rank).toBe(1);
-    expect(() => photoCheckResultSchema.parse({...result, photos: [{...photo, scores: {...photo.scores, lighting: 11}}]})).toThrow();
+    expect(photoCheckResultSchema.parse(result).photos[0].appearance?.band).toBe(3);
+    const broken = (changes: object) => ({...result, photos: [{...photo, ...changes}]});
+    expect(() => photoCheckResultSchema.parse(broken({scores: {...photo.scores, lighting: 11}}))).toThrow();
+    expect(() => photoCheckResultSchema.parse(broken({appearance: {...photo.appearance, band: 5}}))).toThrow();
+    expect(() => photoCheckResultSchema.parse(broken({appearance: {...photo.appearance, band: 2.5}}))).toThrow();
+    // A vibe is always a known style, never free text such as a person's name.
+    expect(() => photoCheckResultSchema.parse(broken({roast: {lines: [], vibe: "Tony Leung"}}))).toThrow();
     expect(() => photoCheckResultSchema.parse({...result, photos: Array(6).fill(photo)})).toThrow();
-    expect(photoCheckStatusSchema.parse({available: false, reason: "paused", consent_version: "gemini-paid-v1",
-      consent_required: false, used_today: 0, daily_limit: 30, max_photos: 5}).reason).toBe("paused");
+    expect(photoCheckStatusSchema.parse(status).next_free_on).toBe("2026-11-30");
   });
   it("maps fixed server codes to plain messages and never shows raw bodies", () => {
     expect(photoCheckError(503, JSON.stringify({detail: "photo_check_paused"})).message).toBe(photoCheckErrors.photo_check_paused);
+    expect(photoCheckError(409, JSON.stringify({detail: "photo_check_insufficient_credits"})).message).toBe(photoCheckErrors.photo_check_insufficient_credits);
     expect(photoCheckError(500, JSON.stringify({detail: "Traceback: secret"})).message).toBe("Service temporarily unavailable.");
     expect(photoCheckError(401, "").message).toBe("Sign in to check your photos.");
   });
-  it("has a Chinese translation for every message", () => {
-    for (const message of Object.values(photoCheckErrors)) expect(Object.hasOwn(zh, message), message).toBe(true);
-    expect(Object.hasOwn(zh, "Sign in to check your photos.")).toBe(true);
+  it("has Chinese copy for every message, band and vibe, without 颜值打分", () => {
+    const keys = [...Object.values(photoCheckErrors), ...Object.values(bandLabels), ...Object.values(archetypeLabels), "Sign in to check your photos."];
+    for (const key of keys) expect(Object.hasOwn(zh, key), key).toBe(true);
+    expect(Object.keys(archetypeLabels).sort()).toEqual([...archetypes].sort());
+    for (const value of Object.values(zh as Record<string, string>)) expect(value).not.toContain("颜值打分");
   });
   it("lets the same-origin proxy reach only the photo check routes, with the upload limit", () => {
     for (const path of ["v1/photo-check/status", "v1/photo-check/consent", "v1/photo-check/analyses"]) expect(allowedApiPath(path)).toBe(true);

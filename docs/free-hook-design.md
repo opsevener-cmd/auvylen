@@ -1,7 +1,9 @@
 # Free photo-quality hook — design
 
-Status: **implemented** as the free photo check; see [photo-check.md](photo-check.md) for
-the shipped behaviour, settings and deployment. This page records the approved design.
+Status: **implemented, then extended.** The owner decision of 2026-11-25 replaced the
+technique-only scope and the 30-per-day limit with appearance feedback, an AI impression, an
+optional roast and free checks followed by Credits. See [photo-check.md](photo-check.md) for
+current behaviour, settings and deployment. This page records the approved design.
 Approved by the user on 2026-11-24: the additive schema change, the Gemini call from the
 API (Gemini 3.5 Flash-Lite, Standard paid tier), the consent wording, and up to 5 photos
 per check.

@@ -1,21 +1,38 @@
-"""Free photo check: consent, limits, spend cap and strict parsing, with a fake Gemini."""
+"""Photo check: consent, quota and Credits, spend cap, appearance, roast and strict parsing,
+with a fake Gemini. Never contacts Google."""
 
 import base64
 import json
+from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 
 import pytest
+from aevyra_api.commercial.models import now
+from aevyra_api.credits.ledger import append_credit, lock_wallet
+from aevyra_api.credits.models import CreditTransaction, User, Wallet
+from aevyra_api.photo_check.consistency import summarize
 from aevyra_api.photo_check.gemini import (
     ENDPOINT,
+    ROAST_OFF,
     GeminiPhotoQuality,
     ProviderError,
     api_key_problem,
     parse_response,
     urllib_transport,
 )
-from aevyra_api.photo_check.models import PhotoCheckAnalysis, PhotoCheckBudgetDay
-from aevyra_api.photo_check.service import PhotoCheckService, micro_usd, ranked_photos
+from aevyra_api.photo_check.models import (
+    PhotoCheckAnalysis,
+    PhotoCheckBudgetDay,
+    PhotoCheckConsent,
+)
+from aevyra_api.photo_check.safety import appearance_lines, roast_lines
+from aevyra_api.photo_check.service import (
+    PhotoCheckService,
+    micro_usd,
+    ranked_photos,
+    week_start,
+)
 from aevyra_contracts.photo_check import CONSENT_VERSION
 from PIL import Image
 from pydantic import SecretStr
@@ -27,6 +44,7 @@ BASE = "/api/v1/photo-check"
 # Dummy key in the current "AQ." format (dotted, 53 characters). Never a real key.
 TEST_KEY = "AQ.Ab8RN6-test-only-dummy-key-not-real.0123456789abcd"
 CONSENT = {"consent_version": CONSENT_VERSION, "adult_confirmed": True, "processing_accepted": True}
+CRITERIA = ("lighting", "sharpness", "framing", "expression", "eye_contact", "background")
 
 
 def jpeg(size=(400, 500)):
@@ -35,19 +53,23 @@ def jpeg(size=(400, 500)):
     return base64.b64encode(output.getvalue()).decode()
 
 
-def photo_json(index, refusal=None, base=6):
+def photo_json(index, refusal=None, base=6, band=3, roast=(), vibe=None, **appearance):
     scores = {
-        name: None if refusal else base + offset
-        for offset, name in enumerate(
-            ("lighting", "sharpness", "framing", "expression", "eye_contact", "background")
-        )
+        name: None if refusal else min(base + offset, 10) for offset, name in enumerate(CRITERIA)
     }
-    scores = {k: (min(v, 10) if v else v) for k, v in scores.items()}
     return {
         "index": index,
         "refusal_reason": refusal,
         **scores,
         "tips": [] if refusal else ["Face the window"],
+        "appearance_strengths": [] if refusal else appearance.get("strengths", ["Warm smile"]),
+        "appearance_flattering": []
+        if refusal
+        else appearance.get("flattering", ["Soft side light"]),
+        "appearance_tips": [] if refusal else appearance.get("tips", ["Try a darker jacket"]),
+        "band": None if refusal else band,
+        "roast_lines": list(roast),
+        "vibe": vibe,
     }
 
 
@@ -79,6 +101,10 @@ class FakeTransport:
         return self.replies.pop(0)
 
 
+def ok(**kwargs):
+    return (200, gemini_reply([photo_json(0, **kwargs)]))
+
+
 def configure(fixture, transport, **overrides):
     settings = fixture.client.app.state.settings
     settings.free_hook_enabled = True
@@ -92,12 +118,11 @@ def configure(fixture, transport, **overrides):
     return settings
 
 
-def submit(fixture, count=1, language="en"):
-    return fixture.client.post(
-        BASE + "/analyses",
-        json={"photos": [jpeg() for _ in range(count)], "language": language},
-        headers=csrf_headers(fixture.client),
-    )
+def submit(fixture, count=1, language="en", roast="off", confirmed=True):
+    body = {"photos": [jpeg() for _ in range(count)], "language": language, "roast": roast}
+    if confirmed:
+        body["self_and_adult_confirmed"] = True
+    return fixture.client.post(BASE + "/analyses", json=body, headers=csrf_headers(fixture.client))
 
 
 def accept(fixture):
@@ -107,48 +132,120 @@ def accept(fixture):
     assert response.status_code == 200, response.text
 
 
+def status(fixture):
+    return fixture.client.get(BASE + "/status").json()
+
+
+def account(fixture, public_id):
+    with fixture.sessions() as session:
+        return session.scalars(select(User).where(User.public_user_id == public_id)).one()
+
+
+def grant(fixture, public_id, amount):
+    with fixture.sessions.begin() as session:
+        user = session.scalars(select(User).where(User.public_user_id == public_id)).one()
+        append_credit(
+            session,
+            lock_wallet(session, user.id),
+            amount=amount,
+            kind="TEST_GRANT",
+            reference_type="test",
+            reference_id="grant",
+            key=f"test-grant:{amount}:{now().timestamp()}",
+        )
+
+
+def balance(fixture, public_id):
+    with fixture.sessions() as session:
+        user = session.scalars(select(User).where(User.public_user_id == public_id)).one()
+        return session.scalar(select(Wallet.cached_balance).where(Wallet.user_id == user.id))
+
+
+def ledger(fixture):
+    with fixture.sessions() as session:
+        return [
+            (t.transaction_type, t.amount)
+            for t in session.scalars(
+                select(CreditTransaction)
+                .where(CreditTransaction.transaction_type.like("PHOTO_CHECK%"))
+                .order_by(CreditTransaction.created_at)
+            )
+        ]
+
+
 def test_unavailable_until_enabled_keyed_and_paid_tier_confirmed(credits):
     assert credits.client.get(BASE + "/status").status_code == 401
     register(credits.client)
-    status = credits.client.get(BASE + "/status").json()
-    assert status["available"] is False and status["reason"] == "disabled"
-    assert status["consent_required"] is True and status["daily_limit"] == 30
+    current = status(credits)
+    assert current["available"] is False and current["reason"] == "disabled"
+    assert current["consent_required"] is True and current["free_checks_now"] == 4
+    assert current["free_signup_remaining"] == 3 and current["next_free_on"] is None
+    assert current["credit_cost"] == 1 and current["roast_available"] is False
     settings = credits.client.app.state.settings
     settings.free_hook_enabled = True
-    assert credits.client.get(BASE + "/status").json()["reason"] == "not_configured"
+    assert status(credits)["reason"] == "not_configured"
     settings.gemini_api_key = SecretStr(TEST_KEY)
-    assert credits.client.get(BASE + "/status").json()["reason"] == "paid_tier_unconfirmed"
+    assert status(credits)["reason"] == "paid_tier_unconfirmed"
     accept(credits)
     assert submit(credits).json()["detail"] == "photo_check_unavailable"
     settings.free_hook_paid_tier_confirmed = True
-    status = credits.client.get(BASE + "/status").json()
-    assert status["available"] is True and status["consent_required"] is False
+    current = status(credits)
+    assert current["available"] is True and current["consent_required"] is False
 
 
-def test_consent_is_required_and_validated(credits):
-    register(credits.client)
+def test_consent_v2_is_required_and_old_consent_must_be_renewed(credits):
+    user = register(credits.client)
     configure(credits, FakeTransport([]))
+    with credits.sessions.begin() as session:
+        session.add(
+            PhotoCheckConsent(
+                user_id=account(credits, user["public_user_id"]).id,
+                consent_version="gemini-paid-v1",
+                adult_confirmed=True,
+                processing_accepted=True,
+            )
+        )
+    assert CONSENT_VERSION == "gemini-paid-v2"
+    assert status(credits)["consent_required"] is True  # v1 does not cover appearance.
     response = submit(credits)
-    assert (
-        response.status_code == 403 and response.json()["detail"] == "photo_check_consent_required"
-    )
-    bad = {**CONSENT, "adult_confirmed": False}
-    response = credits.client.post(
-        BASE + "/consent", json=bad, headers=csrf_headers(credits.client)
-    )
-    assert response.status_code == 422
+    assert response.status_code == 403
+    assert response.json()["detail"] == "photo_check_consent_required"
+    for bad in (
+        {**CONSENT, "adult_confirmed": False},
+        {**CONSENT, "consent_version": "gemini-paid-v1"},
+    ):
+        rejected = credits.client.post(
+            BASE + "/consent", json=bad, headers=csrf_headers(credits.client)
+        )
+        assert rejected.status_code == 422
     accept(credits)
     accept(credits)  # Idempotent.
+    assert status(credits)["consent_required"] is False
 
 
-def test_ranks_photos_records_cost_and_sends_a_strict_request(credits):
+def test_every_upload_must_confirm_own_face_and_18_plus(credits):
+    register(credits.client)
+    transport = FakeTransport([])
+    configure(credits, transport)
+    accept(credits)
+    response = submit(credits, confirmed=False)
+    assert response.status_code == 422
+    assert response.json()["detail"] == "photo_check_confirmation_required"
+    assert transport.calls == []
+
+
+def test_ranks_photos_with_appearance_and_records_cost(credits):
     register(credits.client)
     transport = FakeTransport(
         [
             (
                 200,
                 gemini_reply(
-                    [photo_json(0, base=4), photo_json(1, base=7), photo_json(2, "no_person")]
+                    [
+                        photo_json(0, base=4, band=2),
+                        photo_json(1, base=7, band=4),
+                        photo_json(2, "no_person"),
+                    ]
                 ),
             )
         ]
@@ -160,33 +257,226 @@ def test_ranks_photos_records_cost_and_sends_a_strict_request(credits):
     result = response.json()
     photos = {p["index"]: p for p in result["photos"]}
     assert photos[1]["rank"] == 1 and photos[0]["rank"] == 2
-    assert photos[2] == {**photos[2], "usable": False, "rank": None, "scores": None, "tips": []}
+    assert photos[2] == {
+        **photos[2],
+        "usable": False,
+        "rank": None,
+        "scores": None,
+        "tips": [],
+        "appearance": None,
+    }
     # Plain mean of the six criteria: 7..12 capped at 10 -> (7+8+9+10+10+10)/6.
     assert photos[1]["raw_score"] == pytest.approx(54 / 6)
     assert photos[1]["display_score"] == 9.0
-    assert result["used_today"] == 1 and result["engine"] == "gemini-photo-quality"
+    assert photos[1]["appearance"] == {
+        "strengths": ["Warm smile"],
+        "flattering": ["Soft side light"],
+        "tips": ["Try a darker jacket"],
+        "band": 4,
+    }
+    assert photos[1]["roast"] is None  # Roast is off unless asked for.
+    assert result["engine"] == "gemini-photo-check" and result["funding"] == "free_signup"
+    assert result["credits_charged"] == 0 and result["free_checks_now"] == 3
     url, headers, body = transport.calls[0]
     assert url == ENDPOINT.format(model="gemini-3.5-flash-lite")
     assert headers["x-goog-api-key"] == TEST_KEY
     config = body["generationConfig"]
     assert config["responseMimeType"] == "application/json" and config["temperature"] == 0
+    assert isinstance(config["seed"], int)
     assert config["thinkingConfig"] == {"thinkingLevel": "minimal"}
     assert config["mediaResolution"] == "MEDIA_RESOLUTION_MEDIUM"
-    assert "Simplified Chinese" in body["systemInstruction"]["parts"][0]["text"]
-    images = [p for p in body["contents"][0]["parts"] if "inline_data" in p]
-    assert len(images) == 3
+    prompt = body["systemInstruction"]["parts"][0]["text"]
+    assert "Simplified Chinese" in prompt and ROAST_OFF in prompt
+    for rule in ("flaw", "cosmetic surgery", "diets", "race, ethnicity", "under 18"):
+        assert rule in prompt
+    assert len([p for p in body["contents"][0]["parts"] if "inline_data" in p]) == 3
     with credits.sessions() as session:
         row = session.scalars(select(PhotoCheckAnalysis)).one()
         budget = session.scalars(select(PhotoCheckBudgetDay)).one()
     # 2000 input tokens at $0.30/M = 600 micro-USD; 340 output tokens at $2.50/M = 850.
-    assert (row.status, row.cost_micro_usd, row.input_tokens, row.output_tokens) == (
+    assert (row.status, row.cost_micro_usd, row.funding, row.roast) == (
         "COMPLETED",
         1450,
-        2000,
-        340,
+        "free_signup",
+        "off",
     )
     assert (budget.spent_micro_usd, budget.reserved_micro_usd) == (1450, 0)
-    assert row.result is not None and "photos" in row.result
+
+
+@pytest.mark.parametrize(
+    ("model_reason", "public_reason"),
+    [
+        ("multiple_people", "cannot_analyse"),
+        ("appears_under_18", "cannot_analyse"),
+        ("explicit", "cannot_analyse"),
+        ("no_person", "no_person"),
+        ("not_a_photo", "not_a_photo"),
+    ],
+)
+def test_refusals_are_neutral_and_carry_no_score_or_band(model_reason, public_reason):
+    photos = parse_response(gemini_reply([photo_json(0, model_reason)]), 1).photos
+    view = ranked_photos(photos, "spicy")[0]
+    assert view.refusal_reason == public_reason
+    assert view.usable is False and view.scores is None and view.appearance is None
+    assert view.roast is None and view.raw_score is None
+
+
+def test_free_quota_then_weekly_then_credits_charged_only_on_success(credits):
+    user = register(credits.client)
+    public = user["public_user_id"]
+    replies = [ok(), ok(), (503, b""), ok(), ok(), (503, b""), ok()]
+    configure(credits, FakeTransport(replies))
+    accept(credits)
+    # Three lifetime free checks; a failed check never uses one.
+    assert submit(credits).json()["funding"] == "free_signup"
+    assert submit(credits).json()["funding"] == "free_signup"
+    assert submit(credits).json()["detail"] == "photo_check_provider_failed"
+    assert submit(credits).json()["funding"] == "free_signup"
+    # Then this week's free check.
+    assert status(credits)["free_signup_remaining"] == 0
+    weekly = submit(credits).json()
+    assert weekly["funding"] == "free_weekly" and weekly["free_checks_now"] == 0
+    monday = week_start(date.today()) + timedelta(days=7)
+    assert weekly["next_free_on"] == monday.isoformat()
+    # Then Credits: refused without a balance, nothing called.
+    refused = submit(credits)
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == "photo_check_insufficient_credits"
+    grant(credits, public, 2)
+    # A provider failure refunds the debit; a success keeps it.
+    assert submit(credits).json()["detail"] == "photo_check_provider_failed"
+    assert balance(credits, public) == 2
+    paid = submit(credits).json()
+    assert paid["funding"] == "credits" and paid["credits_charged"] == 1
+    assert balance(credits, public) == 1
+    assert ledger(credits) == [
+        ("PHOTO_CHECK", -1),
+        ("PHOTO_CHECK_REFUND", 1),
+        ("PHOTO_CHECK", -1),
+    ]
+    current = status(credits)
+    assert current["credit_balance"] == 1 and current["next_free_on"] == monday.isoformat()
+
+
+def test_credit_cost_is_configurable(credits):
+    user = register(credits.client)
+    configure(
+        credits,
+        FakeTransport([ok()]),
+        photo_check_free_signup=0,
+        photo_check_free_weekly=0,
+        photo_check_credit_cost=3,
+    )
+    accept(credits)
+    grant(credits, user["public_user_id"], 5)
+    assert status(credits)["next_free_on"] is None  # No weekly free checks configured.
+    assert submit(credits).json()["credits_charged"] == 3
+    assert balance(credits, user["public_user_id"]) == 2
+
+
+def test_owner_is_never_charged(credits):
+    from test_owner import owner
+
+    owner(credits)  # Provisions the Owner and signs in.
+    configure(credits, FakeTransport([ok()]), photo_check_free_signup=0, photo_check_free_weekly=0)
+    accept(credits)
+    assert status(credits)["credit_cost"] == 0
+    result = submit(credits).json()
+    assert result["funding"] == "owner" and result["credits_charged"] == 0
+    assert ledger(credits) == []
+
+
+def test_roast_is_offered_from_the_second_check_and_stays_within_limits(credits):
+    register(credits.client)
+    roasted = ok(
+        roast=[
+            "That ceiling light is auditioning for interrogation-room drama.",
+            "Your nose is doing a lot here",  # Body: dropped.
+        ],
+        vibe="hk_film_lead_90s",
+    )
+    transport = FakeTransport([ok(), roasted])
+    configure(credits, transport)
+    accept(credits)
+    assert status(credits)["roast_available"] is False
+    first = submit(credits, roast="spicy").json()
+    # The first check stays friendly: roast is switched off and not even requested.
+    assert first["photos"][0]["roast"] is None
+    assert ROAST_OFF in transport.calls[0][2]["systemInstruction"]["parts"][0]["text"]
+    assert status(credits)["roast_available"] is True
+    second = submit(credits, roast="spicy").json()
+    prompt = transport.calls[1][2]["systemInstruction"]["parts"][0]["text"]
+    assert "Roast (spicy)" in prompt and "never meaner" in prompt
+    assert "Never compare the person to a real or famous person" in prompt
+    assert second["photos"][0]["roast"] == {
+        "lines": ["That ceiling light is auditioning for interrogation-room drama."],
+        "vibe": "hk_film_lead_90s",
+    }
+
+
+# Example model outputs: which lines may be shown. Jokes target the photo, never the person.
+ROAST_EXAMPLES = [
+    ("That ceiling light is auditioning for interrogation-room drama.", True),
+    ("The background plant is the real main character here.", True),
+    ("Many thanks to the spotlight for the free mugshot vibes.", True),
+    ("This blur says 'taken mid-sneeze by a friend on a moving bus'.", True),
+    ("Bold of you to pose in front of a laundry pile.", True),
+    ("那盆绿植比你还抢镜。", True),
+    ("这张照片的光线像在审讯室里拍的。", True),
+    ("Your nose is doing a lot of work here.", False),
+    ("Acne cameo in the corner.", False),
+    ("Looks like a young Tony Leung.", False),
+    ("Total celebrity look-alike energy.", False),
+    ("Gaining a little weight suits you.", False),
+    ("Very teen-drama energy for someone your age.", False),
+    ("Is that a receding hairline or the lighting?", False),
+    ("你长得像某个明星。", False),
+    ("下巴的角度有点奇怪。", False),
+    ("看起来比实际年龄老。", False),
+]
+
+
+@pytest.mark.parametrize(("line", "shown"), ROAST_EXAMPLES)
+def test_roast_examples_target_the_photo_never_the_person(line, shown):
+    assert roast_lines([line]) == ([line] if shown else [])
+
+
+APPEARANCE_EXAMPLES = [
+    ("Warm, open smile that reaches your eyes.", True),
+    ("Bold brows frame your eyes well.", True),
+    ("Deep greens and navy flatter you.", True),
+    ("Your skin looks radiant in soft window light.", True),
+    ("笑容很有感染力。", True),
+    ("侧光让轮廓更立体。", True),
+    ("One small flaw: your nose.", False),
+    ("Fillers could balance your lips.", False),
+    ("A low-carb diet would sharpen your face.", False),
+    ("You look younger with short hair.", False),
+    ("Your ethnic features stand out.", False),
+    ("建议考虑医美调整。", False),
+    ("减肥后会更上镜。", False),
+]
+
+
+@pytest.mark.parametrize(("line", "shown"), APPEARANCE_EXAMPLES)
+def test_appearance_examples_are_constructive_only(line, shown):
+    assert appearance_lines([line]) == ([line] if shown else [])
+
+
+def test_no_joke_rather_than_a_joke_that_breaks_the_rules():
+    photos = parse_response(
+        gemini_reply(
+            [photo_json(0, roast=["Your teeth glow", "Acne says hi"], vibe="indie_band_frontman")]
+        ),
+        1,
+    ).photos
+    joke = ranked_photos(photos, "gentle")[0].roast
+    assert joke is not None and joke.lines == [] and joke.vibe == "indie_band_frontman"
+
+
+def test_vibe_can_only_be_an_archetype_never_a_person():
+    with pytest.raises(ProviderError, match="invalid_response"):
+        parse_response(gemini_reply([photo_json(0, vibe="Tony Leung")]), 1)
 
 
 def test_never_sends_or_stores_more_than_five_or_undecodable_photos(credits):
@@ -197,40 +487,25 @@ def test_never_sends_or_stores_more_than_five_or_undecodable_photos(credits):
     assert submit(credits, 6).status_code == 422
     response = credits.client.post(
         BASE + "/analyses",
-        json={"photos": [base64.b64encode(b"not an image").decode()]},
+        json={
+            "photos": [base64.b64encode(b"not an image").decode()],
+            "self_and_adult_confirmed": True,
+        },
         headers=csrf_headers(credits.client),
     )
     assert response.status_code == 422 and response.json()["detail"] == "photo_check_invalid_photos"
     assert transport.calls == []
 
 
-def test_daily_user_limit_counts_only_successful_or_in_flight_checks(credits):
+def test_global_budget_pauses_the_check_before_it_can_be_exceeded(credits):
     register(credits.client)
-    replies = [
-        (503, b""),
-        (200, gemini_reply([photo_json(0)])),
-        (200, gemini_reply([photo_json(0)])),
-    ]
-    configure(credits, FakeTransport(replies), free_hook_user_daily_limit=2)
-    accept(credits)
-    failed = submit(credits)
-    assert failed.status_code == 503 and failed.json()["detail"] == "photo_check_provider_failed"
-    assert submit(credits).status_code == 200
-    assert submit(credits).status_code == 200
-    limited = submit(credits)
-    assert limited.status_code == 429 and limited.json()["detail"] == "photo_check_daily_limit"
-    assert credits.client.get(BASE + "/status").json()["used_today"] == 2
-
-
-def test_global_budget_pauses_the_hook_before_it_can_be_exceeded(credits):
-    register(credits.client)
-    transport = FakeTransport([(200, gemini_reply([photo_json(0)]))])
-    # A full five-photo reservation is 900+3500 input and 1300 output tokens: 4570 micro-USD.
-    configure(credits, transport, free_hook_daily_budget_usd=Decimal("0.006"))
+    transport = FakeTransport([ok()])
+    # A full five-photo reservation is 1400+3500 input and 2550 output tokens: 7845 micro-USD.
+    configure(credits, transport, free_hook_daily_budget_usd=Decimal("0.009"))
     accept(credits)
     assert submit(credits).status_code == 200
-    status = credits.client.get(BASE + "/status").json()
-    assert status["available"] is False and status["reason"] == "paused"
+    current = status(credits)
+    assert current["available"] is False and current["reason"] == "paused"
     paused = submit(credits)
     assert paused.status_code == 503 and paused.json()["detail"] == "photo_check_paused"
     assert len(transport.calls) == 1
@@ -239,37 +514,43 @@ def test_global_budget_pauses_the_hook_before_it_can_be_exceeded(credits):
     assert budget.paused_at is not None and budget.reserved_micro_usd == 0
 
 
-def test_abandoned_reservations_are_charged_conservatively(credits):
+def test_abandoned_reservations_are_charged_conservatively_and_credits_refunded(credits):
     user = register(credits.client)
-    configure(credits, FakeTransport([(200, gemini_reply([photo_json(0)]))]))
+    public = user["public_user_id"]
+    configure(credits, FakeTransport([ok()]))
     accept(credits)
+    grant(credits, public, 1)
     service = PhotoCheckService(credits.sessions, credits.client.app.state.settings)
+    day = service.today()
+    owner_id = account(credits, public).id
     with credits.sessions.begin() as session:
-        from aevyra_api.credits.models import User
-
-        owner = session.scalars(
-            select(User).where(User.public_user_id == user["public_user_id"])
-        ).one()
-        day = service.today()
         session.add(PhotoCheckBudgetDay(day=day, spent_micro_usd=0, reserved_micro_usd=999))
-        from datetime import timedelta
-
-        from aevyra_api.commercial.models import now
-
-        session.add(
-            PhotoCheckAnalysis(
-                user_id=owner.id,
-                day=day,
-                status="RESERVED",
-                photo_count=1,
-                language="en",
-                model="m",
-                prompt_version="p",
-                consent_version=CONSENT_VERSION,
-                reserved_micro_usd=999,
-                created_at=now() - timedelta(hours=1),
-            )
+        stale = PhotoCheckAnalysis(
+            user_id=owner_id,
+            day=day,
+            status="RESERVED",
+            photo_count=1,
+            language="en",
+            model="m",
+            prompt_version="p",
+            consent_version=CONSENT_VERSION,
+            reserved_micro_usd=999,
+            funding="credits",
+            credits_charged=1,
+            created_at=now() - timedelta(hours=1),
         )
+        session.add(stale)
+        session.flush()
+        append_credit(
+            session,
+            lock_wallet(session, owner_id),
+            amount=-1,
+            kind="PHOTO_CHECK",
+            reference_type="photo_check",
+            reference_id=str(stale.id),
+            key=f"photo-check:{stale.id}",
+        )
+    assert balance(credits, public) == 0
     assert submit(credits).status_code == 200
     with credits.sessions() as session:
         stale = session.scalars(
@@ -282,6 +563,7 @@ def test_abandoned_reservations_are_charged_conservatively(credits):
         999,
     )
     assert budget.reserved_micro_usd == 0 and budget.spent_micro_usd > 999
+    assert balance(credits, public) == 1  # No result was delivered: refunded.
 
 
 def test_blocked_and_invalid_responses_never_become_results():
@@ -291,12 +573,14 @@ def test_blocked_and_invalid_responses_never_become_results():
     assert blocked.value.reason == "blocked" and blocked.value.usage is not None
     with pytest.raises(ProviderError, match="invalid_response"):
         parse_response(gemini_reply([photo_json(1)]), 1)  # Wrong index.
-    missing_score = {**photo_json(0), "sharpness": None}
-    with pytest.raises(ProviderError, match="invalid_response"):
-        parse_response(gemini_reply([missing_score]), 1)
-    out_of_range = {**photo_json(0), "lighting": 11}
-    with pytest.raises(ProviderError, match="invalid_response"):
-        parse_response(gemini_reply([out_of_range]), 1)
+    for broken in (
+        {**photo_json(0), "sharpness": None},
+        {**photo_json(0), "lighting": 11},
+        {**photo_json(0), "band": None},
+        {**photo_json(0), "band": 5},
+    ):
+        with pytest.raises(ProviderError, match="invalid_response"):
+            parse_response(gemini_reply([broken]), 1)
     with pytest.raises(ProviderError, match="invalid_response"):
         parse_response(b"not json", 1)
 
@@ -314,6 +598,26 @@ def test_costs_round_up_in_integer_micro_usd():
     assert micro_usd(1, Decimal("0.30")) == 1
     assert micro_usd(1_000_000, Decimal("2.50")) == 2_500_000
     assert micro_usd(3333, Decimal("0.30")) == 1000
+
+
+def test_weeks_start_on_monday_utc():
+    assert week_start(date(2026, 11, 25)) == date(2026, 11, 23)  # Wednesday -> Monday.
+    assert week_start(date(2026, 11, 23)) == date(2026, 11, 23)
+    assert week_start(date(2026, 11, 29)) == date(2026, 11, 23)  # Sunday stays in the week.
+
+
+def test_consistency_report_counts_band_agreement():
+    runs = [
+        {"band": 3, **{name: 7 for name in CRITERIA}},
+        {"band": 3, **{name: 8 for name in CRITERIA}},
+        {"band": 2, **{name: 7 for name in CRITERIA}},
+        {"band": 3, **{name: 7 for name in CRITERIA}},
+        {"refusal": "multiple_people"},
+    ]
+    report = summarize(runs)
+    assert "band agreement: 3/5 runs gave band 3 (60%)" in report
+    assert "lighting: min 7, max 8, spread 1" in report
+    assert report[4] == "run 5: no result (multiple_people)"
 
 
 def test_production_policy_gate_requires_paid_tier_confirmation(credits):
