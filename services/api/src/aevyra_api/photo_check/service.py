@@ -17,9 +17,11 @@ counts replaces the reservation.
 import logging
 import math
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
+from typing import Literal
 from uuid import UUID, uuid4
 
 from aevyra_contracts import EngineMetadata
@@ -79,7 +81,51 @@ _reported_key_problems: set[str] = set()
 RESULT_RETENTION = timedelta(days=30)
 STALE_RESERVATION = timedelta(minutes=10)
 PROVIDER_LONG_EDGE = 1024
-ProviderFactory = Callable[[Settings], PhotoQualityProvider]
+Tier = Literal["default", "advanced"]
+
+
+@dataclass(frozen=True)
+class ModelChoice:
+    """Which Gemini model serves a check, with its prices (USD per 1M tokens)."""
+
+    tier: Tier
+    model: str
+    price_input_per_m: Decimal
+    price_output_per_m: Decimal
+    thinking_level: str
+
+
+def tier_for(funding: Funding) -> Tier:
+    # Free checks use the default model; checks paid with Credits and the Owner's use the
+    # advanced one (owner decision 2026-11-27).
+    return "advanced" if funding in ("credits", "owner") else "default"
+
+
+def model_choice(settings: Settings, tier: Tier) -> ModelChoice:
+    if tier == "advanced":
+        return ModelChoice(
+            "advanced",
+            settings.gemini_model_advanced,
+            settings.gemini_advanced_price_input_per_m,
+            settings.gemini_advanced_price_output_per_m,
+            settings.gemini_advanced_thinking_level,
+        )
+    return ModelChoice(
+        "default",
+        settings.gemini_model,
+        settings.free_hook_price_input_per_m,
+        settings.free_hook_price_output_per_m,
+        settings.free_hook_thinking_level,
+    )
+
+
+def cost_micro_usd(usage: Usage, choice: ModelChoice) -> int:
+    return micro_usd(usage.input_tokens, choice.price_input_per_m) + micro_usd(
+        usage.output_tokens, choice.price_output_per_m
+    )
+
+
+ProviderFactory = Callable[[Settings, ModelChoice], PhotoQualityProvider]
 # Model refusals are reported neutrally: one message for more than one person, a possible
 # minor or explicit content, so the reason is never spelled out to the user.
 PUBLIC_REFUSAL: dict[str, RefusalReason] = {
@@ -96,12 +142,12 @@ def week_start(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
 
-def gemini_provider(settings: Settings) -> PhotoQualityProvider:
+def gemini_provider(settings: Settings, choice: ModelChoice) -> PhotoQualityProvider:
     assert settings.gemini_api_key is not None
     return GeminiPhotoQuality(
         settings.gemini_api_key.get_secret_value(),
-        settings.free_hook_model,
-        thinking_level=settings.free_hook_thinking_level,
+        choice.model,
+        thinking_level=choice.thinking_level,
         timeout=float(settings.free_hook_timeout_seconds),
     )
 
@@ -208,7 +254,7 @@ class PhotoCheckService:
         return EngineMetadata(
             slug=ENGINE,
             display_name="Gemini photo check (technique and appearance)",
-            version=f"{s.free_hook_model}/{PROMPT_VERSION}",
+            version=f"{s.gemini_model}+{s.gemini_model_advanced}/{PROMPT_VERSION}",
             licensing_status=(
                 "Gemini API Standard paid tier under the Gemini API Additional Terms; "
                 "paid-tier prompts and responses are not used to improve Google products"
@@ -247,15 +293,17 @@ class PhotoCheckService:
     def budget_micro_usd(self) -> int:
         return micro_usd(1_000_000, self.settings.free_hook_daily_budget_usd)
 
-    def reservation(self, provider: TokenBudget, photos: int) -> int:
-        s = self.settings
+    def reservation(self, provider: TokenBudget, photos: int, choice: ModelChoice) -> int:
         return micro_usd(
-            provider.estimated_input_tokens(photos), s.free_hook_price_input_per_m
-        ) + micro_usd(provider.max_output_tokens(photos), s.free_hook_price_output_per_m)
+            provider.estimated_input_tokens(photos), choice.price_input_per_m
+        ) + micro_usd(provider.max_output_tokens(photos), choice.price_output_per_m)
 
     def worst_case_reservation(self) -> int:
-        # Pause before the budget cannot cover a full-size request.
-        return self.reservation(ESTIMATOR, MAX_PHOTOS)
+        # Pause before the budget cannot cover a full-size request on the dearest model.
+        return max(
+            self.reservation(ESTIMATOR, MAX_PHOTOS, model_choice(self.settings, tier))
+            for tier in ("default", "advanced")
+        )
 
     @staticmethod
     def today() -> date:
@@ -439,12 +487,9 @@ class PhotoCheckService:
             return "free_weekly"
         return "credits"
 
-    def record_spend(self, usage: Usage) -> int:
+    def record_spend(self, usage: Usage, choice: ModelChoice) -> int:
         """Add spend made outside a user check (the consistency script) to today's budget."""
-        s = self.settings
-        cost = micro_usd(usage.input_tokens, s.free_hook_price_input_per_m) + micro_usd(
-            usage.output_tokens, s.free_hook_price_output_per_m
-        )
+        cost = cost_micro_usd(usage, choice)
         with self.sessions.begin() as session:
             self._budget_row(session, self.today()).spent_micro_usd += cost
         return cost
@@ -452,12 +497,10 @@ class PhotoCheckService:
     def _reserve(
         self,
         user: UUID,
-        provider: PhotoQualityProvider,
         photos: int,
         language: Language,
         roast: RoastLevel,
-    ) -> tuple[UUID, date, Funding, int, RoastLevel]:
-        amount = self.reservation(provider, photos)
+    ) -> tuple[UUID, date, Funding, int, RoastLevel, ModelChoice]:
         day = self.today()
         analysis_id: UUID | None = None
         with self.sessions.begin() as session:
@@ -468,6 +511,9 @@ class PhotoCheckService:
             if roast != "off" and not self.roast_available(session, user):
                 roast = "off"  # The first check stays friendly.
             funding = self._funding(session, user, day)
+            # The model follows the funding, and the reservation uses that model's prices.
+            choice = model_choice(self.settings, tier_for(funding))
+            amount = self.reservation(ESTIMATOR, photos, choice)
             cost = self.settings.photo_check_credit_cost if funding == "credits" else 0
             if cost:
                 wallet = lock_wallet(session, user)
@@ -489,7 +535,7 @@ class PhotoCheckService:
                     status="RESERVED",
                     photo_count=photos,
                     language=language,
-                    model=provider.model,
+                    model=choice.model,
                     prompt_version=PROMPT_VERSION,
                     consent_version=CONSENT_VERSION,
                     reserved_micro_usd=amount,
@@ -513,7 +559,7 @@ class PhotoCheckService:
                 analysis_id = row.id
         if analysis_id is None:
             raise DomainError("photo_check_paused", 503)
-        return analysis_id, day, funding, cost, roast
+        return analysis_id, day, funding, cost, roast, choice
 
     def _settle(
         self,
@@ -522,14 +568,9 @@ class PhotoCheckService:
         usage: Usage | None,
         result: dict[str, object] | None,
         failure: str | None,
+        choice: ModelChoice,
     ) -> None:
-        s = self.settings
-        cost = (
-            micro_usd(usage.input_tokens, s.free_hook_price_input_per_m)
-            + micro_usd(usage.output_tokens, s.free_hook_price_output_per_m)
-            if usage
-            else 0
-        )
+        cost = cost_micro_usd(usage, choice) if usage else 0
         with self.sessions.begin() as session:
             budget = self._budget_row(session, day)
             row = session.get(PhotoCheckAnalysis, analysis_id, with_for_update=True)
@@ -564,14 +605,14 @@ class PhotoCheckService:
             raise DomainError("photo_check_invalid_photos", 422)
         if self.configuration() != "ready":
             raise DomainError("photo_check_unavailable", 503)
-        provider = self.provider_factory(self.settings)
-        analysis_id, day, funding, cost, roast = self._reserve(
-            user, provider, len(images), language, roast
+        analysis_id, day, funding, cost, roast, choice = self._reserve(
+            user, len(images), language, roast
         )
         try:
+            provider = self.provider_factory(self.settings, choice)
             assessment = provider.assess(images, language, roast)
         except ProviderError as error:
-            self._settle(analysis_id, day, error.usage, None, error.reason)
+            self._settle(analysis_id, day, error.usage, None, error.reason, choice)
             logger.error(
                 "photo_check_provider_failed",
                 extra={
@@ -584,7 +625,7 @@ class PhotoCheckService:
                 raise DomainError("photo_check_blocked", 422) from None
             raise DomainError("photo_check_provider_failed", 503) from None
         except Exception as error:
-            self._settle(analysis_id, day, None, None, "internal_error")
+            self._settle(analysis_id, day, None, None, "internal_error", choice)
             logger.error(
                 "photo_check_internal_error",
                 extra={"analysis_id": str(analysis_id), "error_type": type(error).__name__},
@@ -593,7 +634,7 @@ class PhotoCheckService:
         photos = ranked_photos(assessment.photos, roast)
         created = now()
         result: dict[str, object] = {"photos": [photo.model_dump(mode="json") for photo in photos]}
-        self._settle(analysis_id, day, assessment.usage, result, None)
+        self._settle(analysis_id, day, assessment.usage, result, None, choice)
         logger.info("photo_check_completed", extra={"analysis_id": str(analysis_id)})
         with self.sessions() as session:
             signup, weekly = self.free_remaining(session, user, day)
@@ -601,7 +642,8 @@ class PhotoCheckService:
             id=analysis_id,
             photos=photos,
             engine=ENGINE,
-            model=provider.model,
+            model=choice.model,
+            advanced=choice.tier == "advanced",
             prompt_version=PROMPT_VERSION,
             created_at=created,
             funding=funding,

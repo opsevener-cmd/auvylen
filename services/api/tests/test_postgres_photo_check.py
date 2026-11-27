@@ -55,11 +55,11 @@ def test_concurrent_checks_never_exceed_the_daily_budget():
             gemini_api_key=SecretStr(TEST_KEY),
             free_hook_paid_tier_confirmed=True,
             photo_check_free_signup=100,
-            # Room for about two full-size reservations (7845 micro-USD each).
-            free_hook_daily_budget_usd=Decimal("0.02"),
+            # The pause threshold is a full-size advanced reservation (26475 micro-USD).
+            free_hook_daily_budget_usd=Decimal("0.06"),
             _env_file=None,
         )
-        service = PhotoCheckService(sessions, settings, lambda s: SlowProvider())
+        service = PhotoCheckService(sessions, settings, lambda s, choice: SlowProvider())
         users = []
         for index in range(3):
             user, _ = AccountService(sessions, settings).register(
@@ -93,7 +93,7 @@ def test_concurrent_checks_never_exceed_the_daily_budget():
             )
         # Every reservation was released, and real spend stayed within the cap.
         assert budget.reserved_micro_usd == 0
-        assert budget.spent_micro_usd <= 20_000
+        assert budget.spent_micro_usd <= 60_000
         assert completed == outcomes.count("ok")
 
 
@@ -113,7 +113,7 @@ def test_concurrent_checks_never_grant_extra_free_checks_or_overspend_credits():
             photo_check_credit_cost=1,
             _env_file=None,
         )
-        service = PhotoCheckService(sessions, settings, lambda s: SlowProvider())
+        service = PhotoCheckService(sessions, settings, lambda s, choice: SlowProvider())
         user, _ = AccountService(sessions, settings).register(
             "photo-quota-race", "test-photo-cap-password"
         )

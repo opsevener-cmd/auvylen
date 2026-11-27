@@ -24,6 +24,27 @@ In detail, they get:
 The rules come from the owner's decision of 2026-11-25 (AGENTS.md). No SCUT-FBP5500 or other
 restricted dataset is involved anywhere.
 
+## Models
+
+| Check paid by | Model (setting) | Price per 1M tokens (input / output incl. thinking) |
+| --- | --- | --- |
+| Free checks (signup and weekly) | `GEMINI_MODEL`, default `gemini-3.5-flash-lite` | $0.30 / $2.50 |
+| Credits, and the Owner | `GEMINI_MODEL_ADVANCED`, default `gemini-4-hydrogen` | $1.50 / $7.50 |
+
+- **Same rules for both.** Both models get the same prompt, safety filter, refusals and quality
+  gate. Results from the advanced model show a small "Advanced analysis" / "进阶分析" label,
+  and the API returns `advanced: true`.
+- **Per-model cost.** The daily-budget reservation and the final cost use the chosen model's
+  prices. The pause threshold is a full five-photo request on the dearer model (about
+  $0.026).
+- **Thinking level.** Each model starts at the lowest level, `minimal`. If Gemini rejects that
+  level with HTTP 400 (nothing is billed), the check retries once at `low`. It never drops
+  thinking control, because a model's default could cost far more.
+- **Verify before relying on it.** The `gemini-4-hydrogen` model ID and its prices come from
+  the owner and were not checked here. Confirm in AI Studio that it is billed on the
+  Standard paid tier, not a Contributor or preview tier that uses data. Then run the
+  consistency check with `--model advanced`.
+
 ## What it will and won't say
 
 | Area | Rule | Enforced by |
@@ -60,7 +81,7 @@ Credit cost and balance. The old 30-per-day limit is gone. The global daily spen
 | Consent (once per version, now `gemini-paid-v2`): 18+ and processing for photo technique **and** appearance. Anyone who accepted v1 is asked again | `POST /api/v1/photo-check/consent` |
 | The browser shrinks photos to 1024 px JPEG; the server re-decodes them under the normal upload limits, strips metadata and re-encodes | `apps/web/src/lib/photo-check-api.ts`, `photo_check/service.py` |
 | Free check or Credits chosen and the cost reserved against the $3/day cap, all in one locked transaction | `photo_check/service.py` |
-| One Gemini 3.5 Flash-Lite call (Standard paid tier): strict JSON schema, temperature 0, fixed seed, minimal thinking, medium image resolution | `photo_check/gemini.py` |
+| One Gemini call (Standard paid tier) to the default or advanced model, chosen by how the check is paid: strict JSON schema, temperature 0, fixed seed, minimal thinking, medium image resolution | `photo_check/gemini.py` |
 | The server validates the JSON, filters every appearance and roast line, computes the technique score as the mean of the six criteria, and ranks | `photo_check/service.py`, `photo_check/safety.py` |
 | Photos are discarded in memory as soon as the result is ready and are never written to disk | — |
 
@@ -84,9 +105,14 @@ lock on the day's budget row:
 
 A PostgreSQL test runs concurrent requests and confirms the cap holds.
 
-**Expected cost** ($0.30 per 1M input, $2.50 per 1M output including thinking): about $0.002
-for one photo and about $0.005 for five, since the appearance and roast text roughly doubles
-the output. $3 a day covers roughly 600 five-photo checks.
+**Expected cost** (prices above; output includes thinking):
+
+| Model | One photo | Five photos |
+| --- | --- | --- |
+| Default (free checks) | ≈ $0.002 | ≈ $0.005 |
+| Advanced (Credits) | ≈ $0.007 | ≈ $0.022 |
+
+$3 a day covers roughly 600 five-photo free checks, or about 140 five-photo advanced ones.
 
 **Policy gate.** Every call passes `EngineRegistry.check_policy` with provider metadata.
 It is refused unless `FREE_HOOK_PAID_TIER_CONFIRMED=true`. That flag is the operator's
@@ -104,8 +130,15 @@ budget.
 
 ```bash
 dc exec -T api python -m aevyra_api.photo_check.consistency --runs 5 < ~/my-photo.jpg
+dc exec -T api python -m aevyra_api.photo_check.consistency --model advanced --runs 5 < ~/my-photo.jpg
 # Chinese tips: add --language zh-CN
 ```
+
+It also prints the model, the thinking level actually used, and how many runs returned
+valid JSON. An invalid JSON reply counts as a failed run, so you can see whether the lowest
+thinking level is enough for each model. If it isn't, set `FREE_HOOK_THINKING_LEVEL=low` or
+`GEMINI_ADVANCED_THINKING_LEVEL=low`. A run costs about $0.002 on the default model and about
+$0.007 on the advanced one.
 
 ## Settings (`.env.production`)
 
@@ -114,13 +147,16 @@ dc exec -T api python -m aevyra_api.photo_check.consistency --runs 5 < ~/my-phot
 | `FREE_HOOK_ENABLED` | `false` | Master switch |
 | `GEMINI_API_KEY` | empty | Secret. Never commit or paste it into chat |
 | `FREE_HOOK_PAID_TIER_CONFIRMED` | `false` | Set `true` only after checking AI Studio billing |
-| `FREE_HOOK_MODEL` | `gemini-3.5-flash-lite` | |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Free checks. The old name `FREE_HOOK_MODEL` still works |
+| `GEMINI_MODEL_ADVANCED` | `gemini-4-hydrogen` | Checks paid with Credits, and the Owner's |
+| `GEMINI_ADVANCED_PRICE_INPUT_PER_M` / `GEMINI_ADVANCED_PRICE_OUTPUT_PER_M` | `1.50` / `7.50` | Advanced model prices, USD per 1M tokens |
+| `GEMINI_ADVANCED_THINKING_LEVEL` | `minimal` | Lowest level that gives valid JSON; `low` if needed |
 | `PHOTO_CHECK_FREE_SIGNUP` | `3` | Free checks per account, for life |
 | `PHOTO_CHECK_FREE_WEEKLY` | `1` | Free checks per week (Monday 00:00 UTC reset); `0` turns them off |
 | `PHOTO_CHECK_CREDIT_COST` | `1` | Credits per check after the free ones |
 | `FREE_HOOK_DAILY_BUDGET_USD` | `3.00` | Global cap; checks pause when it is reached |
-| `FREE_HOOK_PRICE_INPUT_PER_M` / `FREE_HOOK_PRICE_OUTPUT_PER_M` | `0.30` / `2.50` | Update these if Google changes prices |
-| `FREE_HOOK_THINKING_LEVEL` | `minimal` | Set it to empty if the model rejects `thinkingConfig` |
+| `FREE_HOOK_PRICE_INPUT_PER_M` / `FREE_HOOK_PRICE_OUTPUT_PER_M` | `0.30` / `2.50` | Default model prices; update them if Google changes prices |
+| `FREE_HOOK_THINKING_LEVEL` | `minimal` | Default model; `low` if `minimal` gives invalid JSON, empty to omit `thinkingConfig` |
 
 `FREE_HOOK_USER_DAILY_LIMIT` no longer exists. An old value left in `.env.production` is
 ignored.

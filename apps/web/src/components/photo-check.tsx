@@ -158,6 +158,7 @@ function Results({result, selected, onAgain}: {result: PhotoCheckResult; selecte
     : result.funding === "owner" ? "" : t("This one was free.");
   return <div className="mt-6 space-y-4">
     <h2 ref={heading} tabIndex={-1} className="text-2xl outline-none">{t("Your results")}</h2>
+    {result.advanced && <p className="inline-block rounded-full border border-[#537462]/40 px-3 py-0.5 text-xs uppercase tracking-[0.14em] text-[#537462]">{t("Advanced analysis")}</p>}
     {paid && <p className="text-sm text-[#63706a]">{paid}</p>}
     {ordered.map(photo => <ResultCard key={photo.index} photo={photo} url={selected[photo.index]?.url} onAgain={onAgain}/>)}
     <button className="button-secondary" onClick={onAgain}>{t("Check other photos")}</button>

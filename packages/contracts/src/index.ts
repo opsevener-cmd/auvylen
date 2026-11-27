@@ -180,6 +180,8 @@ export interface PhotoCheckPhoto {
   appearance: PhotoAppearance | null; roast: PhotoRoast | null;
 }
 export interface PhotoCheckResult {
-  id: string; photos: PhotoCheckPhoto[]; engine: string; model: string; prompt_version: string;
+  id: string; photos: PhotoCheckPhoto[]; engine: string; model: string;
+  /** True when the advanced model served this check (Credits or Owner). */
+  advanced: boolean; prompt_version: string;
   created_at: string; funding: PhotoCheckFunding; credits_charged: number; free_checks_now: number; next_free_on: string | null;
 }

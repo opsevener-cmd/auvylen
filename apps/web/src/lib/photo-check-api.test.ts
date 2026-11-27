@@ -7,7 +7,7 @@ const photo = {index: 0, rank: 1, usable: true, refusal_reason: null, raw_score:
   scores: {lighting: 7, sharpness: 8, framing: 7, expression: 8, eye_contact: 7, background: 8},
   appearance: {strengths: ["Warm smile"], flattering: ["Soft side light"], tips: ["Try navy"], band: 3},
   roast: {lines: ["That ceiling light is auditioning for a crime drama."], vibe: "hk_film_lead_90s"}};
-const result = {id: "6b0b2f1e-4b5c-4d3e-9f10-2a3b4c5d6e7f", engine: "gemini-photo-check", model: "gemini-3.5-flash-lite",
+const result = {id: "6b0b2f1e-4b5c-4d3e-9f10-2a3b4c5d6e7f", engine: "gemini-photo-check", model: "gemini-3.5-flash-lite", advanced: false,
   prompt_version: "photo-appearance-v1", created_at: "2026-11-25T09:00:00Z", funding: "free_signup", credits_charged: 0,
   free_checks_now: 3, next_free_on: null, photos: [photo]};
 const status = {available: false, reason: "paused", consent_version: "gemini-paid-v2", consent_required: false,
@@ -32,6 +32,12 @@ describe("photo check client", () => {
     expect(() => photoCheckResultSchema.parse({...result, photos: [withoutGate]})).toThrow();
     const below = {...photo, raw_score: 5.8, display_score: 5.8, quality_passed: false, appearance: null, roast: null};
     expect(photoCheckResultSchema.parse({...result, photos: [below]}).photos[0].quality_passed).toBe(false);
+  });
+  it("says whether the advanced model was used", () => {
+    expect(photoCheckResultSchema.parse({...result, model: "gemini-4-hydrogen", advanced: true}).advanced).toBe(true);
+    const {advanced: _omitted, ...withoutFlag} = result;
+    void _omitted;
+    expect(() => photoCheckResultSchema.parse(withoutFlag)).toThrow();
   });
   it("maps fixed server codes to plain messages and never shows raw bodies", () => {
     expect(photoCheckError(503, JSON.stringify({detail: "photo_check_paused"})).message).toBe(photoCheckErrors.photo_check_paused);

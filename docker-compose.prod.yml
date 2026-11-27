@@ -43,7 +43,12 @@ x-app-environment: &app-environment
   FREE_HOOK_ENABLED: ${FREE_HOOK_ENABLED:-false}
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   FREE_HOOK_PAID_TIER_CONFIRMED: ${FREE_HOOK_PAID_TIER_CONFIRMED:-false}
-  FREE_HOOK_MODEL: ${FREE_HOOK_MODEL:-gemini-3.5-flash-lite}
+  # Default model for free checks; advanced model for checks paid with Credits (and Owner).
+  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+  GEMINI_MODEL_ADVANCED: ${GEMINI_MODEL_ADVANCED:-gemini-4-hydrogen}
+  GEMINI_ADVANCED_PRICE_INPUT_PER_M: ${GEMINI_ADVANCED_PRICE_INPUT_PER_M:-1.50}
+  GEMINI_ADVANCED_PRICE_OUTPUT_PER_M: ${GEMINI_ADVANCED_PRICE_OUTPUT_PER_M:-7.50}
+  GEMINI_ADVANCED_THINKING_LEVEL: ${GEMINI_ADVANCED_THINKING_LEVEL:-minimal}
   # Quota: lifetime free checks per account, then free checks per week, then Credits.
   PHOTO_CHECK_FREE_SIGNUP: ${PHOTO_CHECK_FREE_SIGNUP:-3}
   PHOTO_CHECK_FREE_WEEKLY: ${PHOTO_CHECK_FREE_WEEKLY:-1}

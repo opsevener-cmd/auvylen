@@ -4,12 +4,15 @@ Operator tool, run inside the API container with the deployed settings. The phot
 from standard input and never written anywhere:
 
     dc exec -T api python -m aevyra_api.photo_check.consistency --runs 5 < my-photo.jpg
+    dc exec -T api python -m aevyra_api.photo_check.consistency --model advanced < my-photo.jpg
 
 It prints only numbers: each run's technique score, whether it passed the quality gate, its
 band (shown to users only when the gate passes) and the six scores; then the gate
 agreement, the band agreement among runs that passed, and the spread of every score.
-Each run is a real paid Gemini call (about $0.002 for one photo); the spend is added to
-today's budget so the daily cap stays accurate.
+Each run is a real paid Gemini call (about $0.002 per photo on the default model, about
+$0.007 on the advanced one); the spend is added to today's budget so the daily cap stays
+accurate. It also prints the model, the thinking level actually used and how many runs
+returned valid JSON.
 """
 
 import argparse
@@ -24,6 +27,7 @@ from aevyra_api.photo_check.gemini import ProviderError
 from aevyra_api.photo_check.service import (
     PhotoCheckService,
     gemini_provider,
+    model_choice,
     passes_quality_gate,
     prepare_photo,
 )
@@ -80,6 +84,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--runs", type=int, default=5, choices=range(2, 11))
     parser.add_argument("--language", choices=["en", "zh-CN"], default="en")
+    parser.add_argument(
+        "--model",
+        choices=["default", "advanced"],
+        default="default",
+        help="default = GEMINI_MODEL (free checks); advanced = GEMINI_MODEL_ADVANCED (Credits)",
+    )
     args = parser.parse_args()
     if sys.stdin.isatty():
         print("Pipe a JPEG or PNG on standard input: ... consistency < photo.jpg", file=sys.stderr)
@@ -92,23 +102,33 @@ def main() -> int:
         print(f"Photo check is not ready: {reason}", file=sys.stderr)
         return 1
     photo = prepare_photo(sys.stdin.buffer.read())
-    provider = gemini_provider(settings)
+    choice = model_choice(settings, args.model)
+    provider = gemini_provider(settings, choice)
     runs: list[dict[str, object]] = []
+    invalid = 0
     spent = 0
     for _ in range(args.runs):
         try:
             assessment = provider.assess([photo], args.language)
         except ProviderError as error:
-            print(f"Gemini call failed: {error.reason} (HTTP {error.status_code})", file=sys.stderr)
             if error.usage:
-                spent += service.record_spend(error.usage)
+                spent += service.record_spend(error.usage, choice)
+            if error.reason == "invalid_response":
+                # Counted, not fatal: shows whether this thinking level gives valid JSON.
+                invalid += 1
+                runs.append({"refusal": "invalid JSON"})
+                continue
+            print(f"Gemini call failed: {error.reason} (HTTP {error.status_code})", file=sys.stderr)
             return 1
-        spent += service.record_spend(assessment.usage)
+        spent += service.record_spend(assessment.usage, choice)
         result = assessment.photos[0]
         if result.refusal_reason:
             runs.append({"refusal": result.refusal_reason})
         else:
             runs.append({"band": result.band, **{name: getattr(result, name) for name in CRITERIA}})
+    thinking = getattr(provider, "thinking_used", choice.thinking_level) or "model default"
+    print(f"model: {choice.model} ({choice.tier}), thinking level: {thinking}")
+    print(f"valid JSON: {args.runs - invalid}/{args.runs} runs")
     print("\n".join(summarize(runs)))
     print(f"cost: ${spent / 1_000_000:.4f} (added to today's photo check budget)")
     checks.close()

@@ -1146,5 +1146,6 @@
   "We can't analyse these photos. Use clear photos of just you.": "这些照片无法分析。请使用只有你本人的清晰照片。",
   "Photo quality {score}/10. Retake it with the tips above, then check your look.": "照片质量 {score}/10，按上面的建议重拍一张，再来看颜值评价。",
   "Try another photo": "换一张试试",
-  "Quality OK ✓": "照片质量合格 ✓"
+  "Quality OK ✓": "照片质量合格 ✓",
+  "Advanced analysis": "进阶分析"
 }

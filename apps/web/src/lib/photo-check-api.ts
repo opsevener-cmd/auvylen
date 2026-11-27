@@ -29,7 +29,7 @@ export const photoCheckStatusSchema: z.ZodType<PhotoCheckStatus> = z.object({
   next_free_on: z.iso.date().nullable(), credit_cost: count, credit_balance: count, roast_available: z.boolean(), max_photos: count,
 });
 export const photoCheckResultSchema: z.ZodType<PhotoCheckResult> = z.object({
-  id: z.uuid(), engine: z.string(), model: z.string(), prompt_version: z.string(), created_at: z.string(),
+  id: z.uuid(), engine: z.string(), model: z.string(), advanced: z.boolean(), prompt_version: z.string(), created_at: z.string(),
   funding: z.enum(["free_signup", "free_weekly", "credits", "owner"]), credits_charged: count,
   free_checks_now: count, next_free_on: z.iso.date().nullable(),
   photos: z.array(z.object({

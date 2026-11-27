@@ -137,6 +137,8 @@ class PhotoCheckResult(BaseModel):
     photos: list[PhotoCheckPhoto]
     engine: str
     model: str
+    # True when the advanced model served this check (Credits or Owner).
+    advanced: bool
     prompt_version: str
     created_at: datetime
     funding: Funding
