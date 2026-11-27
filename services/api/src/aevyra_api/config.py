@@ -72,8 +72,18 @@ class Settings(BaseSettings):
     # the operator sets FREE_HOOK_PAID_TIER_CONFIRMED after checking AI Studio billing.
     free_hook_enabled: bool = False
     gemini_api_key: SecretStr | None = None
-    free_hook_model: str = Field(
-        default="gemini-3.5-flash-lite", pattern=r"^[a-z0-9][a-z0-9.-]{0,63}$"
+    # Two models (owner decision 2026-11-27): the default model serves free checks; the
+    # advanced model serves checks paid with Credits and the Owner's. FREE_HOOK_MODEL is the
+    # old name of GEMINI_MODEL and is still accepted.
+    gemini_model: str = Field(
+        default="gemini-3.5-flash-lite",
+        pattern=r"^[a-z0-9][a-z0-9.-]{0,63}$",
+        validation_alias=AliasChoices("GEMINI_MODEL", "FREE_HOOK_MODEL", "gemini_model"),
+    )
+    gemini_model_advanced: str = Field(
+        default="gemini-4-hydrogen",
+        pattern=r"^[a-z0-9][a-z0-9.-]{0,63}$",
+        validation_alias=AliasChoices("GEMINI_MODEL_ADVANCED", "gemini_model_advanced"),
     )
     free_hook_paid_tier_confirmed: bool = False
     # Photo check quota (owner decision 2026-11-25): lifetime free checks per account, then
@@ -86,6 +96,10 @@ class Settings(BaseSettings):
     free_hook_price_input_per_m: Decimal = Field(default=Decimal("0.30"), gt=0, le=100)
     free_hook_price_output_per_m: Decimal = Field(default=Decimal("2.50"), gt=0, le=1000)
     free_hook_thinking_level: Literal["", "minimal", "low"] = "minimal"
+    # Advanced model prices, USD per 1M tokens (output includes thinking), and thinking level.
+    gemini_advanced_price_input_per_m: Decimal = Field(default=Decimal("1.50"), gt=0, le=100)
+    gemini_advanced_price_output_per_m: Decimal = Field(default=Decimal("7.50"), gt=0, le=1000)
+    gemini_advanced_thinking_level: Literal["", "minimal", "low"] = "minimal"
     free_hook_timeout_seconds: int = Field(default=30, ge=5, le=120)
 
     @field_validator(

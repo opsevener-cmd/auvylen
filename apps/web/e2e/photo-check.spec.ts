@@ -33,7 +33,10 @@ test("photo check: consent, own-face confirmation, quota, appearance, hidden AI 
     uploads.push(body);
     checks += 1;
     const roasted = body.roast !== "off";
-    return route.fulfill({json: {id: "6b0b2f1e-4b5c-4d3e-9f10-2a3b4c5d6e7f", engine: "gemini-photo-check", model: "gemini-3.5-flash-lite",
+    // The first check is free (default model); the second is shown as an advanced one.
+    const advanced = checks > 1;
+    return route.fulfill({json: {id: "6b0b2f1e-4b5c-4d3e-9f10-2a3b4c5d6e7f", engine: "gemini-photo-check",
+      model: advanced ? "gemini-4-hydrogen" : "gemini-3.5-flash-lite", advanced,
       prompt_version: "photo-appearance-v1", created_at: new Date().toISOString(), funding: "free_signup", credits_charged: 0,
       free_checks_now: 4 - checks, next_free_on: null, photos: [
         // Below the 6.0 quality gate: technique feedback only, no appearance, band or roast.
@@ -60,6 +63,7 @@ test("photo check: consent, own-face confirmation, quota, appearance, hidden AI 
   await run.click();
   await expect(page.getByText("Best photo")).toBeVisible();
   await expect(page.getByText("This one was free.")).toBeVisible();
+  await expect(page.getByText("Advanced analysis")).toHaveCount(0);
   await expect(page.getByText("8.0")).toBeVisible();
   await expect(page.getByText("We can't analyse this photo.")).toBeVisible();
   await expect(page.locator("article").first()).toContainText("Best photo");
@@ -94,11 +98,13 @@ test("photo check: consent, own-face confirmation, quota, appearance, hidden AI 
   await expect(page.getByText("That ceiling light is auditioning for a crime drama.")).toBeVisible();
   await expect(page.getByText("Vibe: 90s Hong Kong film lead")).toBeVisible();
   expect(uploads[1].roast).toBe("spicy");
+  await expect(page.getByText("Advanced analysis")).toBeVisible();
 
   // Chinese copy.
   await page.getByRole("button", {name: "中文"}).click();
   await expect(page.getByRole("heading", {name: "你的哪张照片效果最好？"})).toBeVisible();
   await expect(page.getByText("氛围感：90 年代港片主角")).toBeVisible();
+  await expect(page.getByText("进阶分析")).toBeVisible();
   await expect(page.getByText("照片质量 5.0/10，按上面的建议重拍一张，再来看颜值评价。")).toBeVisible();
   // "Try another photo" goes straight back to choosing photos.
   await page.getByRole("button", {name: "换一张试试"}).click();

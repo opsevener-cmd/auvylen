@@ -47,9 +47,14 @@ back to Windows/WSL or local Docker. No cloud environment or paid server is assu
   user-facing path, including the photo check. The release gate refuses them
   (`rights_failures` in `aesthetic_checkpoint.py`). The local scoring pipeline stays
   disabled until a licensed, consented adult dataset passes that gate.
-- Photo check (owner decision, 2026-11-25; see docs/photo-check.md). It gives photo-technique
-  feedback plus appearance feedback, using Gemini 3.5 Flash-Lite on the Gemini API Standard
-  paid tier only (never the free or Contributor tier).
+- Photo check (owner decisions, 2026-11-25 and 2026-11-27; see docs/photo-check.md). It gives
+  photo-technique feedback plus appearance feedback, on the Gemini API Standard paid tier only
+  (never the free or Contributor tier).
+  - Two models: free checks use `GEMINI_MODEL` (default `gemini-3.5-flash-lite`); checks paid
+    with Credits, and the Owner's, use `GEMINI_MODEL_ADVANCED` (default `gemini-4-hydrogen`).
+    Both get the same prompt, safety rules, refusals and quality gate. Budget reservations and
+    spend use the chosen model's own token prices, and the lowest thinking level that returns
+    valid JSON, to keep output cost down.
   - Two stages, one call. Stage 1 is photo technique and is always shown. Only a photo whose
     technique score (mean of the six criteria, 1-10) is at least `QUALITY_GATE` (6.0) gets
     stage 2: appearance feedback, the AI impression band and roast. Below the gate, stage 2

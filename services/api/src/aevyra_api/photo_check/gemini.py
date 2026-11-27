@@ -247,6 +247,10 @@ class TokenEstimates:
 
 
 ESTIMATOR = TokenEstimates()
+# Thinking levels tried from the configured one upwards, lowest first, to keep output tokens
+# (billed) down. A model that rejects a level with HTTP 400 (no tokens billed) is retried once
+# at the next level. Thinking control is never dropped: a model's default could cost far more.
+THINKING_LADDER = ("minimal", "low")
 
 
 class GeminiPhotoQuality(TokenEstimates):
@@ -265,12 +269,19 @@ class GeminiPhotoQuality(TokenEstimates):
         self._api_key = api_key
         self.model = model
         self._thinking_level = thinking_level
+        # The level the last successful call actually used (after any 400 fallback).
+        self.thinking_used = thinking_level
         self._timeout = timeout
         self._transport = transport
 
     def request_body(
-        self, images: Sequence[bytes], language: Language, roast: RoastLevel = "off"
+        self,
+        images: Sequence[bytes],
+        language: Language,
+        roast: RoastLevel = "off",
+        thinking_level: str | None = None,
     ) -> dict[str, object]:
+        thinking = self._thinking_level if thinking_level is None else thinking_level
         parts: list[dict[str, object]] = [
             {"text": f"{len(images)} photo(s) follow, numbered from 0."}
         ]
@@ -286,8 +297,8 @@ class GeminiPhotoQuality(TokenEstimates):
             "maxOutputTokens": self.max_output_tokens(len(images)),
             "mediaResolution": "MEDIA_RESOLUTION_MEDIUM",
         }
-        if self._thinking_level:
-            config["thinkingConfig"] = {"thinkingLevel": self._thinking_level}
+        if thinking:
+            config["thinkingConfig"] = {"thinkingLevel": thinking}
         return {
             "systemInstruction": {
                 "parts": [
@@ -310,13 +321,21 @@ class GeminiPhotoQuality(TokenEstimates):
     def assess(
         self, images: Sequence[bytes], language: Language, roast: RoastLevel = "off"
     ) -> Assessment:
-        body = json.dumps(self.request_body(images, language, roast)).encode()
-        status, payload = self._transport(
-            ENDPOINT.format(model=self.model),
-            {"Content-Type": "application/json", "x-goog-api-key": self._api_key},
-            body,
-            self._timeout,
-        )
+        levels: tuple[str, ...] = (self._thinking_level,)
+        if self._thinking_level in THINKING_LADDER:
+            levels = THINKING_LADDER[THINKING_LADDER.index(self._thinking_level) :]
+        for attempt, level in enumerate(levels):
+            body = json.dumps(self.request_body(images, language, roast, level)).encode()
+            status, payload = self._transport(
+                ENDPOINT.format(model=self.model),
+                {"Content-Type": "application/json", "x-goog-api-key": self._api_key},
+                body,
+                self._timeout,
+            )
+            # 400 is how Gemini rejects an unsupported thinking level; nothing is billed.
+            if status != 400 or attempt == len(levels) - 1:
+                break
+        self.thinking_used = level
         if status == 429 or status >= 500:
             raise ProviderError("provider_unavailable", status_code=status)
         if status != 200:

@@ -28,10 +28,13 @@ from aevyra_api.photo_check.models import (
 )
 from aevyra_api.photo_check.safety import appearance_lines, roast_lines
 from aevyra_api.photo_check.service import (
+    ESTIMATOR,
     PhotoCheckService,
     micro_usd,
+    model_choice,
     passes_quality_gate,
     ranked_photos,
+    tier_for,
     week_start,
 )
 from aevyra_contracts.photo_check import CONSENT_VERSION, QUALITY_GATE, PhotoCheckPhoto
@@ -117,8 +120,8 @@ def configure(fixture, transport, **overrides):
     settings.free_hook_paid_tier_confirmed = True
     for name, value in overrides.items():
         setattr(settings, name, value)
-    fixture.client.app.state.photo_check_provider = lambda s: GeminiPhotoQuality(
-        TEST_KEY, s.free_hook_model, transport=transport
+    fixture.client.app.state.photo_check_provider = lambda s, choice: GeminiPhotoQuality(
+        TEST_KEY, choice.model, thinking_level=choice.thinking_level, transport=transport
     )
     return settings
 
@@ -505,8 +508,9 @@ def test_never_sends_or_stores_more_than_five_or_undecodable_photos(credits):
 def test_global_budget_pauses_the_check_before_it_can_be_exceeded(credits):
     register(credits.client)
     transport = FakeTransport([ok()])
-    # A full five-photo reservation is 1400+3500 input and 2550 output tokens: 7845 micro-USD.
-    configure(credits, transport, free_hook_daily_budget_usd=Decimal("0.009"))
+    # The pause threshold is a full five-photo reservation on the dearer (advanced) model:
+    # 4900 input tokens at $1.50/M plus 2550 output tokens at $7.50/M = 26475 micro-USD.
+    configure(credits, transport, free_hook_daily_budget_usd=Decimal("0.027"))
     accept(credits)
     assert submit(credits).status_code == 200
     current = status(credits)
@@ -852,3 +856,147 @@ def test_api_never_returns_or_stores_stage_two_for_a_photo_below_the_gate(credit
     low_stored = next(photo for photo in stored.result["photos"] if photo["index"] == 0)
     assert low_stored["appearance"] is None and low_stored["roast"] is None
     assert "band" not in json.dumps(low_stored)
+
+
+# --- Default and advanced models -----------------------------------------------------------
+
+HYDROGEN = "gemini-4-hydrogen"
+
+
+def models_called(transport):
+    return [url.split("/models/")[1].split(":")[0] for url, _, _ in transport.calls]
+
+
+@pytest.mark.parametrize(
+    ("funding", "tier"),
+    [
+        ("free_signup", "default"),
+        ("free_weekly", "default"),
+        ("credits", "advanced"),
+        ("owner", "advanced"),
+    ],
+)
+def test_model_follows_funding(funding, tier):
+    assert tier_for(funding) == tier
+
+
+def test_free_checks_use_the_default_model_and_paid_checks_the_advanced_one(credits):
+    user = register(credits.client)
+    transport = FakeTransport([ok(), ok(), ok()])
+    configure(credits, transport, photo_check_free_signup=1, photo_check_free_weekly=1)
+    accept(credits)
+    grant(credits, user["public_user_id"], 1)
+    signup, weekly, paid = (submit(credits).json() for _ in range(3))
+    assert [r["funding"] for r in (signup, weekly, paid)] == [
+        "free_signup",
+        "free_weekly",
+        "credits",
+    ]
+    assert [r["advanced"] for r in (signup, weekly, paid)] == [False, False, True]
+    assert paid["model"] == HYDROGEN and signup["model"] == "gemini-3.5-flash-lite"
+    assert models_called(transport) == ["gemini-3.5-flash-lite", "gemini-3.5-flash-lite", HYDROGEN]
+    # Same prompt, rules and schema for both models.
+    prompts = [body["systemInstruction"] for _, _, body in transport.calls]
+    schemas = [body["generationConfig"]["responseSchema"] for _, _, body in transport.calls]
+    assert prompts[0] == prompts[2] and schemas[0] == schemas[2]
+    with credits.sessions() as session:
+        rows = session.scalars(
+            select(PhotoCheckAnalysis).order_by(PhotoCheckAnalysis.created_at)
+        ).all()
+    assert [row.model for row in rows] == [
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash-lite",
+        HYDROGEN,
+    ]
+    # Settled at each model's price: 2000 input and 340 output tokens.
+    #   default:  2000 * 0.30 + 340 * 2.50 = 600 + 850   = 1450 micro-USD
+    #   advanced: 2000 * 1.50 + 340 * 7.50 = 3000 + 2550 = 5550 micro-USD
+    assert [row.cost_micro_usd for row in rows] == [1450, 1450, 5550]
+    with credits.sessions() as session:
+        budget = session.scalars(select(PhotoCheckBudgetDay)).one()
+    assert budget.spent_micro_usd == 1450 * 2 + 5550 and budget.reserved_micro_usd == 0
+
+
+def test_owner_checks_use_the_advanced_model(credits):
+    from test_owner import owner
+
+    owner(credits)
+    transport = FakeTransport([ok()])
+    configure(credits, transport)
+    accept(credits)
+    result = submit(credits).json()
+    assert result["funding"] == "owner" and result["advanced"] is True
+    assert models_called(transport) == [HYDROGEN]
+
+
+def test_reservations_and_spend_use_the_chosen_models_prices(credits):
+    settings = configure(credits, FakeTransport([]))
+    service = PhotoCheckService(credits.sessions, settings)
+    default, advanced = model_choice(settings, "default"), model_choice(settings, "advanced")
+    assert (advanced.model, advanced.price_input_per_m, advanced.price_output_per_m) == (
+        HYDROGEN,
+        Decimal("1.50"),
+        Decimal("7.50"),
+    )
+    # One photo: 2100 input and 750 output tokens reserved.
+    assert service.reservation(ESTIMATOR, 1, default) == 2100 * 0.30 + 750 * 2.50 == 2505
+    assert service.reservation(ESTIMATOR, 1, advanced) == 2100 * 1.50 + 750 * 7.50 == 8775
+    assert service.worst_case_reservation() == service.reservation(ESTIMATOR, 5, advanced)
+    from aevyra_api.photo_check.gemini import Usage
+
+    assert service.record_spend(Usage(1000, 100), advanced) == 1500 + 750
+    assert service.record_spend(Usage(1000, 100), default) == 300 + 250
+    with credits.sessions() as session:
+        assert session.scalars(select(PhotoCheckBudgetDay)).one().spent_micro_usd == 2250 + 550
+
+
+def test_prices_and_models_are_configurable(credits):
+    user = register(credits.client)
+    transport = FakeTransport([ok()])
+    configure(
+        credits,
+        transport,
+        photo_check_free_signup=0,
+        photo_check_free_weekly=0,
+        gemini_model_advanced="gemini-test-advanced",
+        gemini_advanced_price_input_per_m=Decimal("2.00"),
+        gemini_advanced_price_output_per_m=Decimal("10.00"),
+    )
+    accept(credits)
+    grant(credits, user["public_user_id"], 1)
+    assert submit(credits).json()["model"] == "gemini-test-advanced"
+    with credits.sessions() as session:
+        assert session.scalars(select(PhotoCheckAnalysis)).one().cost_micro_usd == 4000 + 3400
+
+
+def test_old_free_hook_model_setting_name_is_still_accepted(monkeypatch):
+    from aevyra_api.config import Settings
+
+    monkeypatch.setenv("FREE_HOOK_MODEL", "gemini-legacy-name")
+    assert Settings(api_environment="test", _env_file=None).gemini_model == "gemini-legacy-name"
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-new-name")
+    assert Settings(api_environment="test", _env_file=None).gemini_model == "gemini-new-name"
+
+
+def test_lowest_thinking_level_first_and_one_step_up_only_on_http_400():
+    transport = FakeTransport([(400, b""), (200, gemini_reply([photo_json(0)]))])
+    provider = GeminiPhotoQuality(TEST_KEY, HYDROGEN, thinking_level="minimal", transport=transport)
+    provider.assess([b"jpeg"], "en")
+    levels = [
+        body["generationConfig"]["thinkingConfig"]["thinkingLevel"]
+        for _, _, body in transport.calls
+    ]
+    assert levels == ["minimal", "low"] and provider.thinking_used == "low"
+    # Rejected at every level: it stops at "low" and never drops thinking control.
+    transport = FakeTransport([(400, b""), (400, b"")])
+    provider = GeminiPhotoQuality(TEST_KEY, HYDROGEN, thinking_level="minimal", transport=transport)
+    with pytest.raises(ProviderError, match="provider_rejected"):
+        provider.assess([b"jpeg"], "en")
+    assert len(transport.calls) == 2
+    assert all("thinkingConfig" in body["generationConfig"] for _, _, body in transport.calls)
+    # Other failures are never retried (they may be billed).
+    transport = FakeTransport([(200, b"not json")])
+    provider = GeminiPhotoQuality(TEST_KEY, HYDROGEN, thinking_level="minimal", transport=transport)
+    with pytest.raises(ProviderError, match="invalid_response"):
+        provider.assess([b"jpeg"], "en")
+    assert len(transport.calls) == 1

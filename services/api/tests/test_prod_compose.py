@@ -82,12 +82,16 @@ def test_free_hook_compose_defaults_match_application_defaults():
     from decimal import Decimal
 
     block = COMPOSE.split("x-app-environment: &app-environment", 1)[1].split("\nservices:", 1)[0]
-    defaults = dict(re.findall(r"((?:FREE_HOOK|PHOTO_CHECK)_[A-Z_]+): \$\{\1:-([^}]*)\}", block))
+    defaults = dict(
+        re.findall(
+            r"((?:FREE_HOOK|PHOTO_CHECK|GEMINI_MODEL|GEMINI_ADVANCED)[A-Z_]*): \$\{\1:-([^}]*)\}",
+            block,
+        )
+    )
     fields = Settings.model_fields
     assert set(defaults) == {
         "FREE_HOOK_ENABLED",
         "FREE_HOOK_PAID_TIER_CONFIRMED",
-        "FREE_HOOK_MODEL",
         "FREE_HOOK_DAILY_BUDGET_USD",
         "FREE_HOOK_PRICE_INPUT_PER_M",
         "FREE_HOOK_PRICE_OUTPUT_PER_M",
@@ -95,6 +99,11 @@ def test_free_hook_compose_defaults_match_application_defaults():
         "PHOTO_CHECK_FREE_SIGNUP",
         "PHOTO_CHECK_FREE_WEEKLY",
         "PHOTO_CHECK_CREDIT_COST",
+        "GEMINI_MODEL",
+        "GEMINI_MODEL_ADVANCED",
+        "GEMINI_ADVANCED_PRICE_INPUT_PER_M",
+        "GEMINI_ADVANCED_PRICE_OUTPUT_PER_M",
+        "GEMINI_ADVANCED_THINKING_LEVEL",
     }
     for name, value in defaults.items():
         default = fields[name.lower()].default
